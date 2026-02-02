@@ -46,7 +46,7 @@ export async function loadWeeklyReportsFromDatabase(): Promise<MonitorItem[]> {
     });
 
     // 获取数据库文件
-    const response = await fetch(`${import.meta.env.BASE_URL}competitor_data.db`);
+    const response = await fetch('competitor_data.db');
     if (!response.ok) {
       throw new Error(`Failed to fetch database: ${response.statusText}`);
     }

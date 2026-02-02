@@ -10,7 +10,7 @@ import type { MonitorItem, ReportDocument } from '../types';
  */
 export async function loadHotTrendReport(): Promise<MonitorItem[]> {
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}热点日报.md`);
+    const response = await fetch('热点日报.md');
     if (!response.ok) {
       console.error('Failed to load 热点日报.md');
       return [];
@@ -28,7 +28,7 @@ export async function loadHotTrendReport(): Promise<MonitorItem[]> {
  */
 export async function loadAIDailyReport(): Promise<MonitorItem[]> {
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}小红书周报.md`);
+    const response = await fetch('小红书周报.md');
     if (!response.ok) {
       console.error('Failed to load 小红书周报.md');
       return [];

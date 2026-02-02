@@ -59,7 +59,7 @@ function App() {
       try {
         // 并行加载游戏排行榜、周报和日报数据
         const [rankings, weeklyReportsFromDb, dailyReports] = await Promise.all([
-          loadGameRankingsFromCSV(`${import.meta.env.BASE_URL}周报谷歌表单.csv`).catch((error) => {
+          loadGameRankingsFromCSV('周报谷歌表单.csv').catch((error) => {
             console.error('Failed to load game rankings from CSV:', error);
             return mockGameRankings;
           }),

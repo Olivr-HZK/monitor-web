@@ -10,7 +10,7 @@ import type { MonitorItem, ReportDocument } from '../types';
  */
 export async function loadHotTrendReport(): Promise<MonitorItem[]> {
   try {
-    const response = await fetch('/热点日报.md');
+    const response = await fetch(`${import.meta.env.BASE_URL}热点日报.md`);
     if (!response.ok) {
       console.error('Failed to load 热点日报.md');
       return [];
@@ -28,7 +28,7 @@ export async function loadHotTrendReport(): Promise<MonitorItem[]> {
  */
 export async function loadAIDailyReport(): Promise<MonitorItem[]> {
   try {
-    const response = await fetch('/小红书周报.md');
+    const response = await fetch(`${import.meta.env.BASE_URL}小红书周报.md`);
     if (!response.ok) {
       console.error('Failed to load 小红书周报.md');
       return [];
@@ -153,7 +153,7 @@ function parseAIDailyReport(text: string): MonitorItem[] {
       time: doc.time ?? '08:00',
       views: 5000,
       engagement: 300,
-      description: doc.summary,
+      description: doc.summary ?? '',
       tags: doc.tags ?? [],
       language: '中文',
       trend: 'up',
@@ -220,13 +220,13 @@ function parseAIDailyReport(text: string): MonitorItem[] {
       time: doc.time ?? '09:00',
       views: Math.floor(3000 + Math.random() * 5000),
       engagement: Math.floor(200 + Math.random() * 500),
-      description: doc.summary,
+      description: doc.summary ?? '',
       tags: doc.tags ?? [],
       language: '中文',
       trend: 'up',
       sentiment: 'positive',
       score: doc.score,
-      url: link === '点击打开' ? '#' : link,
+      url: link === '点击打开' ? '#' : (link ?? '#'),
       reportContent: JSON.stringify(doc),
     });
     

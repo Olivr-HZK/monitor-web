@@ -3,7 +3,7 @@
  * 统一使用 ReportDocument 格式：标题、标签、时间、来源、摘要来自文档，正文仅渲染 content
  */
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { MonitorItem, ReportDocument } from '../types';
 import { toReportDocument } from '../utils/reportDocument';
 
@@ -129,7 +129,7 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
  */
 const MarkdownRenderer = ({ content }: { content: string }) => {
   const lines = content.split('\n');
-  const elements: JSX.Element[] = [];
+  const elements: React.JSX.Element[] = [];
   let currentParagraph: string[] = [];
   let listItems: string[] = [];
   let inList = false;
@@ -238,8 +238,8 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
 /**
  * 渲染行内 Markdown
  */
-function renderInlineMarkdown(text: string): JSX.Element[] {
-  const parts: (string | JSX.Element)[] = [];
+function renderInlineMarkdown(text: string): React.JSX.Element[] {
+  const parts: (string | React.JSX.Element)[] = [];
   let currentIndex = 0;
 
   // 处理粗体 **text**
@@ -265,7 +265,7 @@ function renderInlineMarkdown(text: string): JSX.Element[] {
 
   // 处理链接 [text](url)
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  const finalParts: (string | JSX.Element)[] = [];
+  const finalParts: (string | React.JSX.Element)[] = [];
   let linkLastIndex = 0;
 
   parts.forEach((part, partIndex) => {
@@ -296,7 +296,7 @@ function renderInlineMarkdown(text: string): JSX.Element[] {
     }
   });
 
-  return finalParts.length > 0 ? (finalParts as JSX.Element[]) : [<span key="empty">{text}</span>];
+  return finalParts.length > 0 ? (finalParts as React.JSX.Element[]) : [<span key="empty">{text}</span>];
 }
 
 export default WeeklyReportDetail;

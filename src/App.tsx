@@ -1,18 +1,35 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import MonitorList from './components/MonitorList';
 import GameRankingView from './components/GameRankingView';
 import Sidebar from './components/Sidebar';
 import WeeklyReportDetail from './components/WeeklyReportDetail';
+import Login from './components/Login';
 import { mockMonitorItems, mockMonitorSources } from './data/mockData';
 import { mockGameRankings } from './data/gameRankings';
 import { loadGameRankingsFromCSV } from './data/gameRankingLoader';
 import { loadWeeklyReportsFromDatabase } from './data/weeklyReportLoader';
 import { loadAllDailyReports } from './data/dailyReportLoader';
+import { loadReportDocuments } from './data/reportDocumentsLoader';
 import type { MonitorType } from './types';
 import type { GameRanking, GamePlatformKey, MonitorItem, CasualGameMainCategory, CasualGameCompetitorSub } from './types';
 
 function App() {
+  const { authMode, user, loading: authLoading, staticPasswordRequired, getDataUrl, logout } = useAuth();
+
+  // 后端模式：验证登录中
+  if (authMode === 'backend' && authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-gray-500">验证登录中…</p>
+      </div>
+    );
+  }
+  // 未登录时显示登录页：后端模式 或 静态模式但配置了访问密码
+  if ((authMode === 'backend' && !user) || (staticPasswordRequired && !user)) {
+    return <Login />;
+  }
   const [selectedType, setSelectedType] = useState<MonitorType | '全部'>('全部');
   const [gameRankings, setGameRankings] = useState<GameRanking[]>(mockGameRankings);
   const [monitorItems, setMonitorItems] = useState<MonitorItem[]>(mockMonitorItems);
@@ -53,22 +70,31 @@ function App() {
     // 保留当前筛选条件，不重置类型和公司
   };
 
-  // 加载CSV数据、周报数据和日报数据
+  // 加载CSV数据、周报数据和日报数据（静态模式或已登录后）
+  const shouldLoadData = authMode === 'static' || user;
   useEffect(() => {
+    if (!shouldLoadData) return;
     const loadData = async () => {
+      const useAuthData = authMode === 'backend' && user;
+      const csvUrl = useAuthData ? getDataUrl('周报谷歌表单.csv') : '周报谷歌表单.csv';
+      const dbUrl = useAuthData ? getDataUrl('competitor_data.db') : 'competitor_data.db';
+      const getDataUrlFn = useAuthData ? getDataUrl : undefined;
       try {
-        // 并行加载游戏排行榜、周报和日报数据
-        const [rankings, weeklyReportsFromDb, dailyReports] = await Promise.all([
-          loadGameRankingsFromCSV('周报谷歌表单.csv').catch((error) => {
+        const [rankings, weeklyReportsFromDb, dailyReports, reportDocuments] = await Promise.all([
+          loadGameRankingsFromCSV(csvUrl).catch((error) => {
             console.error('Failed to load game rankings from CSV:', error);
             return mockGameRankings;
           }),
-          loadWeeklyReportsFromDatabase().catch((error) => {
+          loadWeeklyReportsFromDatabase(dbUrl).catch((error) => {
             console.error('Failed to load weekly reports from database:', error);
             return [];
           }),
-          loadAllDailyReports().catch((error) => {
+          loadAllDailyReports(getDataUrlFn).catch((error) => {
             console.error('Failed to load daily reports:', error);
+            return [];
+          }),
+          loadReportDocuments(getDataUrlFn).catch((error) => {
+            console.error('Failed to load report_documents.json:', error);
             return [];
           })
         ]);
@@ -89,9 +115,10 @@ function App() {
           (item) => item.type === '竞品社媒监控'
         );
 
-        // 日报 + 周报 + 休闲游戏 mock + 竞品社媒 mock
+        // 日报 + report_documents（新 AI 日报）+ 周报 + 休闲游戏 mock + 竞品社媒 mock
         setMonitorItems([
           ...dailyReports,
+          ...reportDocuments,
           ...weeklyReportsFromDb,
           ...casualGameItems,
           ...competitorSocialItems
@@ -104,7 +131,7 @@ function App() {
     };
 
     loadData();
-  }, []);
+  }, [shouldLoadData, authMode, user, getDataUrl]);
 
   // 休闲游戏检测页面标题
   const getCasualGamePageTitle = () => {
@@ -138,7 +165,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header selectedType={selectedType} onTypeSelect={setSelectedType} />
+      <Header selectedType={selectedType} onTypeSelect={setSelectedType} user={user} onLogout={logout} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
           <div className="flex-1">

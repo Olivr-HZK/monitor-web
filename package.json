@@ -6,7 +6,9 @@
   "homepage": "https://Oliver-HZK.github.io/monitor-web/",
   "scripts": {
     "dev": "vite",
+    "dev:server": "cd server && npm run start",
     "build": "tsc -b && vite build",
+    "start": "npm run build && node server/server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",

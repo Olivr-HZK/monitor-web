@@ -29,8 +29,9 @@ export interface WeeklyReportContent {
 /**
  * 从数据库加载周报数据并转换为 MonitorItem
  * 每个公司每周一份周报（一个卡片）
+ * @param dbUrl 可选，默认 'competitor_data.db'；后端鉴权时传 getDataUrl('competitor_data.db')
  */
-export async function loadWeeklyReportsFromDatabase(): Promise<MonitorItem[]> {
+export async function loadWeeklyReportsFromDatabase(dbUrl: string = 'competitor_data.db'): Promise<MonitorItem[]> {
   try {
     // 使用 sql.js 读取数据库
     // 动态导入 sql.js
@@ -45,8 +46,9 @@ export async function loadWeeklyReportsFromDatabase(): Promise<MonitorItem[]> {
       }
     });
 
-    // 获取数据库文件
-    const response = await fetch('competitor_data.db');
+    // 获取数据库文件（支持 /api/data 鉴权）
+    const opts = dbUrl.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+    const response = await fetch(dbUrl, opts);
     if (!response.ok) {
       throw new Error(`Failed to fetch database: ${response.statusText}`);
     }

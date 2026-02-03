@@ -5,12 +5,17 @@
 
 import type { MonitorItem, ReportDocument } from '../types';
 
+/** 可选：后端鉴权时传入，用于拼接受保护数据 URL */
+type GetDataUrl = (filename: string) => string;
+
 /**
  * 解析热点日报 MD 文件
  */
-export async function loadHotTrendReport(): Promise<MonitorItem[]> {
+export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
-    const response = await fetch('热点日报.md');
+    const url = getDataUrl ? getDataUrl('热点日报.md') : '热点日报.md';
+    const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+    const response = await fetch(url, opts);
     if (!response.ok) {
       console.error('Failed to load 热点日报.md');
       return [];
@@ -26,9 +31,11 @@ export async function loadHotTrendReport(): Promise<MonitorItem[]> {
 /**
  * 解析小红书周报（AI日报）MD 文件
  */
-export async function loadAIDailyReport(): Promise<MonitorItem[]> {
+export async function loadAIDailyReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
-    const response = await fetch('小红书周报.md');
+    const url = getDataUrl ? getDataUrl('小红书周报.md') : '小红书周报.md';
+    const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+    const response = await fetch(url, opts);
     if (!response.ok) {
       console.error('Failed to load 小红书周报.md');
       return [];
@@ -237,13 +244,107 @@ function parseAIDailyReport(text: string): MonitorItem[] {
 }
 
 /**
- * 加载所有日报数据
+ * 解析 UA 素材日报 MD 文件
  */
-export async function loadAllDailyReports(): Promise<MonitorItem[]> {
-  const [hotTrend, aiDaily] = await Promise.all([
-    loadHotTrendReport(),
-    loadAIDailyReport(),
+export async function loadUADailyReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
+  try {
+    const url = getDataUrl ? getDataUrl('ua_report_daily.md') : 'ua_report_daily.md';
+    const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+    const response = await fetch(url, opts);
+    if (!response.ok) {
+      console.warn('Failed to load ua_report_daily.md');
+      return [];
+    }
+    const text = await response.text();
+    return parseUADailyReport(text);
+  } catch (error) {
+    console.error('Error loading UA daily report:', error);
+    return [];
+  }
+}
+
+/**
+ * 解析 UA 素材日报内容
+ */
+function parseUADailyReport(text: string): MonitorItem[] {
+  const items: MonitorItem[] = [];
+  
+  // 提取日期（格式：**日期**: 2026-02-03）
+  const dateMatch = text.match(/\*\*日期\*\*[：:]\s*(\d{4}-\d{2}-\d{2})/);
+  const reportDate = dateMatch ? dateMatch[1] : '';
+  const dateParts = reportDate.split('-');
+  const dateStr = dateParts.length >= 3 ? `${dateParts[1]}-${dateParts[2]}` : '02-03';
+  
+  // 提取素材来源
+  const sourceMatch = text.match(/\*\*素材来源\*\*[：:]\s*(.+?)(?=\n|$)/);
+  const source = sourceMatch ? sourceMatch[1].trim() : '广大大';
+  
+  // 提取标题（第一行 # UA 素材日报）
+  const titleMatch = text.match(/^#\s*(.+?)(?=\n|$)/m);
+  const title = titleMatch ? titleMatch[1].trim() : 'UA 素材日报';
+  
+  // 提取摘要（从"一、各公司 UA 素材概览"部分提取前几段作为摘要）
+  const overviewMatch = text.match(/## UA 素材日报[^\n]*\n\n(.+?)(?=###|##|$)/s);
+  let summary = '';
+  if (overviewMatch) {
+    const overviewText = overviewMatch[1].trim();
+    // 提取前300字符作为摘要
+    summary = overviewText.substring(0, 300).replace(/\n+/g, ' ').trim();
+    if (overviewText.length > 300) {
+      summary += '...';
+    }
+  }
+  
+  // 如果没有找到摘要，使用默认摘要
+  if (!summary) {
+    summary = `来自${source}的UA素材日报，涵盖9款竞品游戏的素材分析，包括视频时长、投放平台、展示估值等关键信息。`;
+  }
+  
+  // 创建 ReportDocument
+  const doc: ReportDocument = {
+    title: `${title} - ${reportDate}`,
+    tags: ['UA素材', '竞品', '素材分析', source],
+    date: dateStr,
+    time: '09:00',
+    source: source,
+    summary: summary,
+    content: text, // 保存完整的 markdown 内容
+  };
+  
+  items.push({
+    id: `ua-daily-${reportDate.replace(/-/g, '')}`,
+    type: '休闲游戏检测',
+    casualGameCategory: '竞品',
+    casualGameCompetitorSub: 'UA素材',
+    title: doc.title,
+    source: doc.source ?? source,
+    platform: source,
+    date: doc.date ?? dateStr,
+    time: doc.time ?? '09:00',
+    views: 0,
+    engagement: 0,
+    description: doc.summary ?? summary,
+    tags: doc.tags ?? ['UA素材', '竞品'],
+    language: '中文',
+    trend: 'stable',
+    sentiment: 'neutral',
+    url: '#',
+    reportContent: JSON.stringify(doc),
+  });
+  
+  return items;
+}
+
+/**
+ * 加载所有日报数据
+ * @param getDataUrl 可选，后端鉴权时传入
+ */
+export async function loadAllDailyReports(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
+  const [hotTrend, aiDaily, uaDaily] = await Promise.all([
+    loadHotTrendReport(getDataUrl),
+    loadAIDailyReport(getDataUrl),
+    loadUADailyReport(getDataUrl),
   ]);
   
-  return [...hotTrend, ...aiDaily];
+  return [...hotTrend, ...aiDaily, ...uaDaily];
 }

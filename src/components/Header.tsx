@@ -5,9 +5,12 @@ import type { MonitorType } from '../types';
 interface HeaderProps {
   selectedType?: MonitorType | '全部';
   onTypeSelect?: (type: MonitorType | '全部') => void;
+  /** 后端登录时显示用户名与退出 */
+  user?: string | null;
+  onLogout?: () => void;
 }
 
-const Header = ({ selectedType, onTypeSelect }: HeaderProps) => {
+const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const navItems = [
@@ -125,10 +128,21 @@ const Header = ({ selectedType, onTypeSelect }: HeaderProps) => {
               )}
             </button>
 
-            {/* User/Login button */}
-            <button className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-              登录
-            </button>
+            {/* User / Logout */}
+            {user && onLogout ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">{user}</span>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  退出
+                </button>
+              </div>
+            ) : (
+              <span className="px-4 py-2 text-sm text-gray-500">登录</span>
+            )}
           </div>
         </div>
       </div>

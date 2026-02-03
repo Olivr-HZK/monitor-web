@@ -63,7 +63,8 @@ function formatDate(dateStr: string): string {
  */
 export async function loadGameRankingsFromCSV(filePath: string): Promise<GameRanking[]> {
   try {
-    const response = await fetch(filePath);
+    const opts = filePath.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+    const response = await fetch(filePath, opts);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV file: ${response.statusText}`);
     }

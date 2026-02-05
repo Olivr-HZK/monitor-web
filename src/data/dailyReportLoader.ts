@@ -13,7 +13,7 @@ type GetDataUrl = (filename: string) => string;
  */
 export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
-    const url = getDataUrl ? getDataUrl('热点日报.md') : '热点日报.md';
+    const url = getDataUrl ? getDataUrl('热点/热点日报.md') : '热点/热点日报.md';
     const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
     const response = await fetch(url, opts);
     if (!response.ok) {
@@ -33,11 +33,11 @@ export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<Monit
  */
 export async function loadAIDailyReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
-    const url = getDataUrl ? getDataUrl('小红书周报.md') : '小红书周报.md';
+    const url = getDataUrl ? getDataUrl('ai热点/小红书周报.md') : 'ai热点/小红书周报.md';
     const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
     const response = await fetch(url, opts);
     if (!response.ok) {
-      console.error('Failed to load 小红书周报.md');
+      console.error('Failed to load ai热点/小红书周报.md');
       return [];
     }
     const text = await response.text();
@@ -96,7 +96,7 @@ function parseHotTrendReport(text: string): MonitorItem[] {
     summary,
     content: contentParts.join('\n') || summary || '暂无内容',
     score,
-    coverImage: '/img_v3_02ud_b81bf139-6ea7-4b85-9a02-757d54361c4g.jpg',
+    coverImage: '/热点/img_v3_02ud_b81bf139-6ea7-4b85-9a02-757d54361c4g.jpg',
   };
 
   items.push({
@@ -248,11 +248,11 @@ function parseAIDailyReport(text: string): MonitorItem[] {
  */
 export async function loadUADailyReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
-    const url = getDataUrl ? getDataUrl('ua_report_daily.md') : 'ua_report_daily.md';
+    const url = getDataUrl ? getDataUrl('休闲游戏检测/ua_report_daily.md') : '休闲游戏检测/ua_report_daily.md';
     const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
     const response = await fetch(url, opts);
     if (!response.ok) {
-      console.warn('Failed to load ua_report_daily.md');
+      console.warn('Failed to load 休闲游戏检测/ua_report_daily.md');
       return [];
     }
     const text = await response.text();

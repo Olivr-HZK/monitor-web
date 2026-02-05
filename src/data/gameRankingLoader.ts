@@ -217,3 +217,245 @@ export async function loadGameRankingsFromCSV(filePath: string): Promise<GameRan
     throw error;
   }
 }
+
+/**
+ * 公共：根据是否走后端 API，决定 fetch 选项
+ */
+function getFetchOptions(filePath: string): RequestInit {
+  return filePath.startsWith('/api')
+    ? { credentials: 'include' as RequestCredentials }
+    : {};
+}
+
+/**
+ * 从多个美国榜单 CSV 加载排行榜：
+ * - test_rankings_us_ios.csv        -> iOS Top Charts
+ * - test_rankings_us_android.csv    -> Android Top Charts
+ * - test_rank_changes_ios.csv       \
+ * - test_rank_changes_android.csv    \-> 榜单异动（合并）
+ */
+export interface UsChartsCsvConfig {
+  iosTop: string;
+  androidTop: string;
+  iosChanges: string;
+  androidChanges: string;
+}
+
+interface UsTopChartRow {
+  平台: string;
+  品类ID: string;
+  品类名称: string;
+  榜单类型: string;
+  国家: string;
+  排名: string;
+  'App ID': string;
+  应用名称: string;
+}
+
+interface UsChangeRow {
+  信号: string;
+  应用名称: string;
+  'App ID': string;
+  国家: string;
+  平台: string;
+  本周排名: string;
+  上周排名: string;
+  变化: string;
+  异动类型: string;
+}
+
+async function fetchCsvText(path: string): Promise<string> {
+  const response = await fetch(path, getFetchOptions(path));
+  if (!response.ok) {
+    throw new Error(`Failed to fetch CSV file: ${response.statusText}`);
+  }
+  return await response.text();
+}
+
+function parseCsv<T>(text: string): Promise<T[]> {
+  return new Promise<T[]>((resolve, reject) => {
+    Papa.parse<T>(text, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        resolve(results.data);
+      },
+      error: (error: Error) => {
+        reject(new Error(`CSV parsing error: ${error.message}`));
+      },
+    });
+  });
+}
+
+function getTodayDateString(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function normalizeGameRankingItemFromTopChartRow(
+  row: UsTopChartRow,
+  index: number,
+  platformLabel: string
+): GameRankingItem | null {
+  const rank = parseInt(row.排名?.trim() || '0', 10);
+  if (!rank || Number.isNaN(rank)) return null;
+
+  const name = row.应用名称?.trim();
+  if (!name) return null;
+
+  return {
+    id: `${platformLabel}-top-${index}-${rank}`,
+    rank,
+    name,
+    platformLabel,
+    country: row.国家?.trim() || undefined,
+    categoryId: row.品类ID?.trim() || undefined,
+    category: row.品类名称?.trim() || undefined,
+    listType: row.榜单类型?.trim() || undefined,
+    appId: row['App ID']?.trim() || undefined,
+    change: '--',
+    updateDate: getTodayDateString(),
+  };
+}
+
+function getChangePriority(changeType: string): number {
+  // 优先：排名飙升 / 新进榜单 -> 排名上升 -> 排名下跌 -> 其他
+  if (changeType.includes('排名飙升') || changeType.includes('新进榜')) return 1;
+  if (changeType.includes('排名上升')) return 2;
+  if (changeType.includes('排名下跌')) return 3;
+  return 4;
+}
+
+function normalizeGameRankingItemFromChangeRow(
+  row: UsChangeRow,
+  index: number
+): GameRankingItem | null {
+  const currentRank = parseInt(row.本周排名?.trim() || '0', 10);
+  if (!currentRank || Number.isNaN(currentRank)) return null;
+
+  const name = row.应用名称?.trim();
+  if (!name) return null;
+
+  const changeRaw = row.变化?.trim() || '--';
+
+  const changeType = row.异动类型?.trim() || '';
+  const platform = row.平台?.trim() || '';
+  const country = row.国家?.trim() || '';
+  const lastRank = row.上周排名?.trim();
+
+  return {
+    id: `us-change-${index}-${currentRank}`,
+    rank: currentRank,
+    name,
+    platformLabel: platform || undefined,
+    country: country || undefined,
+    appId: row['App ID']?.trim() || undefined,
+    lastRankRaw: lastRank,
+    changeType: changeType || undefined,
+    category: undefined,
+    change: changeRaw,
+    updateDate: getTodayDateString(),
+  };
+}
+
+export async function loadUsGameRankingsFromCSVs(config: UsChartsCsvConfig): Promise<GameRanking[]> {
+  try {
+    const [iosTopText, androidTopText, iosChangesText, androidChangesText] = await Promise.all([
+      fetchCsvText(config.iosTop),
+      fetchCsvText(config.androidTop),
+      fetchCsvText(config.iosChanges),
+      fetchCsvText(config.androidChanges),
+    ]);
+
+    const [iosTopRows, androidTopRows, iosChangeRows, androidChangeRows] = await Promise.all([
+      parseCsv<UsTopChartRow>(iosTopText),
+      parseCsv<UsTopChartRow>(androidTopText),
+      parseCsv<UsChangeRow>(iosChangesText),
+      parseCsv<UsChangeRow>(androidChangesText),
+    ]);
+
+    const iosItems: GameRankingItem[] = [];
+    iosTopRows.forEach((row, index) => {
+      const item = normalizeGameRankingItemFromTopChartRow(row, index, 'iOS');
+      if (item) iosItems.push(item);
+    });
+    iosItems.sort((a, b) => a.rank - b.rank);
+
+    const androidItems: GameRankingItem[] = [];
+    androidTopRows.forEach((row, index) => {
+      const item = normalizeGameRankingItemFromTopChartRow(row, index, 'Android');
+      if (item) androidItems.push(item);
+    });
+    androidItems.sort((a, b) => a.rank - b.rank);
+
+    const changeItems: GameRankingItem[] = [];
+    const allChangeRows: UsChangeRow[] = [...iosChangeRows, ...androidChangeRows];
+    allChangeRows.forEach((row, index) => {
+      const item = normalizeGameRankingItemFromChangeRow(row, index);
+      if (item) changeItems.push(item);
+    });
+
+    // 榜单异动排序：按异动类型优先级，其次按变化幅度（如果是 ↑/↓N），最后按本周排名
+    changeItems.sort((a, b) => {
+      const typeA = (a.changeType || '').toString();
+      const typeB = (b.changeType || '').toString();
+      const priorityA = getChangePriority(typeA);
+      const priorityB = getChangePriority(typeB);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+
+      const getDelta = (change: string): number => {
+        const c = change.trim();
+        if (!c || c === '--') return 0;
+        if (c.toUpperCase() === 'NEW') return Number.MAX_SAFE_INTEGER;
+        const num = parseInt(c.replace(/[↑↓]/g, ''), 10);
+        if (Number.isNaN(num)) return 0;
+        return num;
+      };
+
+      const deltaA = getDelta(a.change);
+      const deltaB = getDelta(b.change);
+      if (deltaA !== deltaB) return deltaB - deltaA; // 变化大的在前
+
+      return a.rank - b.rank;
+    });
+
+    const today = getTodayDateString();
+    const updateTime = `${today} 14:00`;
+
+    const rankings: GameRanking[] = [];
+
+    if (iosItems.length > 0) {
+      rankings.push({
+        type: 'iOS游戏',
+        title: 'ios top charts',
+        updateTime,
+        period: 'Top Charts',
+        items: iosItems,
+      });
+    }
+
+    if (androidItems.length > 0) {
+      rankings.push({
+        type: '安卓游戏',
+        title: 'android top charts',
+        updateTime,
+        period: 'Top Charts',
+        items: androidItems,
+      });
+    }
+
+    if (changeItems.length > 0) {
+      rankings.push({
+        type: '榜单异动' as GameRankingType,
+        title: '榜单异动',
+        updateTime,
+        period: '榜单异动',
+        items: changeItems,
+      });
+    }
+
+    return rankings;
+  } catch (error) {
+    console.error('Error loading US game rankings from CSVs:', error);
+    throw error;
+  }
+}

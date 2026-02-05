@@ -114,9 +114,27 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
           </div>
         )}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-          <div className="prose prose-lg max-w-none">
-            <MarkdownRenderer content={doc.content} />
-          </div>
+          {(!doc.content || !doc.content.trim() || doc.content.includes('暂无玩法说明') || doc.content === '暂无内容') ? (
+            <div className="prose prose-lg max-w-none">
+              <p className="text-gray-600 mb-4">暂无该游戏的玩法说明内容。</p>
+              <p className="text-gray-600">
+                详情信息请前往：{' '}
+                <a
+                  href="https://olivr-hzk.github.io/monitor-web/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  https://olivr-hzk.github.io/monitor-web/
+                </a>
+                {' '}查看。
+              </p>
+            </div>
+          ) : (
+            <div className="prose prose-lg max-w-none">
+              <MarkdownRenderer content={doc.content} />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -162,14 +180,18 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
     }
   };
 
-  lines.forEach((line, index) => {
+  const isTableRow = (s: string) => /^\|.+\|$/.test(s);
+  const parseTableRow = (s: string) => s.split('|').slice(1, -1).map((c) => c.trim());
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
     const trimmed = line.trim();
 
     // 空行
     if (!trimmed) {
       flushParagraph();
       flushList();
-      return;
+      continue;
     }
 
     // 标题
@@ -181,7 +203,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
           {trimmed.substring(2)}
         </h1>
       );
-      return;
+      continue;
     }
 
     if (trimmed.startsWith('## ')) {
@@ -192,7 +214,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
           {trimmed.substring(3)}
         </h2>
       );
-      return;
+      continue;
     }
 
     if (trimmed.startsWith('### ')) {
@@ -203,7 +225,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
           {trimmed.substring(4)}
         </h3>
       );
-      return;
+      continue;
     }
 
     // 分隔线
@@ -211,7 +233,48 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       flushParagraph();
       flushList();
       elements.push(<hr key={index} className="my-6 border-gray-300" />);
-      return;
+      continue;
+    }
+
+    // 表格：连续 |...| 行
+    if (isTableRow(trimmed)) {
+      flushParagraph();
+      flushList();
+      const tableRows: string[] = [trimmed];
+      while (index + 1 < lines.length && isTableRow(lines[index + 1].trim())) {
+        index++;
+        tableRows.push(lines[index].trim());
+      }
+      const isSeparator = (cells: string[]) => cells.every((c) => /^[-:]+$/.test(c));
+      const headerCells = parseTableRow(tableRows[0]);
+      const bodyRows = tableRows.slice(1).filter((row) => !isSeparator(parseTableRow(row)));
+      elements.push(
+        <div key={index} className="mb-6 overflow-x-auto">
+          <table className="min-w-full border border-gray-200 text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                {headerCells.map((cell, i) => (
+                  <th key={i} className="border border-gray-200 px-3 py-2 text-left font-semibold text-gray-700">
+                    {cell}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bodyRows.map((row, ri) => (
+                <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                  {parseTableRow(row).map((cell, ci) => (
+                    <td key={ci} className="border border-gray-200 px-3 py-2 text-gray-800">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
     }
 
     // 列表项
@@ -221,13 +284,13 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
         inList = true;
       }
       listItems.push(trimmed.substring(2));
-      return;
+      continue;
     }
 
     // 普通段落
     flushList();
     currentParagraph.push(line);
-  });
+  }
 
   flushParagraph();
   flushList();

@@ -29,6 +29,10 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
         return '🤖';
       case 'iOS游戏':
         return '🍎';
+      case '榜单异动':
+        return '📊';
+      case '竞品动态':
+        return '🏆';
       default:
         return '🎮';
     }
@@ -45,7 +49,7 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
           <p className="text-sm text-gray-600">
             {selectedPlatform
               ? '该平台小游戏周榜'
-              : '各平台周榜：微信、抖音、iOS、安卓'}
+              : 'US Top Charts & 榜单异动'}
           </p>
         </div>
         {onBack && (
@@ -119,7 +123,7 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
 
           {/* 排行榜表格 */}
           <div className="p-6">
-            <GameRankingTable items={activeRanking.items} />
+            <GameRankingTable items={activeRanking.items} rankingType={activeRanking.type} />
           </div>
         </div>
       )}

@@ -18,6 +18,7 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
     { label: 'AI热点', type: 'ai热点检测', active: selectedType === 'ai热点检测' },
     { label: '趋势检测', type: '热点趋势检测', active: selectedType === '热点趋势检测' },
     { label: '休闲游戏检测', type: '休闲游戏检测', active: selectedType === '休闲游戏检测' },
+    { label: 'AI产品检测', type: 'AI产品检测', active: selectedType === 'AI产品检测' },
   ];
 
   return (

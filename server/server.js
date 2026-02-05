@@ -86,22 +86,43 @@ app.post('/api/logout', (req, res) => {
 
 // 受保护的数据文件（从项目 public 目录读取）
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
-const ALLOWED_NAMES = new Set([
-  'competitor_data.db',
-  '周报谷歌表单.csv',
-  '热点日报.md',
-  '小红书周报.md',
-  'ua_report_daily.md',
-  'report_documents.json',
-]);
+// 允许的子目录前缀
+const ALLOWED_PREFIXES = ['ai产品/', 'ai热点/', '休闲游戏检测/'];
 
 app.get('/api/data/:filename', verifyAuth, (req, res) => {
   const raw = req.params.filename;
   const decoded = decodeURIComponent(raw);
-  if (!decoded || decoded.includes('..') || decoded.includes('/')) {
+  if (!decoded || decoded.includes('..')) {
     return res.status(400).json({ error: '非法路径' });
   }
-  if (!ALLOWED_NAMES.has(decoded)) {
+  
+  // 检查是否在允许的子目录中
+  const isInAllowedSubdir = ALLOWED_PREFIXES.some(prefix => decoded.startsWith(prefix));
+  
+  // 允许根目录文件或允许的子目录文件
+  if (decoded.includes('/')) {
+    if (!isInAllowedSubdir) {
+      return res.status(400).json({ error: '非法路径' });
+    }
+    const filePath = path.join(PUBLIC_DIR, decoded);
+    // 确保路径在 PUBLIC_DIR 下且不存在目录遍历
+    if (!filePath.startsWith(PUBLIC_DIR) || !fs.existsSync(filePath)) {
+      return res.status(404).json({ error: '文件不存在' });
+    }
+    return res.sendFile(filePath);
+  }
+  
+  // 根目录文件白名单
+  const ALLOWED_ROOT_FILES = new Set([
+    'competitor_data.db',
+    'videos.db',
+    '周报谷歌表单.csv',
+    '热点日报.md',
+    'report_documents.json',
+    'auth-config.json',
+  ]);
+  
+  if (!ALLOWED_ROOT_FILES.has(decoded)) {
     return res.status(404).json({ error: '文件不存在' });
   }
   const filePath = path.join(PUBLIC_DIR, decoded);

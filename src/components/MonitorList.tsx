@@ -1,22 +1,30 @@
 import { useState, useMemo } from 'react';
 import type { MonitorItem, MonitorType } from '../types';
-import type { GamePlatformKey, CasualGameMainCategory, CasualGameCompetitorSub } from '../types';
+import type { GamePlatformKey, CasualGameMainCategory, CasualGameCompetitorSub, AiProductSubCategory } from '../types';
 import MonitorCard from './MonitorCard';
 
 interface MonitorListProps {
   items: MonitorItem[];
   selectedType?: MonitorType | '全部';
+  /** 按公司筛选（竞品社媒动态-社媒监控时显示并生效） */
   selectedCompanyName?: string | null;
+  /** 公司选项列表（来自竞品社媒周报） */
+  companies?: string[];
+  onCompanySelect?: (company: string | null) => void;
   /** 休闲游戏检测：选中的大类（新游戏/新玩法/竞品） */
   selectedCasualGameCategory?: CasualGameMainCategory | null;
   /** 休闲游戏检测-新游戏：按平台筛选周报 */
   selectedGamePlatform?: GamePlatformKey | null;
-  /** 休闲游戏检测-竞品：选中的小类（社媒更新/UA素材） */
+  /** 休闲游戏检测-竞品动态：选中的小类（社媒监控/UA素材） */
   selectedCasualGameCompetitorSub?: CasualGameCompetitorSub | null;
+  /** AI产品检测：选中的子类（排行榜/产品周报/UA素材） */
+  selectedAiProductSub?: AiProductSubCategory | null;
   /** 自定义页面标题（如 休闲游戏检测 - 新游戏 - 微信） */
   pageTitle?: string;
   /** 标题右侧操作区（如 进入排行榜 按钮） */
   headerAction?: React.ReactNode;
+  /** 休闲游戏检测：当前数据块（微信/抖音 与 SensorTower 隔离，只显示对应来源的项） */
+  selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
   onItemClick?: (item: MonitorItem) => void;
 }
 
@@ -24,68 +32,81 @@ const MonitorList = ({
   items,
   selectedType: propSelectedType,
   selectedCompanyName,
+  companies = [],
+  onCompanySelect,
   selectedCasualGameCategory,
   selectedGamePlatform,
   selectedCasualGameCompetitorSub,
+  selectedAiProductSub,
   pageTitle,
   headerAction,
+  selectedCasualSourceSection,
   onItemClick
 }: MonitorListProps) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [internalSelectedType, setInternalSelectedType] = useState<MonitorType | '全部'>('全部');
   const [timeRange, setTimeRange] = useState('过去1周内');
   const [sortBy, setSortBy] = useState('默认排序');
+  /** 休闲游戏检测：按平台筛选（左侧筛选栏），仅当 selectedType === 休闲游戏检测 时生效 */
+  const [platformFilter, setPlatformFilter] = useState<GamePlatformKey | '全部'>('全部');
 
   // 使用prop中的selectedType，如果没有则使用内部状态
   const selectedType = propSelectedType !== undefined ? propSelectedType : internalSelectedType;
 
-  const monitorTypes: MonitorType[] = ['ai热点检测', '热点趋势检测', '休闲游戏检测'];
+  const monitorTypes: MonitorType[] = ['ai热点检测', '热点趋势检测', '休闲游戏检测', 'AI产品检测'];
 
   // 筛选和排序逻辑
   const filteredAndSortedItems = useMemo(() => {
     let filtered = items;
 
-    // 当为休闲游戏检测时，按大类、平台或竞品小类筛选（优先处理，因竞品-社媒更新需包含周报 type 竞品社媒监控）
+    // 休闲游戏检测：按 周报简要 / 新游戏 / 新玩法 / 玩法拆解 / 竞品动态；并与 微信/抖音 vs SensorTower 数据块隔离
     if (selectedType === '休闲游戏检测') {
-      // 按大类筛选
+      filtered = filtered.filter((item) => item.type === '休闲游戏检测');
+      if (selectedCasualSourceSection === 'sensortower') {
+        filtered = filtered.filter((item) => item.casualGameSource === 'sensortower');
+      } else {
+        filtered = filtered.filter((item) => item.casualGameSource !== 'sensortower');
+      }
       if (selectedCasualGameCategory) {
-        // 竞品 - 社媒更新：包含周报（type 竞品社媒监控）+ 休闲游戏检测-竞品-社媒更新
-        if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新') {
+        if (selectedCasualGameCategory === '玩法拆解') {
+          // 玩法拆解：合并「新游戏」+「新玩法」，可按平台筛选
           filtered = filtered.filter(
             (item) =>
-              item.type === '竞品社媒监控' ||
-              (item.type === '休闲游戏检测' &&
-                item.casualGameCategory === '竞品' &&
-                item.casualGameCompetitorSub === '社媒更新')
+              item.casualGameCategory === '新游戏' ||
+              item.casualGameCategory === '新玩法'
           );
-          // 公司筛选（针对竞品社媒监控周报）
-          if (selectedCompanyName) {
-            filtered = filtered.filter(
-              (item) =>
-                item.type !== '竞品社媒监控' || item.companyName === selectedCompanyName
-            );
+          if (platformFilter !== '全部' || selectedGamePlatform) {
+            const platform = platformFilter !== '全部' ? platformFilter : selectedGamePlatform;
+            if (platform) {
+              filtered = filtered.filter((item) => item.platform === platform);
+            }
           }
         } else {
-          filtered = filtered.filter((item) => item.type === '休闲游戏检测');
-          filtered = filtered.filter(
-            (item) => item.casualGameCategory === selectedCasualGameCategory
-          );
-          // 新游戏：按平台进一步筛选周报
-          if (selectedCasualGameCategory === '新游戏' && selectedGamePlatform) {
-            filtered = filtered.filter((item) => item.platform === selectedGamePlatform);
+          filtered = filtered.filter((item) => item.casualGameCategory === selectedCasualGameCategory);
+          if (selectedCasualGameCategory === '新游戏' && (platformFilter !== '全部' || selectedGamePlatform)) {
+            const platform = platformFilter !== '全部' ? platformFilter : selectedGamePlatform;
+            if (platform) filtered = filtered.filter((item) => item.platform === platform);
           }
-          // 竞品 - UA素材
-          if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === 'UA素材') {
-            filtered = filtered.filter(
-              (item) => item.casualGameCompetitorSub === 'UA素材'
-            );
+          if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub) {
+            filtered = filtered.filter((item) => item.casualGameCompetitorSub === selectedCasualGameCompetitorSub);
           }
         }
-      } else {
-        filtered = filtered.filter((item) => item.type === '休闲游戏检测');
+      }
+      // 竞品动态-社媒监控：同时包含「竞品社媒监控」类型的周报，并按公司筛选
+      if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新') {
+        let competitorSocial = items.filter((item) => item.type === '竞品社媒监控');
+        if (selectedCompanyName) {
+          competitorSocial = competitorSocial.filter((item) => item.companyName === selectedCompanyName);
+        }
+        filtered = [...filtered, ...competitorSocial];
+      }
+    } else if (selectedType === 'AI产品检测') {
+      filtered = filtered.filter((item) => item.type === 'AI产品检测');
+      if (selectedAiProductSub) {
+        filtered = filtered.filter((item) => item.aiProductSub === selectedAiProductSub);
       }
     } else if (selectedType !== '全部') {
-      // 非休闲游戏检测：按类型筛选
+      // 其他类型：按类型筛选
       filtered = filtered.filter(item => item.type === selectedType);
     }
 
@@ -122,6 +143,9 @@ const MonitorList = ({
     selectedCasualGameCategory,
     selectedGamePlatform,
     selectedCasualGameCompetitorSub,
+    selectedAiProductSub,
+    selectedCasualSourceSection,
+    platformFilter,
     sortBy
   ]);
 
@@ -135,9 +159,43 @@ const MonitorList = ({
         {headerAction}
       </div>
 
-      {/* Filters */}
+      {/* Filters：休闲游戏-新游戏「按平台筛选」；竞品动态-社媒监控「按公司筛选」 */}
       <div className="mb-6 space-y-4">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center justify-start gap-4">
+          {selectedType === '休闲游戏检测' && selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 whitespace-nowrap">按公司筛选</span>
+              <select
+                value={selectedCompanyName ?? ''}
+                onChange={(e) => onCompanySelect?.(e.target.value || null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">全部公司</option>
+                {companies.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {(selectedType === '休闲游戏检测' &&
+            (selectedCasualGameCategory === '新游戏' ||
+              selectedCasualGameCategory === '新玩法' ||
+              selectedCasualGameCategory === '玩法拆解')) && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 whitespace-nowrap">按平台筛选</span>
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value as GamePlatformKey | '全部')}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="全部">全部</option>
+                <option value="微信">微信</option>
+                <option value="抖音">抖音</option>
+                <option value="iOS">iOS</option>
+                <option value="安卓">安卓</option>
+              </select>
+            </div>
+          )}
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
@@ -177,13 +235,12 @@ const MonitorList = ({
             <option>评分最高</option>
             <option>评分最低</option>
           </select>
-        </div>
 
-        {/* Advanced Filters */}
-        <button
-          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-        >
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
           <svg
             className={`w-4 h-4 transition-transform ${
               showAdvancedFilters ? 'rotate-180' : ''
@@ -219,7 +276,8 @@ const MonitorList = ({
             />
           </svg>
           <span>高级筛选</span>
-        </button>
+          </button>
+        </div>
 
         {showAdvancedFilters && (
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">

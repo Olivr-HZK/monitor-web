@@ -1,10 +1,11 @@
-import type { GameRankingItem } from '../types';
+import type { GameRankingItem, GameRankingType } from '../types';
 
 interface GameRankingTableProps {
   items: GameRankingItem[];
+  rankingType: GameRankingType;
 }
 
-const GameRankingTable = ({ items }: GameRankingTableProps) => {
+const GameRankingTable = ({ items, rankingType }: GameRankingTableProps) => {
   const getRankChangeDisplay = (change: string) => {
     if (!change || change === '--' || change.trim() === '') {
       return (
@@ -59,28 +60,183 @@ const GameRankingTable = ({ items }: GameRankingTableProps) => {
     );
   };
 
-  const getRankBadgeColor = (rank: number) => {
-    if (rank === 1) return 'bg-yellow-500 text-white';
-    if (rank === 2) return 'bg-gray-400 text-white';
-    if (rank === 3) return 'bg-orange-500 text-white';
-    return 'bg-gray-200 text-gray-700';
-  };
+  const isChangeRanking = rankingType === '榜单异动';
+  const isCompetitorRanking = rankingType === '竞品动态';
+  const isMiniGameRanking = rankingType === '微信小游戏' || rankingType === '抖音小游戏';
 
+  // 微信/抖音小游戏榜单：排名、游戏名称、游戏类型、排名变化、监控日期、开发公司
+  if (isMiniGameRanking) {
+    return (
+      <div className="overflow-x-auto -mx-6">
+        <table className="w-full min-w-[800px]">
+          <thead>
+            <tr className="border-b-2 border-gray-200 bg-gray-50">
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">排名</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">游戏名称</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">游戏类型</th>
+              <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">排名变化</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">监控日期</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">开发公司</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {items.map((item, index) => (
+              <tr
+                key={item.id}
+                className={`hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+              >
+                <td className="py-4 px-6 whitespace-nowrap">
+                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
+                    {item.rank}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <div className="font-semibold text-gray-900 text-base">{item.name}</div>
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.category || '—'}
+                </td>
+                <td className="py-4 px-6 text-center whitespace-nowrap">
+                  {getRankChangeDisplay(item.change)}
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.updateDate || '—'}
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.developer || '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // 竞品动态（AI 品类销售）：排名、产品名称、品类、App ID、Android 下载量、Android 收入
+  if (isCompetitorRanking) {
+    return (
+      <div className="overflow-x-auto -mx-6">
+        <table className="w-full min-w-[1000px]">
+          <thead>
+            <tr className="border-b-2 border-gray-200 bg-gray-50">
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">排名</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">产品名称</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">品类</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">App ID</th>
+              <th className="text-right py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Android 下载量</th>
+              <th className="text-right py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Android 收入（估算）</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {items.map((item, index) => (
+              <tr
+                key={item.id}
+                className={`hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+              >
+                <td className="py-4 px-6 whitespace-nowrap">
+                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
+                    {item.rank}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <div className="font-semibold text-gray-900 text-base">{item.name}</div>
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.category || '—'}
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700 font-mono">
+                  {item.appId || '—'}
+                </td>
+                <td className="py-4 px-6 text-right whitespace-nowrap text-sm font-medium text-gray-700">
+                  {item.downloads || '—'}
+                </td>
+                <td className="py-4 px-6 text-right whitespace-nowrap text-sm font-medium text-gray-900">
+                  {item.score != null ? item.score.toLocaleString() : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // 榜单异动：本周 / 上周 / 异动类型，完全按异动 CSV 字段展示
+  if (isChangeRanking) {
+    return (
+      <div className="overflow-x-auto -mx-6">
+        <table className="w-full min-w-[1200px]">
+          <thead>
+            <tr className="border-b-2 border-gray-200 bg-gray-50">
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">信号</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">应用名称</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">App ID</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">国家</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">平台</th>
+              <th className="text-right py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">本周排名</th>
+              <th className="text-right py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">上周排名</th>
+              <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">变化</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">异动类型</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {items.map((item, index) => (
+              <tr
+                key={item.id}
+                className={`hover:bg-blue-50 transition-colors ${
+                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                }`}
+              >
+                <td className="py-4 px-6 whitespace-nowrap text-lg">
+                  {item.signal || '—'}
+                </td>
+                <td className="py-4 px-6">
+                  <div className="font-semibold text-gray-900 text-base">{item.name}</div>
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.appId || '—'}
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.country || '—'}
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.platformLabel || '—'}
+                </td>
+                <td className="py-4 px-6 text-right whitespace-nowrap font-semibold text-gray-900">
+                  {item.rank}
+                </td>
+                <td className="py-4 px-6 text-right whitespace-nowrap text-sm text-gray-700">
+                  {item.lastRankRaw || '-'}
+                </td>
+                <td className="py-4 px-6 text-center whitespace-nowrap">
+                  {getRankChangeDisplay(item.change)}
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-700">
+                  {item.changeType || '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Top Charts：完全按榜单 CSV 字段展示
   return (
     <div className="overflow-x-auto -mx-6">
       <table className="w-full min-w-[1200px]">
         <thead>
-          <tr className="border-b-2 border-gray-200 bg-gray-50">
-            <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">排名</th>
-            <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">游戏名称</th>
-            <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">开发商</th>
-            <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">分类</th>
-            <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">排名变化</th>
-            <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">玩法机制</th>
-            <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">基线微调创新点</th>
-            <th className="text-right py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">评分</th>
-            <th className="text-right py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">下载量</th>
-          </tr>
+            <tr className="border-b-2 border-gray-200 bg-gray-50">
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">排名</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">应用名称</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">App ID</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">平台</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">国家</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">榜单类型</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">品类名称</th>
+            </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {items.map((item, index) => (
@@ -90,81 +246,32 @@ const GameRankingTable = ({ items }: GameRankingTableProps) => {
                 index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
               }`}
             >
-              {/* 排名 */}
               <td className="py-4 px-6 whitespace-nowrap">
-                <span
-                  className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold ${getRankBadgeColor(item.rank)}`}
-                >
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
                   {item.rank}
                 </span>
               </td>
 
-              {/* 游戏名称 */}
               <td className="py-4 px-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md">
-                    {item.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 text-base">{item.name}</div>
-                  </div>
-                </div>
+                <div className="font-semibold text-gray-900 text-base">{item.name}</div>
               </td>
 
-              {/* 开发商 */}
               <td className="py-4 px-6">
-                <span className="text-sm text-gray-700">{item.developer}</span>
+                <span className="text-sm text-gray-700">{item.appId || '—'}</span>
               </td>
 
-              {/* 分类 */}
               <td className="py-4 px-6 whitespace-nowrap">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                  {item.category}
-                </span>
+                <span className="text-sm text-gray-700">{item.platformLabel || '—'}</span>
               </td>
 
-              {/* 变化 */}
-              <td className="py-4 px-6 text-center whitespace-nowrap">
-                {getRankChangeDisplay(item.change)}
+              <td className="py-4 px-6 whitespace-nowrap">
+                <span className="text-sm text-gray-700">{item.country || '—'}</span>
               </td>
-
-              {/* 玩法机制 */}
-              <td className="py-4 px-6 max-w-xs">
-                {item.mechanism ? (
-                  <div className="text-sm text-gray-700 line-clamp-2" title={item.mechanism}>
-                    {item.mechanism}
-                  </div>
-                ) : (
-                  <span className="text-sm text-gray-400">—</span>
-                )}
+              <td className="py-4 px-6 whitespace-nowrap">
+                <span className="text-sm text-gray-700">{item.listType || '—'}</span>
               </td>
-
-              {/* 基线微调创新点 */}
-              <td className="py-4 px-6 max-w-xs">
-                {item.microInnovations ? (
-                  <div className="text-sm text-gray-700 line-clamp-2" title={item.microInnovations}>
-                    {item.microInnovations}
-                  </div>
-                ) : (
-                  <span className="text-sm text-gray-400">—</span>
-                )}
-              </td>
-
-              {/* 评分 */}
-              <td className="py-4 px-6 text-right whitespace-nowrap">
-                {item.score && (
-                  <div className="flex items-center justify-end gap-1.5">
-                    <svg className="w-5 h-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span className="text-sm font-bold text-gray-900">{item.score}</span>
-                  </div>
-                )}
-              </td>
-
-              {/* 下载量 */}
-              <td className="py-4 px-6 text-right whitespace-nowrap">
-                <span className="text-sm font-medium text-gray-700">{item.downloads}</span>
+              <td className="py-4 px-6 whitespace-nowrap">
+                <span className="text-sm text-gray-700">{item.category || '—'}</span>
               </td>
             </tr>
           ))}

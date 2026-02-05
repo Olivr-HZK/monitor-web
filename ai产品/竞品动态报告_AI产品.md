@@ -7,8 +7,8 @@
 
 ## 本周要点速览
 
-- **监控范围**：本周持续跟踪 10 款 AI 产品（Nova、Perplexity、Remini 等聊天 / 修图类核心竞品）。
-- **头部格局**：Nova、Perplexity 在聊天类继续领跑；Remini 在修图类稳居第一，PhotoBoost、UpFoto 形成第二梯队。
-- **市场动向**：收入仍高度集中在美国，新兴市场中印度、巴西、印尼下载增量明显，ARPU 相对较低。
-- **产品策略信号**：头部产品在拉美、南亚等新兴市场持续拉量，整体呈「美国高 ARPU + 新兴市场放量」的组合。
-- **查看详情**：以上为极简播报，包含分国家的下载 / 收入明细及产品截图等内容，请前往网站内本期《AI 产品竞品动态报告》页面查看，或直接访问监测汇总平台：[https://olivr-hzk.github.io/monitor-web/](https://olivr-hzk.github.io/monitor-web/)。
+- **监控范围**：本周持续跟踪 10 款 AI 产品（Nova、Perplexity、Remini 等聊天 / 修图类核心竞品），覆盖**下载 & 收入监测 + UA 素材监测**两个维度。
+- **销售表现**：Nova、Perplexity 在聊天类继续领跑；Remini 在修图类稳居第一，PhotoBoost、UpFoto 形成第二梯队；收入高度集中在美国，新兴市场中印度、巴西、印尼下载增量明显、ARPU 相对较低。
+- **UA 素材概览**：对上述 10 款产品按 video enhancer / seek 分类梳理了主流投放素材（视频 / 图片）、投放平台（AdMob / Facebook / ASA 等）、展示估值与热度，用于观察竞品创意方向与投放强度。
+- **创意&投放建议**：沉淀了可复用的文案句式、Before&After 视觉对比等创意方向，以及平台选择、视频时长、节奏控制等投放策略，并补充了常见避坑提示（如 CTA 表达、文案缺失、本土化等）。
+- **查看详情**：以上为极简播报，本周 AI 产品监测的完整内容（销售监测 + UA 素材日报 + 创意灵感与投放建议 + 素材资源链接）请前往网站内本期《AI 产品竞品动态报告》页面查看，或直接访问监测汇总平台：[https://olivr-hzk.github.io/monitor-web/](https://olivr-hzk.github.io/monitor-web/)。

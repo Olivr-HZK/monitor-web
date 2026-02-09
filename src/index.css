@@ -20,7 +20,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #ffffff;
+  background-color: #0b1020;
+  color: #e5e7eb;
 }
 
 #root {

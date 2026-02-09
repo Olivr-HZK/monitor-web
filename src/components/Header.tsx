@@ -15,21 +15,21 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
 
   const navItems = [
     { label: '监测汇总', type: '全部', active: selectedType === '全部' },
-    { label: 'AI热点', type: 'ai热点检测', active: selectedType === 'ai热点检测' },
-    { label: '趋势检测', type: '热点趋势检测', active: selectedType === '热点趋势检测' },
-    { label: '休闲游戏检测', type: '休闲游戏检测', active: selectedType === '休闲游戏检测' },
-    { label: 'AI产品检测', type: 'AI产品检测', active: selectedType === 'AI产品检测' },
+    { label: 'AI热点', type: 'ai热点监测', active: selectedType === 'ai热点监测' },
+    { label: '趋势监测', type: '热点趋势监测', active: selectedType === '热点趋势监测' },
+    { label: '休闲游戏监测', type: '休闲游戏监测', active: selectedType === '休闲游戏监测' },
+    { label: 'AI产品监测', type: 'AI产品监测', active: selectedType === 'AI产品监测' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-slate-800/70 bg-slate-950/80 backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full">
-              <span className="text-xl">📊</span>
-              <span className="font-bold text-lg text-gray-900">监测汇总平台</span>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2">
+              <span className="text-xl">⚡</span>
+              <span className="font-bold text-lg text-white">监测汇总</span>
             </div>
           </div>
 
@@ -39,10 +39,10 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
               <button
                 key={item.label}
                 onClick={() => onTypeSelect?.(item.type as MonitorType | '全部')}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                className={`px-4 py-2 text-sm font-medium transition-colors rounded-full ${
                   item.active
-                    ? 'text-gray-900 font-semibold border-b-2 border-blue-500'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'text-white bg-white/10 border border-white/20'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
                 }`}
               >
                 {item.label}
@@ -51,11 +51,11 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
           </nav>
 
           {/* Right side actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {/* Search */}
-            <div className="hidden sm:flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-2">
+            <div className="hidden sm:flex items-center space-x-2 bg-slate-900/70 border border-slate-800 rounded-lg px-3 py-2">
               <svg
-                className="w-4 h-4 text-gray-400"
+                className="w-4 h-4 text-slate-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -70,13 +70,13 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
               <input
                 type="text"
                 placeholder="搜索监测内容..."
-                className="bg-transparent border-none outline-none text-sm text-gray-600 placeholder-gray-400 w-32"
+                className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder-slate-500 w-32"
               />
-              <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">K</span>
+              <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">K</span>
             </div>
 
             {/* Notifications */}
-            <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors relative">
+            <button className="p-2 text-slate-300 hover:text-white transition-colors relative">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -90,13 +90,13 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                 />
               </svg>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
             </button>
 
             {/* Dark mode toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+              className="p-2 text-slate-300 hover:text-white transition-colors"
             >
               {isDarkMode ? (
                 <svg
@@ -132,17 +132,17 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
             {/* User / Logout */}
             {user && onLogout ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">{user}</span>
+                <span className="text-sm text-slate-300">{user}</span>
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:bg-gray-50"
+                  className="px-3 py-1.5 text-sm text-slate-200 hover:text-white border border-slate-700 rounded hover:bg-slate-800"
                 >
                   退出
                 </button>
               </div>
             ) : (
-              <span className="px-4 py-2 text-sm text-gray-500">登录</span>
+              <span className="px-4 py-2 text-sm text-slate-500">登录</span>
             )}
           </div>
         </div>

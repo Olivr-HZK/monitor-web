@@ -68,6 +68,7 @@ def send_to_feishu(webhook: str, text: str) -> None:
             title = l.lstrip("#").strip() or title
             break
 
+    elements = build_feishu_elements_from_md(text)
     payload = {
         "msg_type": "interactive",
         "card": {
@@ -81,13 +82,7 @@ def send_to_feishu(webhook: str, text: str) -> None:
                 },
                 "template": "blue",
             },
-            "elements": [
-                {
-                    # 直接把简报 Markdown 内容作为一个 markdown 元素展示
-                    "tag": "markdown",
-                    "content": text,
-                },
-            ],
+            "elements": elements,
         },
     }
     status, resp_text = post_json(webhook, payload)
@@ -102,7 +97,7 @@ def send_to_wechat(webhook: str, text: str) -> None:
     payload = {
         "msgtype": "markdown",
         "markdown": {
-            "content": text,
+            "content": convert_md_tables_to_list(text),
         },
     }
     status, resp_text = post_json(webhook, payload)
@@ -168,6 +163,158 @@ def main() -> None:
         send_to_wechat(wechat_webhook, text)
 
 
+def _is_table_divider(line: str) -> bool:
+    stripped = line.strip()
+    if "|" not in stripped:
+        return False
+    cells = [c.strip() for c in stripped.strip("|").split("|")]
+    if not cells:
+        return False
+    for c in cells:
+        if not c:
+            return False
+        if not all(ch in "-: " for ch in c):
+            return False
+    return True
+
+
+def _parse_md_table(lines: list[str], start: int) -> tuple[int, list[str], list[list[str]]]:
+    header_line = lines[start]
+    divider_line = lines[start + 1]
+    headers = [c.strip() for c in header_line.strip().strip("|").split("|")]
+    if not _is_table_divider(divider_line):
+        return start, [], []
+    rows: list[list[str]] = []
+    i = start + 2
+    while i < len(lines):
+        line = lines[i]
+        if "|" not in line:
+            break
+        row = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(row) != len(headers):
+            break
+        rows.append(row)
+        i += 1
+    return i, headers, rows
+
+
+def split_md_and_tables(md: str) -> list[tuple[str, object]]:
+    lines = md.splitlines()
+    parts: list[tuple[str, object]] = []
+    buffer: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if (
+            i + 1 < len(lines)
+            and "|" in line
+            and _is_table_divider(lines[i + 1])
+        ):
+            if buffer:
+                parts.append(("md", "\n".join(buffer).rstrip()))
+                buffer = []
+            next_i, headers, rows = _parse_md_table(lines, i)
+            if headers and rows is not None:
+                parts.append(("table", {"headers": headers, "rows": rows}))
+                i = next_i
+                continue
+        buffer.append(line)
+        i += 1
+    if buffer:
+        parts.append(("md", "\n".join(buffer).rstrip()))
+    return parts
+
+
+def convert_md_tables_to_list(md: str) -> str:
+    parts = split_md_and_tables(md)
+    out_lines: list[str] = []
+    field_order = ["排名", "国家", "榜单", "平台", "下载量", "收益"]
+    header_aliases = {
+        "排名": ["排名", "当前排名"],
+        "国家": ["国家/地区", "国家"],
+        "榜单": ["榜单"],
+        "平台": ["平台"],
+        "下载量": ["下载量"],
+        "收益": ["收入", "收益"],
+    }
+    name_headers = ["产品名", "游戏名", "应用名", "名称", "标题"]
+    for kind, payload in parts:
+        if kind == "md":
+            text = str(payload).strip()
+            if text:
+                out_lines.append(text)
+            continue
+        headers = payload["headers"]
+        rows = payload["rows"]
+        out_lines.append("**表格**")
+        header_index = {h: i for i, h in enumerate(headers)}
+        for row in rows:
+            name = None
+            for h in name_headers:
+                if h in header_index:
+                    name = row[header_index[h]]
+                    break
+            if not name:
+                name = row[0] if row else "—"
+
+            fields = []
+            for label in field_order:
+                for h in header_aliases.get(label, []):
+                    if h in header_index:
+                        value = row[header_index[h]]
+                        if value:
+                            fields.append(f"{label}：{value}")
+                        break
+            if fields:
+                out_lines.append(f"- {name}（" + "，".join(fields) + "）")
+            else:
+                out_lines.append(f"- {name}")
+        out_lines.append("")
+    return "\n".join(out_lines).strip()
+
+
+def build_feishu_elements_from_md(md: str) -> list[dict]:
+    parts = split_md_and_tables(md)
+    elements: list[dict] = []
+    for kind, payload in parts:
+        if kind == "md":
+            text = str(payload).strip()
+            if text:
+                elements.append({"tag": "markdown", "content": text})
+            continue
+        headers = payload["headers"]
+        rows = payload["rows"]
+        if headers:
+            header_cols = []
+            for h in headers:
+                header_cols.append(
+                    {
+                        "tag": "column",
+                        "width": "weighted",
+                        "weight": 1,
+                        "vertical_align": "top",
+                        "elements": [{"tag": "markdown", "content": f"**{h}**"}],
+                    }
+                )
+            elements.append({"tag": "column_set", "flex_mode": "none", "columns": header_cols})
+        for row in rows:
+            cols = []
+            for v in row:
+                cols.append(
+                    {
+                        "tag": "column",
+                        "width": "weighted",
+                        "weight": 1,
+                        "vertical_align": "top",
+                        "elements": [{"tag": "markdown", "content": v or "—"}],
+                    }
+                )
+            elements.append({"tag": "column_set", "flex_mode": "none", "columns": cols})
+        elements.append({"tag": "hr"})
+    if not elements:
+        elements.append({"tag": "markdown", "content": md})
+    return elements
+
+
 if __name__ == "__main__":
     main()
-

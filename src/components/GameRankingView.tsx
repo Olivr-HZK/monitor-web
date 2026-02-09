@@ -6,7 +6,7 @@ interface GameRankingViewProps {
   rankings: GameRanking[];
   /** 只显示该平台的周榜；不传则显示全部平台标签页 */
   selectedPlatform?: GameRankingType | null;
-  /** 从休闲游戏检测跳转时传入，显示返回按钮 */
+  /** 从休闲游戏监测跳转时传入，显示返回按钮 */
   onBack?: () => void;
 }
 
@@ -43,10 +43,10 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
       {/* 标题 + 返回按钮（从周报页跳转时显示） */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-white mb-2">
             {selectedPlatform ? activeRanking?.title ?? '休闲游戏周榜' : '休闲游戏排行榜'}
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-400">
             {selectedPlatform
               ? '该平台小游戏周榜'
               : 'US Top Charts & 榜单异动'}
@@ -56,7 +56,7 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center px-3 py-2 rounded-md border border-slate-700 text-sm font-medium text-slate-200 bg-slate-900 hover:bg-slate-800 transition-colors"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7 7-7M3 12h18" />
@@ -68,7 +68,7 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
 
       {/* 仅当未指定平台时显示标签页切换 */}
       {!selectedPlatform && (
-        <div className="border-b-2 border-gray-200 mb-6">
+        <div className="border-b border-slate-800 mb-6">
           <nav className="flex space-x-2" aria-label="Tabs">
             {rankings.map((ranking) => (
               <button
@@ -78,15 +78,15 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
                   px-6 py-4 text-sm font-semibold transition-all relative
                   ${
                     activeTab === ranking.type
-                      ? 'text-blue-700'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'text-cyan-300'
+                      : 'text-slate-400 hover:text-white'
                   }
                 `}
               >
                 <span className="mr-2 text-lg">{getTabIcon(ranking.type)}</span>
                 {ranking.title}
                 {activeTab === ranking.type && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"></span>
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400"></span>
                 )}
               </button>
             ))}
@@ -96,27 +96,27 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack }: GameRankingView
 
       {/* 排行榜内容 */}
       {activeRanking && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+        <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-lg overflow-hidden">
           {/* 排行榜头部信息 */}
-          <div className="px-8 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+          <div className="px-8 py-5 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-950">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">{activeRanking.title}</h2>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
+                <h2 className="text-2xl font-bold text-white mb-1">{activeRanking.title}</h2>
+                <div className="flex items-center gap-4 text-sm text-slate-400">
                   <span className="flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     更新时间：{activeRanking.updateTime}
                   </span>
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md font-medium">
+                  <span className="px-2 py-0.5 bg-cyan-500/10 text-cyan-300 rounded-md font-medium border border-cyan-500/30">
                     {activeRanking.period}
                   </span>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">{activeRanking.items.length}</div>
-                <div className="text-sm text-gray-600">款游戏</div>
+                <div className="text-2xl font-bold text-white">{activeRanking.items.length}</div>
+                <div className="text-sm text-slate-400">款游戏</div>
               </div>
             </div>
           </div>

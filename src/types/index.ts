@@ -1,20 +1,20 @@
-export type MonitorType = 'ai热点检测' | '热点趋势检测' | '竞品社媒监控' | '休闲游戏检测' | 'AI产品检测';
+export type MonitorType = 'ai热点监测' | '热点趋势监测' | '竞品社媒监控' | '休闲游戏监测' | 'AI产品监测';
 
 /** AI产品检测下的子类（排行榜通过右上角按钮进入，不在此列） */
 export type AiProductSubCategory = '产品周报' | 'UA素材' | '竞品动态' | '新产品速览';
 
 export type GameRankingType = '微信小游戏' | '抖音小游戏' | '安卓游戏' | 'iOS游戏' | '榜单异动' | '竞品动态';
 
-/** 侧栏休闲游戏检测平台 key，与 GameRankingType 对应 */
+/** 侧栏休闲游戏监测平台 key，与 GameRankingType 对应 */
 export type GamePlatformKey = '微信' | '抖音' | 'iOS' | '安卓';
 
-/** 休闲游戏检测大类
+/** 休闲游戏监测大类
  * - 周报简要：按监控日期命名的完整报告
  * - 新游戏 / 新玩法：从榜单中自动抽取，用于玩法拆解
  * - 玩法拆解：汇总视图，同时包含 新游戏 + 新玩法
  * - 竞品：竞品动态（社媒更新 / UA素材）
  */
-export type CasualGameMainCategory = '新游戏' | '新玩法' | '玩法拆解' | '竞品' | '周报简要';
+export type CasualGameMainCategory = '新游戏' | '新玩法' | '玩法拆解' | '竞品' | '周报简要' | '商店页变化';
 
 /** 竞品下的两个小类 */
 export type CasualGameCompetitorSub = '社媒更新' | 'UA素材';
@@ -73,6 +73,8 @@ export interface SensorTowerTopItem {
   appId: string;
   /** 来自 app_metadata：应用/游戏名 */
   appName?: string;
+  /** 来自 app_metadata：应用商店 URL */
+  appUrl?: string;
   /** 来自 app_metadata：开发/发行公司 */
   publisherName?: string;
   /** 来自 app_metadata：发行日期 */
@@ -95,6 +97,8 @@ export interface SensorTowerRankChangeItem {
   changeType: string;
   /** 来自 app_metadata：应用/游戏名（若与 rank_changes.app_name 不同可覆盖） */
   metadataAppName?: string;
+  /** 来自 app_metadata：应用商店 URL */
+  appUrl?: string;
   /** 来自 app_metadata：开发/发行公司 */
   publisherName?: string;
   /** 来自 app_metadata：发行日期 */
@@ -103,6 +107,81 @@ export interface SensorTowerRankChangeItem {
   downloads?: number;
   /** 收入（rank_changes.revenue） */
   revenue?: number;
+}
+
+/** iOS App Store 商店信息（appstoreinfo 表） */
+export interface AppStoreInfo {
+  app_id: string;
+  app_name: string;
+  subtitle?: string;
+  price?: string;
+  price_type?: string;
+  rating?: number;
+  rating_count?: number;
+  age_rating?: string;
+  category?: string;
+  developer?: string;
+  description?: string;
+  description_short?: string;
+  store_url?: string;
+  icon_url?: string;
+  screenshot_urls?: string;
+  [key: string]: unknown;
+}
+
+/** Android 商店信息（gamestoreinfo 表） */
+export interface GameStoreInfo {
+  app_id: string;
+  title: string;
+  developer?: string;
+  rating?: number;
+  category?: string;
+  short_description?: string;
+  full_description?: string;
+  store_url?: string;
+  icon_url?: string;
+  screenshot_urls?: string;
+  installs?: string;
+  content_rating?: string;
+  [key: string]: unknown;
+}
+
+/** 新进 Top3 商店信息卡片（美国 iOS/Android 免费榜，含 appstoreinfo/gamestoreinfo） */
+export interface SensorTowerStoreCard {
+  id: string;
+  appId: string;
+  platform: 'iOS' | 'Android';
+  gameName: string;
+  currentRank: number;
+  country: string;
+  storeInfo: AppStoreInfo | GameStoreInfo | null;
+  /** 商店截图（首张） */
+  screenshotUrl?: string;
+  /** 简短描述（iOS description_short / Android short_description） */
+  shortDescription?: string;
+}
+
+/** 商店页变化记录（appstoreinfo_changes / gamestoreinfo_changes） */
+export interface SensorTowerStoreChangeItem {
+  id: string;
+  appId: string;
+  platform: 'iOS' | 'Android';
+  rankDate: string;
+  changedAt: string;
+  appName: string;
+  developer?: string;
+  summaries: string[];
+  storeUrl?: string;
+  screenshotUrls?: string[];
+  screenshotBefore?: string[];
+  screenshotAfter?: string[];
+  iconBefore?: string;
+  iconAfter?: string;
+  videoImagesBefore?: string[];
+  videoImagesAfter?: string[];
+  /** 优先级：2 最高（截图数量变化/截图字段变化），1 高（视频相关），0 普通 */
+  priority: 0 | 1 | 2;
+  priorityLabel: '最高' | '高' | '普通';
 }
 
 /**
@@ -143,7 +222,7 @@ export type ReportContentJson =
   | ReportContentWeeklyReport
   | ReportContentGameRanking;
 
-/** 热点日报（热点趋势检测） */
+/** 热点日报（热点趋势监测） */
 export interface ReportContentDailyHot {
   kind: 'daily_hot';
   title?: string;
@@ -155,7 +234,7 @@ export interface ReportContentDailyHot {
   coverImage?: string;
 }
 
-/** AI 日报单条（ai热点检测 - 小红书条目） */
+/** AI 日报单条（ai热点监测 - 小红书条目） */
 export interface ReportContentDailyAi {
   kind: 'daily_ai';
   title?: string;
@@ -198,7 +277,7 @@ export interface ReportContentGameRanking {
   items: GameRankingItem[];
 }
 
-/** 检测内容 kind 枚举 */
+/** 监测内容 kind 枚举 */
 export type ReportContentKind =
   | 'daily_hot'
   | 'daily_ai'
@@ -206,7 +285,7 @@ export type ReportContentKind =
   | 'weekly_report'
   | 'game_ranking';
 
-/** 检测内容 JSON 的版本与根字段（可选，用于扩展） */
+/** 监测内容 JSON 的版本与根字段（可选，用于扩展） */
 export interface ReportContentSchema {
   version?: '1.0';
   kind: ReportContentKind;
@@ -220,13 +299,13 @@ export interface MonitorItem {
   source: string;
   platform: string;
   companyName?: string; // 公司名（用于竞品周报筛选）
-  /** 休闲游戏检测：大类（新游戏/新玩法/竞品） */
+  /** 休闲游戏监测：大类（新游戏/新玩法/竞品） */
   casualGameCategory?: CasualGameMainCategory;
-  /** 休闲游戏检测-数据来源块：仅微信/抖音 或 仅 SensorTower，用于前后端隔离 */
+  /** 休闲游戏监测-数据来源块：仅微信/抖音 或 仅 SensorTower，用于前后端隔离 */
   casualGameSource?: 'wechat_douyin' | 'sensortower';
-  /** 休闲游戏检测-竞品：小类（社媒更新/UA素材） */
+  /** 休闲游戏监测-竞品：小类（社媒更新/UA素材） */
   casualGameCompetitorSub?: CasualGameCompetitorSub;
-  /** AI产品检测：子类（排行榜/产品周报/UA素材） */
+  /** AI产品监测：子类（排行榜/产品周报/UA素材） */
   aiProductSub?: AiProductSubCategory;
   date: string;
   time: string;

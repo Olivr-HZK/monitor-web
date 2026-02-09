@@ -500,7 +500,7 @@ async function buildItemsFromCsv(
     };
     const item: MonitorItem = {
       id: `reports-${category}-${csvId}-${i}-${name}`,
-      type: '休闲游戏检测',
+      type: '休闲游戏监测',
       casualGameCategory: category,
       casualGameSource: 'wechat_douyin',
       title: name,
@@ -647,7 +647,7 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
     const dateStr = doc.date ?? '';
     items.push({
       id: `reports-weekly-db-${weekRange}`,
-      type: '休闲游戏检测',
+      type: '休闲游戏监测',
       casualGameCategory: '周报简要',
       casualGameSource: 'wechat_douyin',
       title: doc.title,
@@ -691,7 +691,7 @@ export async function loadFullReportsByDate(getDataUrl?: GetDataUrl): Promise<Mo
       };
       items.push({
         id: `reports-weekly-${monitorDate}`,
-        type: '休闲游戏检测',
+        type: '休闲游戏监测',
         casualGameCategory: '周报简要',
         casualGameSource: 'wechat_douyin',
         title: doc.title,

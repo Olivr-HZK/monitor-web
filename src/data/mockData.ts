@@ -1,7 +1,7 @@
 import type { MonitorItem, MonitorSource } from '../types';
 
 export const mockMonitorItems: MonitorItem[] = [
-  // AI热点检测 和 热点趋势检测 数据从 dailyReportLoader 加载
+  // AI热点监测 和 热点趋势监测 数据从 dailyReportLoader 加载
   // 竞品社媒监控
   {
     id: '6',
@@ -13,7 +13,7 @@ export const mockMonitorItems: MonitorItem[] = [
     time: '13:20',
     views: 8900,
     engagement: 456,
-    description: '竞品A今日在官方微博宣布智能代码审查助手正式上线，该功能可以自动检测代码问题、提供优化建议，并支持多种编程语言...',
+    description: '竞品A今日在官方微博宣布智能代码审查助手正式上线，该功能可以自动监测代码问题、提供优化建议，并支持多种编程语言...',
     tags: ['竞品', '代码审查', '新功能', '微博'],
     language: '中文',
     trend: 'stable',
@@ -122,10 +122,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // 休闲游戏检测 - 新游戏 - 微信小游戏周报
+  // 休闲游戏监测 - 新游戏 - 微信小游戏周报
   {
     id: 'cg-wx-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新游戏',
     title: '微信小游戏周报 2026-01-19~01-25',
     source: '引力引擎',
@@ -143,7 +143,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'cg-wx-2',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新游戏',
     title: '微信小游戏周报 2026-01-12~01-18',
     source: '引力引擎',
@@ -159,10 +159,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'neutral',
     url: '#'
   },
-  // 休闲游戏检测 - 新游戏 - 抖音小游戏周报
+  // 休闲游戏监测 - 新游戏 - 抖音小游戏周报
   {
     id: 'cg-dy-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新游戏',
     title: '抖音小游戏周报 2026-01-19~01-25',
     source: '引力引擎',
@@ -180,7 +180,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'cg-dy-2',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新游戏',
     title: '抖音小游戏周报 2026-01-12~01-18',
     source: '引力引擎',
@@ -196,10 +196,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'neutral',
     url: '#'
   },
-  // 休闲游戏检测 - 新游戏 - iOS 游戏周报
+  // 休闲游戏监测 - 新游戏 - iOS 游戏周报
   {
     id: 'cg-ios-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新游戏',
     title: 'iOS 游戏排行榜周报 2026-01-19~01-25',
     source: 'SensorTower',
@@ -215,10 +215,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // 休闲游戏检测 - 新游戏 - 安卓游戏周报
+  // 休闲游戏监测 - 新游戏 - 安卓游戏周报
   {
     id: 'cg-android-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新游戏',
     title: '安卓游戏排行榜周报 2026-01-19~01-25',
     source: 'SensorTower',
@@ -234,10 +234,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // 休闲游戏检测 - 新玩法
+  // 休闲游戏监测 - 新玩法
   {
     id: 'cg-newplay-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新玩法',
     title: '合成+消除融合玩法分析：2026年Q1爆款趋势',
     source: '玩法研究院',
@@ -255,7 +255,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'cg-newplay-2',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '新玩法',
     title: '轻度解谜玩法微创新：脑洞类游戏设计拆解',
     source: '玩法研究院',
@@ -271,10 +271,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'neutral',
     url: '#'
   },
-  // 休闲游戏检测 - 竞品 - 社媒更新
+  // 休闲游戏监测 - 竞品 - 社媒更新
   {
     id: 'cg-comp-sm-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '竞品',
     casualGameCompetitorSub: '社媒更新',
     title: '某爆款小游戏官方微博发布春节活动预告',
@@ -293,7 +293,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'cg-comp-sm-2',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '竞品',
     casualGameCompetitorSub: '社媒更新',
     title: '某消除游戏抖音账号发布新关卡挑战视频',
@@ -310,10 +310,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // 休闲游戏检测 - 竞品 - UA素材
+  // 休闲游戏监测 - 竞品 - UA素材
   {
     id: 'cg-comp-ua-1',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '竞品',
     casualGameCompetitorSub: 'UA素材',
     title: '某合成游戏信息流素材汇总（微信/穿山甲）',
@@ -332,7 +332,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'cg-comp-ua-2',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '竞品',
     casualGameCompetitorSub: 'UA素材',
     title: '某找茬游戏巨量引擎素材创意分析',
@@ -349,10 +349,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // AI产品检测 - 产品周报
+  // AI产品监测 - 产品周报
   {
     id: 'ai-product-report-1',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: '产品周报',
     title: 'AI 产品周报 2026-01-20~01-26',
     source: '产品监测',
@@ -370,7 +370,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'ai-product-report-2',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: '产品周报',
     title: 'AI 产品周报 2026-01-13~01-19',
     source: '产品监测',
@@ -386,10 +386,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'neutral',
     url: '#'
   },
-  // AI产品检测 - UA素材
+  // AI产品监测 - UA素材
   {
     id: 'ai-product-ua-1',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: 'UA素材',
     title: 'AI 应用信息流素材汇总（Google / Meta）',
     source: '素材库',
@@ -407,7 +407,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'ai-product-ua-2',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: 'UA素材',
     title: 'AI 工具类应用可玩广告与插屏素材分析',
     source: '素材库',
@@ -423,10 +423,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // AI产品检测 - 竞品动态
+  // AI产品监测 - 竞品动态
   {
     id: 'ai-product-comp-1',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: '竞品动态',
     title: 'ChatGPT 上线新功能：多模态推理助手',
     source: '产品动态',
@@ -444,7 +444,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'ai-product-comp-2',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: '竞品动态',
     title: '文心一言与多家企业达成战略合作',
     source: '产品动态',
@@ -460,10 +460,10 @@ export const mockMonitorItems: MonitorItem[] = [
     sentiment: 'positive',
     url: '#'
   },
-  // AI产品检测 - 新产品速览
+  // AI产品监测 - 新产品速览
   {
     id: 'ai-product-new-1',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: '新产品速览',
     title: '新品速览：Claude 3.5 上线代码解释与长文档能力',
     source: '新产品',
@@ -481,7 +481,7 @@ export const mockMonitorItems: MonitorItem[] = [
   },
   {
     id: 'ai-product-new-2',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     aiProductSub: '新产品速览',
     title: '新品速览：多款 AI 写作工具登陆应用商店',
     source: '新产品',
@@ -504,14 +504,14 @@ export const mockMonitorSources: MonitorSource[] = [
     id: '1',
     name: 'AI热点监测',
     icon: '🤖',
-    type: 'ai热点检测',
+    type: 'ai热点监测',
     count: 156
   },
   {
     id: '2',
-    name: '趋势分析中心',
+    name: '趋势监测中心',
     icon: '📈',
-    type: '热点趋势检测',
+    type: '热点趋势监测',
     count: 89
   },
   {
@@ -572,17 +572,17 @@ export const mockMonitorSources: MonitorSource[] = [
   },
   {
     id: 'cg1',
-    name: '微信',
+    name: '微信小游戏',
     icon: '💬',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     count: 0,
     platform: '微信'
   },
   {
     id: 'cg2',
-    name: '抖音',
+    name: '抖音小游戏',
     icon: '🎵',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     count: 0,
     platform: '抖音'
   },
@@ -590,7 +590,7 @@ export const mockMonitorSources: MonitorSource[] = [
     id: 'cg3',
     name: 'iOS',
     icon: '🍎',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     count: 0,
     platform: 'iOS'
   },
@@ -598,15 +598,15 @@ export const mockMonitorSources: MonitorSource[] = [
     id: 'cg4',
     name: '安卓',
     icon: '🤖',
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     count: 0,
     platform: '安卓'
   },
   {
     id: 'aip1',
-    name: 'AI产品检测',
+    name: 'AI产品监测',
     icon: '✨',
-    type: 'AI产品检测',
+    type: 'AI产品监测',
     count: 0,
     platform: '排行榜/产品周报/UA素材'
   }

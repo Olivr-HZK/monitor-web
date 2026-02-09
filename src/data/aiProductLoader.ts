@@ -1,8 +1,8 @@
 /**
- * AI产品检测相关数据加载
+ * AI产品监测相关数据加载
  * - 竞品动态报告_AI产品.md → 竞品动态列表项（可点击看全文）
  * - ai_sales_batch_crawler.csv → 排行榜「竞品动态」（按收入排序）
- * - ai_products_report_daily.md → UA素材日报（AI产品检测 - UA素材）
+ * - ai_products_report_daily.md → UA素材日报（AI产品监测 - UA素材）
  */
 
 import type { GameRanking, GameRankingItem, GameRankingType } from '../types';
@@ -18,7 +18,7 @@ function getFetchOptions(url: string): RequestInit {
 }
 
 /**
- * 加载竞品动态报告 Markdown，转为一条 MonitorItem（AI产品检测 - 竞品动态），点击可进详情看全文
+ * 加载竞品动态报告 Markdown，转为一条 MonitorItem（AI产品监测 - 竞品动态），点击可进详情看全文
  */
 export async function loadCompetitorReportMd(
   getDataUrl?: (filename: string) => string
@@ -41,7 +41,7 @@ export async function loadCompetitorReportMd(
 
     const item: MonitorItem = {
       id: 'ai-competitor-report-md',
-      type: 'AI产品检测',
+      type: 'AI产品监测',
       aiProductSub: '竞品动态',
       title: doc.title,
       source: doc.source ?? '竞品动态',
@@ -152,7 +152,7 @@ export async function loadAiSalesRankingFromCsv(
 }
 
 /**
- * 加载 AI 产品 UA 素材日报 Markdown，转为一条 MonitorItem（AI产品检测 - UA素材），点击可进详情看全文
+ * 加载 AI 产品 UA 素材日报 Markdown，转为一条 MonitorItem（AI产品监测 - UA素材），点击可进详情看全文
  */
 export async function loadAiProductUADailyReport(
   getDataUrl?: (filename: string) => string
@@ -206,7 +206,7 @@ export async function loadAiProductUADailyReport(
 
     const item: MonitorItem = {
       id: `ai-product-ua-daily-${reportDate.replace(/-/g, '')}`,
-      type: 'AI产品检测',
+      type: 'AI产品监测',
       aiProductSub: 'UA素材',
       title: doc.title,
       source: doc.source ?? source,

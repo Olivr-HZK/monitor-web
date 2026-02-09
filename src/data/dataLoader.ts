@@ -11,7 +11,7 @@ import type { MonitorItem, MonitorSource } from '../types';
  * 
  * CSV 格式示例：
  * id,type,title,source,platform,date,time,views,engagement,description,tags,language,trend,sentiment
- * 1,ai热点检测,标题,来源,平台,01-28,14:30,12500,892,描述,"AI,GPT-5",中文,up,positive
+ * 1,ai热点监测,标题,来源,平台,01-28,14:30,12500,892,描述,"AI,GPT-5",中文,up,positive
  */
 export async function parseCSV(_filePath: string): Promise<MonitorItem[]> {
   // 示例实现 - 需要安装 papaparse

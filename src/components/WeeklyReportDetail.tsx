@@ -10,6 +10,8 @@ import { toReportDocument } from '../utils/reportDocument';
 interface WeeklyReportDetailProps {
   item: MonitorItem;
   onBack: () => void;
+  storeChangeItemMap?: Map<string, MonitorItem>;
+  onOpenStoreChange?: (item: MonitorItem) => void;
 }
 
 /** 判断并解析为统一格式 ReportDocument（含 content 即视为统一格式） */
@@ -43,7 +45,7 @@ function parseAsReportDocument(
   return toReportDocument(raw, item);
 }
 
-const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
+const WeeklyReportDetail = ({ item, onBack, storeChangeItemMap, onOpenStoreChange }: WeeklyReportDetailProps) => {
   const doc = useMemo(() => {
     if (!item.reportContent) {
       return {
@@ -61,14 +63,65 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
     return parseAsReportDocument(item.reportContent, item);
   }, [item]);
 
+  const isAiHotspot = item.type === 'ai热点监测';
+  const isHotTrend = item.type === '热点趋势监测';
+  const isDailySummary =
+    isHotTrend &&
+    ((typeof doc.meta === 'object' && doc.meta && 'kind' in doc.meta && doc.meta.kind === 'daily_summary') ||
+      (doc.tags ?? []).includes('每日汇总'));
+  const originalUrl =
+    (typeof doc.meta === 'object' && doc.meta && 'url' in doc.meta && typeof doc.meta.url === 'string'
+      ? doc.meta.url
+      : undefined) ||
+    item.url;
+  const storeChangeMeta =
+    typeof doc.meta === 'object' && doc.meta && 'kind' in doc.meta && doc.meta.kind === 'store_change'
+      ? (doc.meta as {
+          changedAt?: string;
+          platform?: string;
+          developer?: string;
+          storeUrl?: string;
+          priority?: string;
+          summaries?: string[];
+          screenshots?: { before?: string[]; after?: string[] };
+          icon?: { before?: string; after?: string };
+          videoImages?: { before?: string[]; after?: string[] };
+        })
+      : null;
+  const sensortowerWeeklyMeta =
+    typeof doc.meta === 'object' && doc.meta && 'kind' in doc.meta && doc.meta.kind === 'sensortower_weekly'
+      ? (doc.meta as {
+          storeChanges?: Array<{
+            id: string;
+            appName: string;
+            platform?: string;
+            changedAt?: string;
+            storeUrl?: string;
+            summaries?: string[];
+          }>;
+        })
+      : null;
+
+  const extractSection = (content: string, heading: string) => {
+    const pattern = new RegExp(`##\\s*${heading}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, 'm');
+    const match = content.match(pattern);
+    return match ? match[1].trim() : '';
+  };
+
+  const hotTrendSummary = doc.content ? extractSection(doc.content, '摘要') : '';
+  const hotTrendUA = doc.content ? extractSection(doc.content, 'UA灵感') : '';
+  const hotTrendGen = doc.content ? extractSection(doc.content, '生成适配') : '';
+  const hotTrendLink =
+    doc.content ? extractSection(doc.content, '原文链接').split(/\s+/).find((v) => v.startsWith('http')) : undefined;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-200 bg-slate-900 border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -76,8 +129,8 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
               返回
             </button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">{doc.title}</h1>
-              <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 flex-wrap">
+              <h1 className="text-2xl font-bold text-white">{doc.title}</h1>
+              <div className="flex items-center gap-4 mt-1 text-sm text-slate-400 flex-wrap">
                 {doc.source && <span>{doc.source}</span>}
                 {doc.date && <span>•</span>}
                 {doc.date && <span>{doc.date}</span>}
@@ -88,7 +141,7 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <span className="text-yellow-500">⭐</span>
-                      <span className="font-semibold">{doc.score.toFixed(1)}</span>
+                      <span className="font-semibold text-slate-100">{doc.score.toFixed(1)}</span>
                     </span>
                   </>
                 )}
@@ -96,7 +149,7 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
               {doc.tags && doc.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {doc.tags.map((tag, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
+                    <span key={i} className="px-2 py-0.5 bg-slate-800 text-slate-200 rounded text-xs border border-slate-700">
                       {tag}
                     </span>
                   ))}
@@ -109,21 +162,291 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {doc.coverImage && (
-          <div className="mb-6 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+          <div className="mb-6 rounded-xl overflow-hidden border border-slate-800 shadow-sm">
             <img src={doc.coverImage} alt={doc.title} className="w-full max-h-80 object-cover" />
           </div>
         )}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-          {(!doc.content || !doc.content.trim() || doc.content.includes('暂无玩法说明') || doc.content === '暂无内容') ? (
-            <div className="prose prose-lg max-w-none">
-              <p className="text-gray-600 mb-4">暂无该游戏的玩法说明内容。</p>
-              <p className="text-gray-600">
+        <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-sm p-8">
+          {isHotTrend ? (
+            isDailySummary ? (
+              <div className="prose prose-invert prose-lg max-w-none">
+                <MarkdownRenderer content={doc.content || doc.summary || item.description || '暂无汇总内容。'} />
+              </div>
+            ) : (
+              <div className="prose prose-invert prose-lg max-w-none space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">摘要</h2>
+                  <p className="text-slate-200 whitespace-pre-wrap">
+                    {hotTrendSummary || doc.summary || item.description || '暂无摘要内容。'}
+                  </p>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white">UA 灵感</h2>
+                  <p className="text-slate-200 whitespace-pre-wrap">
+                    {hotTrendUA || '暂无 UA 灵感内容。'}
+                  </p>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white">生成适配</h2>
+                  <p className="text-slate-200 whitespace-pre-wrap">
+                    {hotTrendGen || '暂无生成适配内容。'}
+                  </p>
+                </div>
+                {(hotTrendLink || originalUrl) && (
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">原文链接</h2>
+                    <a
+                      href={hotTrendLink || originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-300 hover:underline"
+                    >
+                      {hotTrendLink || originalUrl}
+                    </a>
+                  </div>
+                )}
+              </div>
+            )
+          ) : storeChangeMeta ? (
+            <div className="space-y-8 text-slate-200">
+              <div className="space-y-2">
+                <div className="text-lg font-semibold text-white">{doc.title}</div>
+                <div>变动时间：{storeChangeMeta.changedAt || doc.date || '—'}</div>
+                <div>平台：{storeChangeMeta.platform || item.platform || '—'}</div>
+                <div>开发者：{storeChangeMeta.developer || '—'}</div>
+                {storeChangeMeta.storeUrl && (
+                  <div>
+                    商店链接：
+                    <a
+                      href={storeChangeMeta.storeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-300 hover:underline ml-1"
+                    >
+                      {storeChangeMeta.storeUrl}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-3">变更项</h2>
+                {storeChangeMeta.summaries && storeChangeMeta.summaries.length > 0 ? (
+                  <ul className="list-disc list-inside space-y-2">
+                    {storeChangeMeta.summaries.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-slate-400">暂无变更项。</div>
+                )}
+              </div>
+
+              {(storeChangeMeta.screenshots?.before?.length || storeChangeMeta.screenshots?.after?.length) && (
+                <div>
+                  <h2 className="text-xl font-semibold text-white mb-3">截图对比</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-medium text-slate-400 mb-2">更新前</div>
+                      <div className="space-y-3">
+                        {(storeChangeMeta.screenshots?.before ?? []).length > 0 ? (
+                          storeChangeMeta.screenshots?.before?.map((url, idx) => (
+                            <img
+                              key={`before-${idx}`}
+                              src={url}
+                              alt="更新前截图"
+                              className="w-full h-48 object-contain rounded-lg border border-slate-800 bg-slate-950/40"
+                              loading="lazy"
+                            />
+                          ))
+                        ) : (
+                          <div className="text-slate-500 text-sm">（无）</div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-slate-400 mb-2">更新后</div>
+                      <div className="space-y-3">
+                        {(storeChangeMeta.screenshots?.after ?? []).length > 0 ? (
+                          storeChangeMeta.screenshots?.after?.map((url, idx) => (
+                            <img
+                              key={`after-${idx}`}
+                              src={url}
+                              alt="更新后截图"
+                              className="w-full h-48 object-contain rounded-lg border border-slate-800 bg-slate-950/40"
+                              loading="lazy"
+                            />
+                          ))
+                        ) : (
+                          <div className="text-slate-500 text-sm">（无）</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(storeChangeMeta.icon?.before || storeChangeMeta.icon?.after) && (
+                <div>
+                  <h2 className="text-xl font-semibold text-white mb-3">图标对比</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-medium text-slate-400 mb-2">更新前</div>
+                      {storeChangeMeta.icon?.before ? (
+                        <img
+                          src={storeChangeMeta.icon.before}
+                          alt="更新前图标"
+                          className="w-24 h-24 object-contain rounded-xl border border-slate-800 bg-slate-950/40"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="text-slate-500 text-sm">（无）</div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-slate-400 mb-2">更新后</div>
+                      {storeChangeMeta.icon?.after ? (
+                        <img
+                          src={storeChangeMeta.icon.after}
+                          alt="更新后图标"
+                          className="w-24 h-24 object-contain rounded-xl border border-slate-800 bg-slate-950/40"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="text-slate-500 text-sm">（无）</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(storeChangeMeta.videoImages?.before?.length || storeChangeMeta.videoImages?.after?.length) && (
+                <div>
+                  <h2 className="text-xl font-semibold text-white mb-3">视频/视频图对比</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-medium text-slate-400 mb-2">更新前</div>
+                      <div className="space-y-3">
+                        {(storeChangeMeta.videoImages?.before ?? []).length > 0 ? (
+                          storeChangeMeta.videoImages?.before?.map((url, idx) => (
+                            <img
+                              key={`video-before-${idx}`}
+                              src={url}
+                              alt="更新前视频图"
+                              className="w-full h-48 object-contain rounded-lg border border-slate-800 bg-slate-950/40"
+                              loading="lazy"
+                            />
+                          ))
+                        ) : (
+                          <div className="text-slate-500 text-sm">（无）</div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-slate-400 mb-2">更新后</div>
+                      <div className="space-y-3">
+                        {(storeChangeMeta.videoImages?.after ?? []).length > 0 ? (
+                          storeChangeMeta.videoImages?.after?.map((url, idx) => (
+                            <img
+                              key={`video-after-${idx}`}
+                              src={url}
+                              alt="更新后视频图"
+                              className="w-full h-48 object-contain rounded-lg border border-slate-800 bg-slate-950/40"
+                              loading="lazy"
+                            />
+                          ))
+                        ) : (
+                          <div className="text-slate-500 text-sm">（无）</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : sensortowerWeeklyMeta ? (
+            <div className="prose prose-invert prose-lg max-w-none">
+              <MarkdownRenderer content={doc.content || doc.summary || item.description || '暂无内容'} />
+              {sensortowerWeeklyMeta.storeChanges && sensortowerWeeklyMeta.storeChanges.length > 0 && (
+                <div className="mt-8">
+                  <h2 className="text-2xl font-bold text-white mb-4">商店页变化</h2>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border border-slate-800 text-sm">
+                      <thead>
+                        <tr className="bg-slate-900/80">
+                          <th className="px-3 py-2 text-left text-slate-400">游戏名</th>
+                          <th className="px-3 py-2 text-left text-slate-400">变动时间</th>
+                          <th className="px-3 py-2 text-left text-slate-400">平台</th>
+                          <th className="px-3 py-2 text-left text-slate-400">主要变化</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {sensortowerWeeklyMeta.storeChanges.map((row) => {
+                          const linkedItem = storeChangeItemMap?.get(row.id);
+                          return (
+                            <tr key={row.id} className="hover:bg-slate-900/60">
+                              <td className="px-3 py-2 text-cyan-300">
+                                {linkedItem && onOpenStoreChange ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenStoreChange(linkedItem)}
+                                    className="text-cyan-300 hover:underline"
+                                  >
+                                    {row.appName}
+                                  </button>
+                                ) : row.storeUrl ? (
+                                  <a
+                                    href={row.storeUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-cyan-300 hover:underline"
+                                  >
+                                    {row.appName}
+                                  </a>
+                                ) : (
+                                  <span>{row.appName}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-slate-300">{row.changedAt || '—'}</td>
+                              <td className="px-3 py-2 text-slate-300">{row.platform || '—'}</td>
+                              <td className="px-3 py-2 text-slate-300">
+                                {row.summaries && row.summaries.length > 0 ? row.summaries.join('，') : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : isAiHotspot ? (
+            <div className="prose prose-invert prose-lg max-w-none">
+              <MarkdownRenderer content={doc.content || doc.summary || item.description || '暂无内容'} />
+              {originalUrl && originalUrl !== '#' && (
+                <p className="mt-4">
+                  <a
+                    href={originalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyan-300 hover:underline"
+                  >
+                    原文链接
+                  </a>
+                </p>
+              )}
+            </div>
+          ) : (!doc.content || !doc.content.trim() || doc.content.includes('暂无玩法说明') || doc.content === '暂无内容') ? (
+            <div className="prose prose-invert prose-lg max-w-none">
+              <p className="text-slate-300 mb-4">暂无该游戏的玩法说明内容。</p>
+              <p className="text-slate-300">
                 详情信息请前往：{' '}
                 <a
                   href="https://olivr-hzk.github.io/monitor-web/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-cyan-300 hover:underline"
                 >
                   https://olivr-hzk.github.io/monitor-web/
                 </a>
@@ -131,7 +454,7 @@ const WeeklyReportDetail = ({ item, onBack }: WeeklyReportDetailProps) => {
               </p>
             </div>
           ) : (
-            <div className="prose prose-lg max-w-none">
+            <div className="prose prose-invert prose-lg max-w-none">
               <MarkdownRenderer content={doc.content} />
             </div>
           )}
@@ -157,7 +480,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       const text = currentParagraph.join(' ');
       if (text.trim()) {
         elements.push(
-          <p key={elements.length} className="mb-4 text-gray-700 leading-relaxed">
+          <p key={elements.length} className="mb-4 text-slate-200 leading-relaxed">
             {renderInlineMarkdown(text)}
           </p>
         );
@@ -169,7 +492,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
   const flushList = () => {
     if (listItems.length > 0) {
       elements.push(
-        <ul key={elements.length} className="mb-4 list-disc list-inside space-y-2 text-gray-700">
+        <ul key={elements.length} className="mb-4 list-disc list-inside space-y-2 text-slate-200">
           {listItems.map((item, idx) => (
             <li key={idx}>{renderInlineMarkdown(item)}</li>
           ))}
@@ -194,12 +517,30 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       continue;
     }
 
+    // 图片：单行 Markdown 图片 ![alt](url)
+    const imageMatch = trimmed.match(/^!\[[^\]]*\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      flushParagraph();
+      flushList();
+      elements.push(
+        <div key={`img-${index}`} className="mb-4">
+          <img
+            src={imageMatch[1]}
+            alt="截图"
+            className="w-full max-h-96 object-contain rounded-lg border border-slate-800 bg-slate-950/40"
+            loading="lazy"
+          />
+        </div>
+      );
+      continue;
+    }
+
     // 标题
     if (trimmed.startsWith('# ')) {
       flushParagraph();
       flushList();
       elements.push(
-        <h1 key={index} className="text-3xl font-bold mb-4 mt-6 text-gray-900">
+        <h1 key={index} className="text-3xl font-bold mb-4 mt-6 text-white">
           {trimmed.substring(2)}
         </h1>
       );
@@ -210,7 +551,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       flushParagraph();
       flushList();
       elements.push(
-        <h2 key={index} className="text-2xl font-bold mb-3 mt-5 text-gray-900">
+        <h2 key={index} className="text-2xl font-bold mb-3 mt-5 text-white">
           {trimmed.substring(3)}
         </h2>
       );
@@ -221,7 +562,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       flushParagraph();
       flushList();
       elements.push(
-        <h3 key={index} className="text-xl font-bold mb-2 mt-4 text-gray-900">
+        <h3 key={index} className="text-xl font-bold mb-2 mt-4 text-white">
           {trimmed.substring(4)}
         </h3>
       );
@@ -232,7 +573,7 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
     if (trimmed === '---' || trimmed.startsWith('---')) {
       flushParagraph();
       flushList();
-      elements.push(<hr key={index} className="my-6 border-gray-300" />);
+      elements.push(<hr key={index} className="my-6 border-slate-700" />);
       continue;
     }
 
@@ -250,11 +591,11 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       const bodyRows = tableRows.slice(1).filter((row) => !isSeparator(parseTableRow(row)));
       elements.push(
         <div key={index} className="mb-6 overflow-x-auto">
-          <table className="min-w-full border border-gray-200 text-sm">
+          <table className="min-w-full border border-slate-800 text-sm">
             <thead>
-              <tr className="bg-gray-50">
+              <tr className="bg-slate-900">
                 {headerCells.map((cell, i) => (
-                  <th key={i} className="border border-gray-200 px-3 py-2 text-left font-semibold text-gray-700">
+                  <th key={i} className="border border-slate-800 px-3 py-2 text-left font-semibold text-slate-200">
                     {cell}
                   </th>
                 ))}
@@ -262,9 +603,9 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
             </thead>
             <tbody>
               {bodyRows.map((row, ri) => (
-                <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                <tr key={ri} className={ri % 2 === 0 ? 'bg-slate-950/60' : 'bg-slate-900/60'}>
                   {parseTableRow(row).map((cell, ci) => (
-                    <td key={ci} className="border border-gray-200 px-3 py-2 text-gray-800">
+                    <td key={ci} className="border border-slate-800 px-3 py-2 text-slate-200">
                       {cell}
                     </td>
                   ))}
@@ -277,13 +618,16 @@ const MarkdownRenderer = ({ content }: { content: string }) => {
       continue;
     }
 
-    // 列表项
-    if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+    // 列表项：无序列表（• - *）或有序列表（1. 2. 等）
+    const unorderedListMatch = trimmed.match(/^[•\-\*]\s+(.+)$/);
+    const orderedListMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (unorderedListMatch || orderedListMatch) {
       flushParagraph();
       if (!inList) {
         inList = true;
       }
-      listItems.push(trimmed.substring(2));
+      const content = unorderedListMatch ? unorderedListMatch[1] : orderedListMatch![1];
+      listItems.push(content);
       continue;
     }
 
@@ -315,7 +659,7 @@ function renderInlineMarkdown(text: string): React.JSX.Element[] {
       parts.push(text.substring(lastIndex, match.index));
     }
     parts.push(
-      <strong key={currentIndex++} className="font-semibold text-gray-900">
+      <strong key={currentIndex++} className="font-semibold text-white">
         {match[1]}
       </strong>
     );
@@ -343,7 +687,7 @@ function renderInlineMarkdown(text: string): React.JSX.Element[] {
             href={match[2]}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 underline"
+            className="text-cyan-300 hover:text-cyan-200 underline"
           >
             {match[1]}
           </a>
@@ -359,7 +703,41 @@ function renderInlineMarkdown(text: string): React.JSX.Element[] {
     }
   });
 
-  return finalParts.length > 0 ? (finalParts as React.JSX.Element[]) : [<span key="empty">{text}</span>];
+  // 处理裸链接（https://...）
+  const urlRegex = /(https?:\/\/[^\s)]+)/g;
+  const withUrls: (string | React.JSX.Element)[] = [];
+
+  finalParts.forEach((part, partIndex) => {
+    if (typeof part === 'string') {
+      let lastUrlIndex = 0;
+      let urlMatch: RegExpExecArray | null;
+      while ((urlMatch = urlRegex.exec(part)) !== null) {
+        if (urlMatch.index > lastUrlIndex) {
+          withUrls.push(part.substring(lastUrlIndex, urlMatch.index));
+        }
+        const url = urlMatch[1];
+        withUrls.push(
+          <a
+            key={`url-${partIndex}-${currentIndex++}`}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-300 hover:text-cyan-200 underline"
+          >
+            {url}
+          </a>
+        );
+        lastUrlIndex = urlMatch.index + urlMatch[0].length;
+      }
+      if (lastUrlIndex < part.length) {
+        withUrls.push(part.substring(lastUrlIndex));
+      }
+    } else {
+      withUrls.push(part);
+    }
+  });
+
+  return withUrls.length > 0 ? (withUrls as React.JSX.Element[]) : [<span key="empty">{text}</span>];
 }
 
 export default WeeklyReportDetail;

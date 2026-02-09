@@ -8,16 +8,16 @@ interface MonitorCardProps {
 const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'ai热点检测':
-        return 'from-blue-400 to-blue-600';
-      case '热点趋势检测':
-        return 'from-purple-400 to-purple-600';
+      case 'ai热点监测':
+        return 'from-cyan-500 to-blue-600';
+      case '热点趋势监测':
+        return 'from-violet-500 to-fuchsia-600';
       case '竞品社媒监控':
-        return 'from-orange-400 to-orange-600';
-      case '休闲游戏检测':
-        return 'from-green-400 to-green-600';
+        return 'from-amber-500 to-orange-600';
+      case '休闲游戏监测':
+        return 'from-emerald-500 to-green-600';
       default:
-        return 'from-gray-400 to-gray-600';
+        return 'from-slate-500 to-slate-700';
     }
   };
 
@@ -43,11 +43,11 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
   const getSentimentColor = (sentiment?: string) => {
     switch (sentiment) {
       case 'positive':
-        return 'bg-green-50 text-green-700 border-green-200';
+        return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30';
       case 'negative':
-        return 'bg-red-50 text-red-700 border-red-200';
+        return 'bg-rose-500/10 text-rose-300 border-rose-500/30';
       default:
-        return 'bg-gray-50 text-gray-700 border-gray-200';
+        return 'bg-slate-500/10 text-slate-300 border-slate-500/30';
     }
   };
 
@@ -59,35 +59,35 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
 
   return (
     <div 
-      className="flex gap-6 py-6 border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+      className="flex gap-6 py-6 border-b border-slate-800/80 hover:bg-slate-900/60 transition-colors cursor-pointer"
       onClick={handleClick}
     >
       {/* Cover/Type Indicator */}
       <div className="flex-shrink-0 relative">
         {item.coverImage ? (
-          <div className="w-32 h-32 rounded-lg overflow-hidden relative">
+          <div className="w-32 h-32 rounded-xl overflow-hidden relative border border-slate-800">
             <img 
               src={item.coverImage} 
               alt={item.title}
               className="w-full h-full object-cover"
             />
-            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2`}>
-              <div className="text-xs font-bold text-white">{item.type}</div>
+            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2`}>
+              <div className="text-xs font-bold text-white/90">{item.type}</div>
             </div>
             {item.trend && (
-              <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1">
+              <div className="absolute top-2 right-2 bg-slate-900/80 rounded-full p-1">
                 {getTrendIcon(item.trend)}
               </div>
             )}
           </div>
         ) : (
-          <div className={`w-32 h-32 bg-gradient-to-br ${getTypeColor(item.type)} rounded-lg overflow-hidden relative flex items-center justify-center`}>
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-2 text-center">
+          <div className={`w-32 h-32 bg-gradient-to-br ${getTypeColor(item.type)} rounded-xl overflow-hidden relative flex items-center justify-center`}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white/90 p-2 text-center">
               <div className="text-2xl mb-1">
-                {item.type === 'ai热点检测' && '🤖'}
-                {item.type === '热点趋势检测' && '📈'}
+                {item.type === 'ai热点监测' && '🤖'}
+                {item.type === '热点趋势监测' && '📈'}
                 {item.type === '竞品社媒监控' && '📱'}
-                {item.type === '休闲游戏检测' && '🎮'}
+                {item.type === '休闲游戏监测' && '🎮'}
               </div>
               <div className="text-xs font-bold">{item.type}</div>
             </div>
@@ -103,19 +103,19 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Title */}
-        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
+        <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">
           {item.title}
         </h3>
 
         {/* Source and Metadata */}
-        <div className="flex items-center gap-3 text-sm text-gray-600 mb-2 flex-wrap">
+        <div className="flex items-center gap-3 text-sm text-slate-400 mb-2 flex-wrap">
           <div className="flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
             <span>{item.source}</span>
           </div>
-          <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
+          <span className="px-2 py-0.5 bg-slate-800 text-slate-200 rounded text-xs border border-slate-700">
             {item.platform}
           </span>
           <span>{item.date}</span>
@@ -141,13 +141,47 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
           {item.score !== undefined && (
             <div className="flex items-center gap-1">
               <span className="text-yellow-500">⭐</span>
-              <span className="font-semibold text-gray-700">{item.score.toFixed(1)}</span>
+              <span className="font-semibold text-slate-200">{item.score.toFixed(1)}</span>
             </div>
           )}
         </div>
 
-        {/* Description */}
-        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+        {/* Description + 原文链接（有 URL 的任何监测项） */}
+        <div className="mb-3 space-y-1">
+          <p className="text-sm text-slate-400 line-clamp-2">
+            {item.description}
+          </p>
+          {item.url && item.url !== '#' && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-xs text-cyan-300 hover:text-cyan-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              原文链接
+              <svg
+                className="w-3 h-3 ml-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 5h6m0 0v6m0-6L10 14"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 19l4-4m0 0h4m-4 0v4"
+                />
+              </svg>
+            </a>
+          )}
+        </div>
 
         {/* Tags and Sentiment */}
         <div className="flex flex-wrap items-center gap-2">
@@ -161,7 +195,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
           {item.tags.map((tag, index) => (
             <span
               key={index}
-              className="px-2.5 py-1 text-xs rounded-full border bg-gray-50 text-gray-700 border-gray-200"
+              className="px-2.5 py-1 text-xs rounded-full border bg-slate-900 text-slate-300 border-slate-700"
             >
               {tag}
             </span>

@@ -11,19 +11,19 @@ interface MonitorListProps {
   /** 公司选项列表（来自竞品社媒周报） */
   companies?: string[];
   onCompanySelect?: (company: string | null) => void;
-  /** 休闲游戏检测：选中的大类（新游戏/新玩法/竞品） */
+  /** 休闲游戏监测：选中的大类（新游戏/新玩法/竞品） */
   selectedCasualGameCategory?: CasualGameMainCategory | null;
-  /** 休闲游戏检测-新游戏：按平台筛选周报 */
+  /** 休闲游戏监测-新游戏：按平台筛选周报 */
   selectedGamePlatform?: GamePlatformKey | null;
-  /** 休闲游戏检测-竞品动态：选中的小类（社媒监控/UA素材） */
+  /** 休闲游戏监测-竞品动态：选中的小类（社媒监控/UA素材） */
   selectedCasualGameCompetitorSub?: CasualGameCompetitorSub | null;
-  /** AI产品检测：选中的子类（排行榜/产品周报/UA素材） */
+  /** AI产品监测：选中的子类（排行榜/产品周报/UA素材） */
   selectedAiProductSub?: AiProductSubCategory | null;
-  /** 自定义页面标题（如 休闲游戏检测 - 新游戏 - 微信） */
+  /** 自定义页面标题（如 休闲游戏监测 - 新游戏 - 微信） */
   pageTitle?: string;
   /** 标题右侧操作区（如 进入排行榜 按钮） */
   headerAction?: React.ReactNode;
-  /** 休闲游戏检测：当前数据块（微信/抖音 与 SensorTower 隔离，只显示对应来源的项） */
+  /** 休闲游戏监测：当前数据块（微信/抖音 与 SensorTower 隔离，只显示对应来源的项） */
   selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
   onItemClick?: (item: MonitorItem) => void;
 }
@@ -47,21 +47,21 @@ const MonitorList = ({
   const [internalSelectedType, setInternalSelectedType] = useState<MonitorType | '全部'>('全部');
   const [timeRange, setTimeRange] = useState('过去1周内');
   const [sortBy, setSortBy] = useState('默认排序');
-  /** 休闲游戏检测：按平台筛选（左侧筛选栏），仅当 selectedType === 休闲游戏检测 时生效 */
+  /** 休闲游戏监测：按平台筛选（左侧筛选栏），仅当 selectedType === 休闲游戏监测 时生效 */
   const [platformFilter, setPlatformFilter] = useState<GamePlatformKey | '全部'>('全部');
 
   // 使用prop中的selectedType，如果没有则使用内部状态
   const selectedType = propSelectedType !== undefined ? propSelectedType : internalSelectedType;
 
-  const monitorTypes: MonitorType[] = ['ai热点检测', '热点趋势检测', '休闲游戏检测', 'AI产品检测'];
+  const monitorTypes: MonitorType[] = ['ai热点监测', '热点趋势监测', '休闲游戏监测', 'AI产品监测'];
 
   // 筛选和排序逻辑
   const filteredAndSortedItems = useMemo(() => {
     let filtered = items;
 
-    // 休闲游戏检测：按 周报简要 / 新游戏 / 新玩法 / 玩法拆解 / 竞品动态；并与 微信/抖音 vs SensorTower 数据块隔离
-    if (selectedType === '休闲游戏检测') {
-      filtered = filtered.filter((item) => item.type === '休闲游戏检测');
+    // 休闲游戏监测：按 周报简要 / 新游戏 / 新玩法 / 玩法拆解 / 竞品动态；并与 微信/抖音 vs SensorTower 数据块隔离
+    if (selectedType === '休闲游戏监测') {
+      filtered = filtered.filter((item) => item.type === '休闲游戏监测');
       if (selectedCasualSourceSection === 'sensortower') {
         filtered = filtered.filter((item) => item.casualGameSource === 'sensortower');
       } else {
@@ -100,8 +100,8 @@ const MonitorList = ({
         }
         filtered = [...filtered, ...competitorSocial];
       }
-    } else if (selectedType === 'AI产品检测') {
-      filtered = filtered.filter((item) => item.type === 'AI产品检测');
+    } else if (selectedType === 'AI产品监测') {
+      filtered = filtered.filter((item) => item.type === 'AI产品监测');
       if (selectedAiProductSub) {
         filtered = filtered.filter((item) => item.aiProductSub === selectedAiProductSub);
       }
@@ -153,22 +153,40 @@ const MonitorList = ({
     <div className="flex-1">
       {/* Title + optional action */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold text-white">
           {pageTitle ?? '监测汇总'}
         </h1>
         {headerAction}
       </div>
 
+      {/* 简单调试：在 AI 热点监测页打印一条卡片信息，帮助确认解析是否成功 */}
+      {selectedType === 'ai热点监测' && filteredAndSortedItems.length > 0 && (
+        <div className="mb-4 text-xs text-slate-400 bg-slate-900/70 border border-dashed border-slate-800 rounded-lg p-3 space-y-2">
+          <div>调试信息（仅本地可见）：当前筛选结果前 3 条卡片实际数据</div>
+          {filteredAndSortedItems.slice(0, 3).map((item, idx) => (
+            <div key={item.id} className="mt-1 border-t border-dashed border-slate-800 pt-1">
+              <div className="font-semibold text-slate-200">第 {idx + 1} 条：</div>
+              <div>id：{item.id}</div>
+              <div>type：{item.type}</div>
+              <div>title：{item.title || '（空）'}</div>
+              <div>description：{item.description || '（空）'}</div>
+              <div>url：{item.url || '（无 url）'}</div>
+              <div>tags：{item.tags && item.tags.length ? item.tags.join(', ') : '（无）'}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Filters：休闲游戏-新游戏「按平台筛选」；竞品动态-社媒监控「按公司筛选」 */}
       <div className="mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-start gap-4">
-          {selectedType === '休闲游戏检测' && selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新' && (
+          {selectedType === '休闲游戏监测' && selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新' && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 whitespace-nowrap">按公司筛选</span>
+              <span className="text-sm text-slate-300 whitespace-nowrap">按公司筛选</span>
               <select
                 value={selectedCompanyName ?? ''}
                 onChange={(e) => onCompanySelect?.(e.target.value || null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
               >
                 <option value="">全部公司</option>
                 {companies.map((name) => (
@@ -177,16 +195,16 @@ const MonitorList = ({
               </select>
             </div>
           )}
-          {(selectedType === '休闲游戏检测' &&
+          {(selectedType === '休闲游戏监测' &&
             (selectedCasualGameCategory === '新游戏' ||
               selectedCasualGameCategory === '新玩法' ||
               selectedCasualGameCategory === '玩法拆解')) && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 whitespace-nowrap">按平台筛选</span>
+              <span className="text-sm text-slate-300 whitespace-nowrap">按平台筛选</span>
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value as GamePlatformKey | '全部')}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
               >
                 <option value="全部">全部</option>
                 <option value="微信">微信</option>
@@ -199,7 +217,7 @@ const MonitorList = ({
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           >
             <option>过去1周内</option>
             <option>过去1个月内</option>
@@ -215,7 +233,7 @@ const MonitorList = ({
                 setInternalSelectedType(newType);
               }
             }}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           >
             <option>全部分类</option>
             {monitorTypes.map(type => (
@@ -226,7 +244,7 @@ const MonitorList = ({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           >
             <option>默认排序</option>
             <option>最新发布</option>
@@ -239,7 +257,7 @@ const MonitorList = ({
           <button
             type="button"
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors"
           >
           <svg
             className={`w-4 h-4 transition-transform ${
@@ -280,11 +298,11 @@ const MonitorList = ({
         </div>
 
         {showAdvancedFilters && (
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="p-4 bg-slate-900/70 rounded-lg border border-slate-800">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">情感分析</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <label className="block text-sm font-medium text-slate-200 mb-2">情感分析</label>
+                <select className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200">
                   <option>全部</option>
                   <option>正面</option>
                   <option>中性</option>
@@ -292,8 +310,8 @@ const MonitorList = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">趋势方向</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <label className="block text-sm font-medium text-slate-200 mb-2">趋势方向</label>
+                <select className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200">
                   <option>全部</option>
                   <option>上升</option>
                   <option>稳定</option>
@@ -306,8 +324,8 @@ const MonitorList = ({
       </div>
 
       {/* Results Count */}
-      <div className="mb-4 text-sm text-gray-600">
-        共找到 <span className="font-semibold text-gray-900">{filteredAndSortedItems.length}</span> 条监测数据
+      <div className="mb-4 text-sm text-slate-400">
+        共找到 <span className="font-semibold text-white">{filteredAndSortedItems.length}</span> 条监测数据
       </div>
 
       {/* Monitor List */}
@@ -317,7 +335,7 @@ const MonitorList = ({
             <MonitorCard key={item.id} item={item} onClick={onItemClick} />
           ))
         ) : (
-          <div className="py-12 text-center text-gray-500">
+          <div className="py-12 text-center text-slate-500">
             <p>暂无监测数据</p>
           </div>
         )}

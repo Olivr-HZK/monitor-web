@@ -67,7 +67,9 @@ def get_weeks(cursor) -> list[tuple[str, str]]:
 
 
 def get_new_entries_top50(cursor, rank_date_current: str) -> list[dict]:
-    """获取当周新进 Top50 列表（新进榜单且 current_rank <= 50），按 current_rank 排序。"""
+    """获取当周新进 Top50 列表（新进榜单且 current_rank <= 50），
+    但若该产品在同国家/平台历史上曾进入 Top50，则不再展示。
+    """
     cursor.execute(
         """
         SELECT
@@ -84,6 +86,15 @@ def get_new_entries_top50(cursor, rank_date_current: str) -> list[dict]:
         WHERE r.rank_date_current = ?
           AND r.change_type = '🆕 新进榜单'
           AND r.current_rank <= 50
+          AND NOT EXISTS (
+            SELECT 1
+            FROM rank_changes h
+            WHERE h.app_id = r.app_id
+              AND h.country = r.country
+              AND h.platform = r.platform
+              AND h.current_rank <= 50
+              AND h.rank_date_current < r.rank_date_current
+          )
         ORDER BY r.current_rank ASC, r.country, r.platform
         """,
         (rank_date_current,),

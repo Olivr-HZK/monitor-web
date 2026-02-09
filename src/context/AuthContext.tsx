@@ -69,6 +69,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = useCallback(async () => {
     setLoading(true);
     try {
+      // 开发环境强制走静态模式（避免本地后端/代理影响）
+      if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+        setAuthMode('static');
+        const hash = await resolveStaticHash();
+        setStaticHash(hash);
+        if (hash) {
+          const stored = sessionStorage.getItem(STATIC_AUTH_KEY);
+          setUser(stored === hash ? '用户' : null);
+        } else {
+          setUser('用户');
+        }
+        return;
+      }
+
       const res = await fetch('/api/me', { credentials: 'include' });
       // 404：明确没有后端；在本地开发时，通过 Vite 代理 /api 且后端未启动通常会返回 502，这里也视为“无后端”
       if (res.status === 404 || res.status === 502) {

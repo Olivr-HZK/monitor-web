@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-按前端「休闲游戏检测」中两个小游戏周报的格式构建内容，并发送到飞书和企业微信：
-  1. 微信/抖音小游戏周报（来自 public/videos.db 的 weekly_report_simple）
-  2. SensorTower 周报（来自 public/sensortower_top100.db 的 rank_changes）
+构建日报/周报内容，并发送到飞书和企业微信：
+  1. 热点趋势日报（来自 public/热点/final_json.json）
+  2. 微信/抖音小游戏周报（来自 public/videos.db 的 weekly_report_simple）
+  3. SensorTower 周报（来自 public/sensortower_top100.db 的 rank_changes）
 
 飞书：发一条互动卡片（interactive card，内容为 Markdown）。
 企业微信：发一条 Markdown 消息。
@@ -13,6 +14,7 @@
 
 使用方式（在项目根目录）：
   python scripts/send_minigame_weekly_reports.py
+  python scripts/send_minigame_weekly_reports.py --reports hot_trend_daily,wechat_douyin_weekly
   python scripts/send_minigame_weekly_reports.py --videos-db public/videos.db --sensortower-db public/sensortower_top100.db
 """
 
@@ -24,6 +26,7 @@ import sqlite3
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -62,9 +65,97 @@ DETAIL_LINK = "https://olivr-hzk.github.io/monitor-web/"
 WEEKLY_BRIEF_PLATFORM = {"wx": "微信小游戏", "dy": "抖音小游戏"}
 
 
+# ---------- 热点趋势日报（来自 public/热点/final_json.json）----------
+def _parse_iso_date(value: str | None) -> str:
+    if not value:
+        return datetime.now().strftime("%Y-%m-%d")
+    try:
+        return datetime.fromisoformat(value).strftime("%Y-%m-%d")
+    except ValueError:
+        return datetime.now().strftime("%Y-%m-%d")
+
+
+def _extract_section(content: str, heading: str) -> str:
+    if not content:
+        return ""
+    pattern = re.compile(rf"##\s*{re.escape(heading)}\s*\n([\s\S]*?)(?=\n##\s|$)")
+    match = pattern.search(content)
+    return match.group(1).strip() if match else ""
+
+
+def build_hot_trend_daily_md(json_path: Path, top_count: int = 5) -> tuple[str | None, str | None]:
+    if not json_path.exists():
+        return None, None
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"[热点趋势日报] JSON 解析失败: {e}", file=sys.stderr)
+        return None, None
+
+    generated_at = str(data.get("generated_at") or "")
+    date_str = _parse_iso_date(generated_at)
+    feishu_block = data.get("feishu", {})
+    documents = feishu_block.get("documents", []) if isinstance(feishu_block, dict) else []
+    if not documents:
+        return None, None
+
+    titles = []
+    for doc in documents:
+        if not isinstance(doc, dict):
+            continue
+        title = str(doc.get("title") or "").strip()
+        if title:
+            titles.append(title)
+    top_titles = titles[:top_count] if titles else []
+
+    summary_lines = [
+        f"【热点趋势日报】{date_str}",
+        f"- 本周 Google Trends Top {len(top_titles)} 热点：{'、'.join(top_titles) if top_titles else '暂无'}",
+        f"> 详情进入 [监测汇总平台]({DETAIL_LINK}) 查看。",
+    ]
+    summary_md = "\n".join(summary_lines)
+
+    full_lines = [f"# 热点趋势日报（{date_str}）", ""]
+    for idx, doc in enumerate(documents, start=1):
+        if not isinstance(doc, dict):
+            continue
+        title = str(doc.get("title") or f"热点 {idx}").strip()
+        content = str(doc.get("content") or "")
+        score = doc.get("score")
+        meta = doc.get("meta", {}) if isinstance(doc.get("meta", {}), dict) else {}
+        heat = meta.get("heat")
+        summary = _extract_section(content, "摘要") or str(doc.get("summary") or "").strip()
+        ua = _extract_section(content, "UA灵感")
+        gen = _extract_section(content, "生成适配")
+        link = _extract_section(content, "原文链接")
+        if link:
+            link = next((v for v in link.split() if v.startswith("http")), link)
+        if not link:
+            link = meta.get("url")
+
+        full_lines.append(f"## {idx}. {title}")
+        if score is not None:
+            full_lines.append(f"**评分**：{score}")
+        if heat is not None:
+            full_lines.append(f"**热度**：{heat}")
+        if summary:
+            full_lines.append(f"**摘要**：{summary}")
+        if ua:
+            full_lines.append(f"**UA灵感**：{ua}")
+        if gen:
+            full_lines.append(f"**生成适配**：{gen}")
+        if link:
+            full_lines.append(f"**原文链接**：{link}")
+        full_lines.append("")
+
+    full_lines.append(f"详情进入 [监测汇总平台]({DETAIL_LINK}) 查看。")
+    full_md = "\n".join(full_lines).strip()
+    return full_md, summary_md
+
+
 # ---------- 微信/抖音小游戏周报（与前端 reportsLoader.loadWeeklyBriefFromDb 一致）----------
 def build_wechat_douyin_weekly_md(conn: sqlite3.Connection) -> str | None:
-    """从 weekly_report_simple 取最新一周，生成与前端一致的周报 Markdown。"""
+    """从 weekly_report_simple 取最新一周，生成与前端一致的「完整版」周报 Markdown。"""
     cur = conn.cursor()
     try:
         cur.execute(
@@ -137,6 +228,77 @@ def build_wechat_douyin_weekly_md(conn: sqlite3.Connection) -> str | None:
     return "\n".join(lines)
 
 
+def build_wechat_douyin_summary_md(conn: sqlite3.Connection) -> str | None:
+    """构建给 IM 使用的「简报版」微信/抖音小游戏周报（不含表格，只保留摘要+代表游戏）。"""
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT week_range, platform, game_name, change_type, rank, rank_change
+            FROM weekly_report_simple
+            WHERE platform IN ('wx','dy')
+            ORDER BY week_range DESC, platform, change_type, CAST(rank AS INTEGER)
+            """
+        )
+        rows = [
+            {
+                "week_range": r[0],
+                "platform": r[1],
+                "game_name": r[2],
+                "change_type": r[3],
+                "rank": r[4],
+                "rank_change": r[5],
+            }
+            for r in cur.fetchall()
+        ]
+    except sqlite3.OperationalError as e:
+        print(f"[微信/抖音] 读取 weekly_report_simple(摘要) 失败: {e}", file=sys.stderr)
+        return None
+
+    if not rows:
+        return None
+
+    by_week: dict[str, list] = {}
+    for r in rows:
+        w = str(r["week_range"] or "")
+        if not w:
+            continue
+        by_week.setdefault(w, []).append(r)
+
+    latest_week = max(by_week.keys())
+    week_rows = by_week[latest_week]
+    new_in = [r for r in week_rows if r["change_type"] == "新进榜"]
+    surge = [r for r in week_rows if r["change_type"] == "飙升"]
+
+    def pick_names(items: list[dict], limit: int = 5) -> str:
+        names = [str(r.get("game_name") or "").strip() for r in items[:limit]]
+        names = [n for n in names if n]
+        return "、".join(names)
+
+    new_names = pick_names(new_in, 5)
+    surge_names = pick_names(surge, 5)
+
+    lines: list[str] = []
+    lines.append(f"【微信/抖音小游戏周报】{latest_week}")
+    if new_in:
+        if new_names:
+            lines.append(f"- 新进榜：{len(new_in)} 款，代表：{new_names}")
+        else:
+            lines.append(f"- 新进榜：{len(new_in)} 款")
+    else:
+        lines.append("- 新进榜：0 款")
+
+    if surge:
+        if surge_names:
+            lines.append(f"- 排名飙升：{len(surge)} 款，代表：{surge_names}")
+        else:
+            lines.append(f"- 排名飙升：{len(surge)} 款")
+    else:
+        lines.append("- 排名飙升：0 款")
+
+    return "\n".join(lines)
+
+
 # ---------- SensorTower 周报（与前端 sensortowerWeeklyReport + generate_sensortower_weekly_report 一致）----------
 def _parse_surge(change: str) -> int:
     if not change or change == "NEW":
@@ -170,7 +332,7 @@ def _fmt_revenue(r) -> str:
 
 
 def build_sensortower_weekly_md(conn: sqlite3.Connection) -> str | None:
-    """从 rank_changes 取最新一周，生成与前端一致的 SensorTower 周报 Markdown。"""
+    """从 rank_changes 取最新一周，生成与前端一致的「完整版」 SensorTower 周报 Markdown。"""
     cur = conn.cursor()
     try:
         cur.execute(
@@ -311,6 +473,108 @@ def build_sensortower_weekly_md(conn: sqlite3.Connection) -> str | None:
     return "\n".join(lines)
 
 
+def build_sensortower_summary_md(conn: sqlite3.Connection) -> str | None:
+    """构建给 IM 使用的「简报版」 SensorTower 周报（只保留数量 + 代表产品）。"""
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT DISTINCT rank_date_current, rank_date_last
+            FROM rank_changes
+            ORDER BY rank_date_current DESC
+            LIMIT 1
+            """
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        rank_date_current, rank_date_last = row[0], row[1] or ""
+    except sqlite3.OperationalError as e:
+        print(f"[SensorTower] 读取 rank_changes(摘要) 失败: {e}", file=sys.stderr)
+        return None
+
+    # 新进 Top50 列表（只为摘要拿名字）
+    cur.execute(
+        """
+        SELECT
+            COALESCE(m.name, r.app_name, r.app_id) AS display_name
+        FROM rank_changes r
+        LEFT JOIN app_metadata m ON m.app_id = r.app_id AND m.os = LOWER(r.platform)
+        WHERE r.rank_date_current = ?
+          AND r.change_type = '🆕 新进榜单'
+          AND r.current_rank <= 50
+        ORDER BY r.current_rank ASC, r.country, r.platform
+        """,
+        (rank_date_current,),
+    )
+    new_names_all = [str(r[0] or "").strip() for r in cur.fetchall() if (r[0] or "").strip()]
+
+    # 排名飙升 Top10（名字 + change）
+    cur.execute(
+        """
+        SELECT
+            r.change,
+            COALESCE(m.name, r.app_name, r.app_id) AS display_name
+        FROM rank_changes r
+        LEFT JOIN app_metadata m ON m.app_id = r.app_id AND m.os = LOWER(r.platform)
+        WHERE r.rank_date_current = ?
+          AND r.change_type = '🚀 排名飙升'
+        ORDER BY r.current_rank ASC
+        """,
+        (rank_date_current,),
+    )
+    surge_rows = []
+    for change_str, name in cur.fetchall():
+        name_str = str(name or "").strip()
+        surge_rows.append(
+            {
+                "change": str(change_str or "").strip(),
+                "surge_value": _parse_surge(change_str or ""),
+                "name": name_str or "—",
+            }
+        )
+    surge_rows.sort(key=lambda x: -x["surge_value"])
+    surge_top10 = surge_rows[:10]
+
+    def join_names(names: list[str], limit: int) -> str:
+        picked = [n for n in names[:limit] if n]
+        return "、".join(picked)
+
+    new_count = len(new_names_all)
+    new_repr = join_names(new_names_all, 5)
+
+    surge_count = len(surge_top10)
+    surge_repr_names = [
+        (item["name"], item["change"]) for item in surge_top10[:3]
+    ]
+    if surge_repr_names:
+        surge_repr_str = "、".join(
+            f"{name}（{change}）" for name, change in surge_repr_names
+        )
+    else:
+        surge_repr_str = ""
+
+    lines: list[str] = []
+    lines.append(f"【SensorTower 周报】{rank_date_current}")
+    if new_count:
+        if new_repr:
+            lines.append(f"- 新进 Top50：{new_count} 款，代表：{new_repr}")
+        else:
+            lines.append(f"- 新进 Top50：{new_count} 款")
+    else:
+        lines.append("- 新进 Top50：0 款")
+
+    if surge_count:
+        if surge_repr_str:
+            lines.append(f"- 排名飙升 Top10：{surge_count} 款，TOP3：{surge_repr_str}")
+        else:
+            lines.append(f"- 排名飙升 Top10：{surge_count} 款")
+    else:
+        lines.append("- 排名飙升 Top10：0 款")
+
+    return "\n".join(lines)
+
+
 # ---------- 发送 ----------
 def _post_json(url: str, payload: dict) -> tuple[int, str]:
     data = json.dumps(payload).encode("utf-8")
@@ -394,7 +658,13 @@ def _clean_url(value: str | None) -> str | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="构建两个小游戏周报并发送到飞书、企业微信")
+    parser = argparse.ArgumentParser(description="构建日报/周报并发送到飞书、企业微信")
+    parser.add_argument(
+        "--reports",
+        type=str,
+        default="hot_trend_daily,wechat_douyin_weekly,sensortower_weekly",
+        help="要发送的报告类型，逗号分隔：hot_trend_daily,wechat_douyin_weekly,sensortower_weekly",
+    )
     parser.add_argument(
         "--videos-db",
         type=Path,
@@ -408,6 +678,12 @@ def main() -> int:
         help="sensortower_top100.db 路径（SensorTower 周报）",
     )
     parser.add_argument(
+        "--hot-trend-json",
+        type=Path,
+        default=Path("public/热点/final_json.json"),
+        help="热点趋势日报 JSON 路径（来自热点/final_json.json）",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="只构建内容并打印，不发送",
@@ -419,46 +695,85 @@ def main() -> int:
 
     videos_db = repo_root / args.videos_db if not args.videos_db.is_absolute() else args.videos_db
     st_db = repo_root / args.sensortower_db if not args.sensortower_db.is_absolute() else args.sensortower_db
+    hot_json = repo_root / args.hot_trend_json if not args.hot_trend_json.is_absolute() else args.hot_trend_json
 
-    parts: list[str] = []
+    selected = {s.strip() for s in args.reports.split(",") if s.strip()}
+    if not selected or "all" in selected:
+        selected = {"hot_trend_daily", "wechat_douyin_weekly", "sensortower_weekly"}
+
+    full_parts: list[str] = []      # 完整版内容（飞书用）
+    summary_parts: list[str] = []   # 简报内容（飞书摘要 + 企业微信用）
+
+    # 0) 热点趋势日报
+    if "hot_trend_daily" in selected:
+        md_full, md_summary = build_hot_trend_daily_md(hot_json)
+        if md_full:
+            full_parts.append(md_full)
+        if md_summary:
+            summary_parts.append(md_summary)
+        if not md_full and not md_summary:
+            print(f"[跳过] 热点趋势日报未生成：{hot_json}", file=sys.stderr)
 
     # 1) 微信/抖音小游戏周报
-    if videos_db.exists():
-        conn_wx = sqlite3.connect(str(videos_db))
-        try:
-            md_wx = build_wechat_douyin_weekly_md(conn_wx)
-            if md_wx:
-                parts.append(md_wx)
-        finally:
-            conn_wx.close()
-    else:
-        print(f"[跳过] videos.db 不存在: {videos_db}", file=sys.stderr)
+    if "wechat_douyin_weekly" in selected:
+        if videos_db.exists():
+            conn_wx = sqlite3.connect(str(videos_db))
+            try:
+                md_full = build_wechat_douyin_weekly_md(conn_wx)
+                if md_full:
+                    full_parts.append(md_full)
+                md_summary = build_wechat_douyin_summary_md(conn_wx)
+                if md_summary:
+                    summary_parts.append(md_summary)
+            finally:
+                conn_wx.close()
+        else:
+            print(f"[跳过] videos.db 不存在: {videos_db}", file=sys.stderr)
 
     # 2) SensorTower 周报
-    if st_db.exists():
-        conn_st = sqlite3.connect(str(st_db))
-        try:
-            md_st = build_sensortower_weekly_md(conn_st)
-            if md_st:
-                parts.append(md_st)
-        finally:
-            conn_st.close()
-    else:
-        print(f"[跳过] sensortower_top100.db 不存在: {st_db}", file=sys.stderr)
+    if "sensortower_weekly" in selected:
+        if st_db.exists():
+            conn_st = sqlite3.connect(str(st_db))
+            try:
+                md_full = build_sensortower_weekly_md(conn_st)
+                if md_full:
+                    full_parts.append(md_full)
+                md_summary = build_sensortower_summary_md(conn_st)
+                if md_summary:
+                    summary_parts.append(md_summary)
+            finally:
+                conn_st.close()
+        else:
+            print(f"[跳过] sensortower_top100.db 不存在: {st_db}", file=sys.stderr)
 
-    if not parts:
-        print("未生成任何周报内容，请检查数据库与表结构。", file=sys.stderr)
+    if not full_parts and not summary_parts:
+        print("未生成任何日报/周报内容，请检查数据文件或参数。", file=sys.stderr)
         return 1
 
-    # 合并为一条：两个周报用分隔线隔开
-    combined_md = "\n\n---\n\n".join(parts)
-    card_title = "小游戏周报（微信/抖音 + SensorTower）"
+    # 飞书：摘要 + 完整内容合并为一条卡片
+    combined_full = "\n\n---\n\n".join(full_parts) if full_parts else ""
+    combined_summary = "\n\n".join(summary_parts) if summary_parts else ""
+    if combined_summary and combined_full:
+        feishu_md = f"{combined_summary}\n\n---\n\n{combined_full}"
+    else:
+        feishu_md = combined_full or combined_summary
+
+    report_order = ["hot_trend_daily", "wechat_douyin_weekly", "sensortower_weekly"]
+    title_map = {
+        "hot_trend_daily": "热点趋势日报",
+        "wechat_douyin_weekly": "微信/抖音小游戏周报",
+        "sensortower_weekly": "SensorTower 周报",
+    }
+    selected_titles = [title_map.get(k, k) for k in report_order if k in selected]
+    card_title = selected_titles[0] if len(selected_titles) == 1 else "监测汇总日报/周报"
 
     if args.dry_run:
         print("=== 构建结果（dry-run，不发送）===")
         print(f"标题: {card_title}")
-        print("---")
-        print(combined_md)
+        print("--- 摘要 ---")
+        print(combined_summary or "(无摘要)")
+        print("\n--- 完整内容 ---")
+        print(combined_full or "(无完整内容)")
         return 0
 
     feishu = _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
@@ -470,12 +785,14 @@ def main() -> int:
         )
         return 1
 
-    if feishu:
-        send_feishu_card(feishu, card_title, combined_md)
+    if feishu and feishu_md:
+        send_feishu_card(feishu, card_title, feishu_md)
     if wecom:
-        # 企业微信单条 Markdown 限制 4096 字节，分两条发送：微信/抖音 + SensorTower
-        for i, part in enumerate(parts):
-            send_wecom_markdown(wecom, part)
+        # 企业微信：优先发「简报版」，避免过长；若无摘要则发完整内容并自动截断
+        wecom_md = combined_summary or combined_full
+        if wecom_md:
+            wecom_md = wecom_md + f"\n\n> 详情请访问：[监测汇总平台]({DETAIL_LINK})"
+            send_wecom_markdown(wecom, wecom_md)
 
     return 0
 

@@ -1,6 +1,6 @@
 /**
  * 日报数据加载器
- * 从 public 目录的 md 文件加载热点日报和AI日报（小红书周报）
+ * 从 public 目录加载热点日报（JSON 优先，MD 兜底）和AI日报（小红书周报）
  */
 
 import type { MonitorItem, ReportDocument } from '../types';
@@ -12,10 +12,24 @@ type GetDataUrl = (filename: string) => string;
  * 解析热点日报 MD 文件
  */
 export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
+  // 优先读取 public/热点/final_json.json；如果失败则回退到 热点日报.md
+  const jsonUrl = getDataUrl ? getDataUrl('热点/final_json.json') : '热点/final_json.json';
+  const mdUrl = getDataUrl ? getDataUrl('热点/热点日报.md') : '热点/热点日报.md';
+  const opts = (url: string) => (url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {});
+
   try {
-    const url = getDataUrl ? getDataUrl('热点/热点日报.md') : '热点/热点日报.md';
-    const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-    const response = await fetch(url, opts);
+    const response = await fetch(jsonUrl, opts(jsonUrl));
+    if (response.ok) {
+      const data = await response.json();
+      const items = parseHotTrendReportJson(data);
+      if (items.length > 0) return items;
+    }
+  } catch (error) {
+    console.warn('Failed to load 热点/final_json.json, fallback to MD:', error);
+  }
+
+  try {
+    const response = await fetch(mdUrl, opts(mdUrl));
     if (!response.ok) {
       console.error('Failed to load 热点日报.md');
       return [];
@@ -101,7 +115,7 @@ function parseHotTrendReport(text: string): MonitorItem[] {
 
   items.push({
     id: 'hot-trend-1',
-    type: '热点趋势检测',
+    type: '热点趋势监测',
     title: doc.title,
     source: doc.source ?? '热点监测',
     platform: '全网',
@@ -118,6 +132,141 @@ function parseHotTrendReport(text: string): MonitorItem[] {
     coverImage: doc.coverImage,
     url: '#',
     reportContent: JSON.stringify(doc),
+  });
+
+  return items;
+}
+
+/**
+ * 解析热点日报 JSON（public/热点/final_json.json）
+ */
+function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
+  const items: MonitorItem[] = [];
+  if (!raw || typeof raw !== 'object') return items;
+
+  const data = raw as {
+    generated_at?: string;
+    feishu?: {
+      documents?: Array<{
+        title?: string;
+        content?: string;
+        tags?: string[];
+        summary?: string;
+        score?: number;
+        coverImage?: string;
+        meta?: {
+          heat?: number;
+          url?: string;
+          image_base64?: string;
+          image_type?: string;
+        };
+      }>;
+    };
+  };
+
+  const generatedAt = data.generated_at;
+  const dateFromGenerated = generatedAt ? new Date(generatedAt) : new Date();
+  const dateStr = `${String(dateFromGenerated.getMonth() + 1).padStart(2, '0')}-${String(
+    dateFromGenerated.getDate()
+  ).padStart(2, '0')}`;
+  const baseTime = `${String(dateFromGenerated.getHours()).padStart(2, '0')}:${String(
+    dateFromGenerated.getMinutes()
+  ).padStart(2, '0')}`;
+
+  const documents = data.feishu?.documents ?? [];
+  const titles = documents
+    .map((doc) => doc.title?.trim())
+    .filter((title): title is string => !!title);
+
+  if (titles.length > 0) {
+    const topCount = 5;
+    const topTitles = titles.slice(0, topCount);
+    const summaryLines = topTitles.map((title, index) => `${index + 1}. ${title}`).join('\n');
+    const summaryTextRaw = `以下是本周 Google Trends Top ${topTitles.length} 热点，详情进入网站查看。`;
+    const summaryText =
+      summaryTextRaw.length > 240 ? `${summaryTextRaw.slice(0, 240)}...` : summaryTextRaw;
+
+    const summaryDoc: ReportDocument = {
+      title: `热点日报每日汇总 ${dateStr}`,
+      tags: ['每日汇总', '热点'],
+      date: dateStr,
+      time: baseTime,
+      source: '热点监测',
+      summary: summaryText,
+      content: `## 摘要\n${summaryText}\n\n## 本周 Google Trends Top ${topTitles.length} 热点\n${summaryLines}\n\n详情进入网站查看：\nhttps://olivr-hzk.github.io/monitor-web/`,
+      meta: {
+        kind: 'daily_summary',
+        titles,
+      },
+    };
+
+    items.push({
+      id: `hot-trend-summary-${dateStr.replace(/-/g, '')}`,
+      type: '热点趋势监测',
+      title: summaryDoc.title,
+      source: summaryDoc.source ?? '热点监测',
+      platform: '全网',
+      date: summaryDoc.date ?? dateStr,
+      time: summaryDoc.time ?? baseTime,
+      views: 0,
+      engagement: 0,
+      description: summaryDoc.summary ?? summaryText,
+      tags: summaryDoc.tags ?? [],
+      language: '中文',
+      trend: 'up',
+      sentiment: 'positive',
+      score: summaryDoc.score,
+      coverImage: summaryDoc.coverImage,
+      url: '#',
+      reportContent: JSON.stringify(summaryDoc),
+    });
+  }
+
+  documents.forEach((doc, index) => {
+    const title = doc.title?.trim() || `热点日报条目 ${index + 1}`;
+    const summary = doc.summary?.trim() || '';
+    const heat = doc.meta?.heat ?? 0;
+    const coverImage =
+      doc.coverImage ||
+      (doc.meta?.image_base64
+        ? `data:image/${doc.meta.image_type ?? 'jpg'};base64,${doc.meta.image_base64}`
+        : undefined);
+
+    const reportDoc: ReportDocument = {
+      title: `热点日报：${title}`,
+      tags: doc.tags && doc.tags.length > 0 ? doc.tags : ['热点'],
+      date: dateStr,
+      time: baseTime,
+      source: '热点监测',
+      summary: summary || title,
+      content: doc.content || summary || title,
+      score: doc.score,
+      coverImage,
+    };
+
+    items.push({
+      id: `hot-trend-json-${dateStr.replace(/-/g, '')}-${index}`,
+      type: '热点趋势监测',
+      title: reportDoc.title,
+      source: reportDoc.source ?? '热点监测',
+      platform: '全网',
+      date: reportDoc.date ?? dateStr,
+      time: reportDoc.time ?? baseTime,
+      views: heat * 1000,
+      engagement: heat * 100,
+      description: (reportDoc.summary ?? summary) || title,
+      tags: reportDoc.tags ?? [],
+      language: '中文',
+      trend: 'up',
+      sentiment: 'positive',
+      score: reportDoc.score,
+      coverImage: reportDoc.coverImage,
+      url: doc.meta?.url ?? '#',
+      reportContent: JSON.stringify({
+        ...reportDoc,
+        meta: doc.meta,
+      }),
+    });
   });
 
   return items;
@@ -152,7 +301,7 @@ function parseAIDailyReport(text: string): MonitorItem[] {
     };
     items.push({
       id: 'ai-daily-overview',
-      type: 'ai热点检测',
+      type: 'ai热点监测',
       title: doc.title,
       source: doc.source ?? '小红书',
       platform: 'Rednotes',
@@ -219,7 +368,7 @@ function parseAIDailyReport(text: string): MonitorItem[] {
 
     items.push({
       id: `ai-daily-${index}`,
-      type: 'ai热点检测',
+      type: 'ai热点监测',
       title: doc.title,
       source: doc.source ?? '小红书',
       platform: 'Rednotes',
@@ -313,7 +462,7 @@ function parseUADailyReport(text: string): MonitorItem[] {
   
   items.push({
     id: `ua-daily-${reportDate.replace(/-/g, '')}`,
-    type: '休闲游戏检测',
+    type: '休闲游戏监测',
     casualGameCategory: '竞品',
     casualGameCompetitorSub: 'UA素材',
     title: doc.title,
@@ -340,11 +489,12 @@ function parseUADailyReport(text: string): MonitorItem[] {
  * @param getDataUrl 可选，后端鉴权时传入
  */
 export async function loadAllDailyReports(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
-  const [hotTrend, aiDaily, uaDaily] = await Promise.all([
+  // AI 日报内容改为统一从 report_documents.json 输入，
+  // 这里仅保留「热点日报」与「UA 素材日报」
+  const [hotTrend, uaDaily] = await Promise.all([
     loadHotTrendReport(getDataUrl),
-    loadAIDailyReport(getDataUrl),
     loadUADailyReport(getDataUrl),
   ]);
-  
-  return [...hotTrend, ...aiDaily, ...uaDaily];
+
+  return [...hotTrend, ...uaDaily];
 }

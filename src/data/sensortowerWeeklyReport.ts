@@ -1,9 +1,9 @@
 /**
- * 根据 rank_changes 数据生成 SensorTower 周报列表（MonitorItem[]），用于在「休闲游戏检测 - SensorTower - 周报简要」中展示。
+ * 根据 rank_changes 数据生成 SensorTower 周报列表（MonitorItem[]），用于在「休闲游戏监测 - SensorTower - 周报简要」中展示。
  * 不生成 MD 文件，周报内容直接为 Markdown 字符串，底部带详情链接。
  */
 
-import type { SensorTowerRankChangeItem } from '../types';
+import type { SensorTowerRankChangeItem, SensorTowerStoreChangeItem } from '../types';
 import type { MonitorItem } from '../types';
 
 const DETAIL_LINK = 'https://olivr-hzk.github.io/monitor-web/';
@@ -90,7 +90,8 @@ function buildWeekReportMd(
  * 根据异动榜单数据生成 SensorTower 周报列表（按 rank_date_current 分组，每周一条 MonitorItem）。
  */
 export function buildSensorTowerWeeklyItems(
-  rankChangeItems: SensorTowerRankChangeItem[]
+  rankChangeItems: SensorTowerRankChangeItem[],
+  storeChangeItems: SensorTowerStoreChangeItem[] = []
 ): MonitorItem[] {
   const byWeek = new Map<string, SensorTowerRankChangeItem[]>();
   for (const item of rankChangeItems) {
@@ -102,23 +103,44 @@ export function buildSensorTowerWeeklyItems(
   const weeks = Array.from(byWeek.keys()).sort().reverse();
   const result: MonitorItem[] = [];
 
+  const weeksAsc = Array.from(byWeek.keys()).sort();
+  const historyTop50 = new Set<string>();
+  const filteredNewTop50ByWeek = new Map<string, SensorTowerRankChangeItem[]>();
+
+  for (const rankDateCurrent of weeksAsc) {
+    const items = byWeek.get(rankDateCurrent)!;
+    const newTop50All = items
+      .filter((i) => i.changeType === '🆕 新进榜单' && i.currentRank <= 50)
+      .sort((a, b) => a.currentRank - b.currentRank);
+
+    const filtered = newTop50All.filter((i) => {
+      const key = `${i.appId}||${i.country}||${i.platform}`;
+      return !historyTop50.has(key);
+    });
+    filteredNewTop50ByWeek.set(rankDateCurrent, filtered);
+
+    for (const i of newTop50All) {
+      const key = `${i.appId}||${i.country}||${i.platform}`;
+      historyTop50.add(key);
+    }
+  }
+
   for (const rankDateCurrent of weeks) {
     const items = byWeek.get(rankDateCurrent)!;
     const rankDateLast = items[0]?.rankDateLast ?? '';
 
-    const newTop50 = items
-      .filter((i) => i.changeType === '🆕 新进榜单' && i.currentRank <= 50)
-      .sort((a, b) => a.currentRank - b.currentRank);
+    const newTop50 = filteredNewTop50ByWeek.get(rankDateCurrent) ?? [];
 
     const surgeAll = items.filter((i) => i.changeType === '🚀 排名飙升');
     surgeAll.sort((a, b) => parseSurgeValue(b.change) - parseSurgeValue(a.change));
     const surgeTop10 = surgeAll.slice(0, 10);
 
     const content = buildWeekReportMd(rankDateCurrent, rankDateLast, newTop50, surgeTop10);
+    const storeChangesForWeek = storeChangeItems.filter((c) => c.rankDate === rankDateCurrent);
 
     result.push({
       id: `sensortower-weekly-${rankDateCurrent}`,
-      type: '休闲游戏检测',
+      type: '休闲游戏监测',
       title: `SensorTower 周报（${rankDateCurrent}）`,
       source: 'SensorTower',
       platform: 'SensorTower',
@@ -136,6 +158,17 @@ export function buildSensorTowerWeeklyItems(
         date: rankDateCurrent,
         source: 'SensorTower',
         content,
+        meta: {
+          kind: 'sensortower_weekly',
+          storeChanges: storeChangesForWeek.map((c) => ({
+            id: c.id,
+            appName: c.appName,
+            platform: c.platform,
+            changedAt: c.changedAt || c.rankDate,
+            storeUrl: c.storeUrl,
+            summaries: c.summaries,
+          })),
+        },
       }),
     });
   }

@@ -7,7 +7,7 @@
   "steps": {
     "install": {
       "inputs": [
-        { "local": true, "include": ["."] }
+        { "step": "build" }
       ],
       "commands": [
         "cd server && npm install"

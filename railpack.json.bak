@@ -1,0 +1,1 @@
+{"$schema":"https://schema.railpack.com","provider":"node","packages":{"node":"20"},"steps":{"server-install":{"inputs":[{"step":"build"}],"commands":["cd server && npm install"]}},"deploy":{"base":{"image":"node:20-slim"},"inputs":[{"step":"server-install","include":["."]}],"startCommand":"cd server && node server.js"}}

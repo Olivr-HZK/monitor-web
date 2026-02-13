@@ -5,7 +5,7 @@
     "node": "20"
   },
   "steps": {
-    "install": {
+    "server-install": {
       "inputs": [
         { "step": "build" }
       ],
@@ -17,7 +17,7 @@
   "deploy": {
     "inputs": [
       {
-        "step": "install",
+        "step": "server-install",
         "include": ["."]
       }
     ],

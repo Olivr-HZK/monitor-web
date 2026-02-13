@@ -12,6 +12,7 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -19,9 +20,39 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'monitor-web-secret-change-in-production';
 const LOGIN_USERNAME = process.env.LOGIN_USERNAME || 'admin';
 const LOGIN_PASSWORD_HASH = process.env.LOGIN_PASSWORD_HASH;
+const FEISHU_APP_ID = process.env.FEISHU_APP_ID || process.env.app_id || '';
+const FEISHU_APP_SECRET = process.env.FEISHU_APP_SECRET || process.env.app_secret || '';
+const FEISHU_MEDIA_PUBLIC = process.env.FEISHU_MEDIA_PUBLIC === 'true';
 
 // 无密码时允许本地开发：仅当未设置 LOGIN_PASSWORD_HASH 时，接受任意密码（仅限单用户）
 const isDevNoPassword = !LOGIN_PASSWORD_HASH;
+let feishuTokenCache = { token: '', expireAt: 0 };
+
+async function getFeishuTenantToken() {
+  const now = Date.now();
+  if (feishuTokenCache.token && feishuTokenCache.expireAt > now + 60 * 1000) {
+    return feishuTokenCache.token;
+  }
+  if (!FEISHU_APP_ID || !FEISHU_APP_SECRET) {
+    throw new Error('FEISHU_APP_ID/FEISHU_APP_SECRET 未配置');
+  }
+  const resp = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_id: FEISHU_APP_ID, app_secret: FEISHU_APP_SECRET }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`获取飞书 token 失败: ${resp.status} ${text}`);
+  }
+  const data = await resp.json();
+  if (!data?.tenant_access_token) {
+    throw new Error('飞书 token 响应缺少 tenant_access_token');
+  }
+  const expires = Number(data.expire) || 3600;
+  feishuTokenCache = { token: data.tenant_access_token, expireAt: now + expires * 1000 };
+  return feishuTokenCache.token;
+}
 
 function verifyAuth(req, res, next) {
   const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
@@ -39,6 +70,16 @@ function verifyAuth(req, res, next) {
 
 app.use(cookieParser());
 app.use(express.json());
+
+// 跨域：前端托管在 Google Pages / GitHub Pages 等时，需单独部署本后端并允许跨域请求
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 // 登录
 app.post('/api/login', (req, res) => {
@@ -84,6 +125,137 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// 申请玩法解析（不要求登录，便于从企微链接进来的用户直接提交）
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const GAMEPLAY_REQUESTS_FILE = path.join(DATA_DIR, 'gameplay_requests.json');
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function readGameplayRequests() {
+  ensureDataDir();
+  if (!fs.existsSync(GAMEPLAY_REQUESTS_FILE)) {
+    return [];
+  }
+  try {
+    const raw = fs.readFileSync(GAMEPLAY_REQUESTS_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function appendGameplayRequest(payload) {
+  const list = readGameplayRequests();
+  list.push({
+    gameName: payload.gameName,
+    source: payload.source || 'wechat_douyin',
+    remark: payload.remark || '',
+    requestedAt: new Date().toISOString(),
+  });
+  fs.writeFileSync(GAMEPLAY_REQUESTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+}
+
+async function notifyGameplayRequest(payload) {
+  const feishu = (process.env.FEISHU_WEBHOOK_URL || '').trim();
+  const wecom = (process.env.WECOM_WEBHOOK_URL_REAL || process.env.WECOM_WEBHOOK_URL || '').trim();
+  const text = `【玩法解析申请】游戏：${payload.gameName}，来源：${payload.source || 'wechat_douyin'}${payload.remark ? `，备注：${payload.remark}` : ''}`;
+  const md = `**玩法解析申请**\n- 游戏：${payload.gameName}\n- 来源：${payload.source || 'wechat_douyin'}${payload.remark ? `\n- 备注：${payload.remark}` : ''}`;
+  if (feishu) {
+    try {
+      await fetch(feishu, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msg_type: 'text', content: { text } }),
+      });
+    } catch (e) {
+      console.error('[feedback] 飞书通知失败:', e?.message || e);
+    }
+  }
+  if (wecom) {
+    try {
+      await fetch(wecom, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msgtype: 'markdown', markdown: { content: md } }),
+      });
+    } catch (e) {
+      console.error('[feedback] 企业微信通知失败:', e?.message || e);
+    }
+  }
+}
+
+app.post('/api/feedback/gameplay-request', (req, res) => {
+  const { gameName, source, remark } = req.body || {};
+  const name = typeof gameName === 'string' ? gameName.trim() : '';
+  if (!name) {
+    return res.status(400).json({ error: '请填写游戏名称' });
+  }
+  const payload = { gameName: name, source: source || 'wechat_douyin', remark: remark || '' };
+  try {
+    appendGameplayRequest(payload);
+    notifyGameplayRequest(payload).catch((e) => console.error('[feedback] notify:', e));
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('[feedback] 写入失败:', e);
+    return res.status(500).json({ error: '提交失败，请稍后重试' });
+  }
+});
+
+const feishuMediaAuth = (req, res, next) => {
+  if (FEISHU_MEDIA_PUBLIC || process.env.NODE_ENV !== 'production') {
+    return next();
+  }
+  return verifyAuth(req, res, next);
+};
+
+// 飞书媒体代理（用于访问受控下载链接）
+app.get('/api/feishu-media', feishuMediaAuth, async (req, res) => {
+  const rawUrl = String(req.query.url || '').trim();
+  if (!rawUrl) {
+    return res.status(400).json({ error: '缺少 url 参数' });
+  }
+  const decodedUrl = rawUrl.includes('%') ? decodeURIComponent(rawUrl) : rawUrl;
+  let targetUrl;
+  try {
+    targetUrl = new URL(decodedUrl);
+  } catch {
+    return res.status(400).json({ error: '非法 url', detail: decodedUrl.slice(0, 200) });
+  }
+  const hostname = targetUrl.hostname;
+  const allowedHost =
+    hostname.endsWith('feishu.cn') ||
+    hostname.endsWith('open.feishu.cn') ||
+    hostname.endsWith('larksuite.com');
+  if (!allowedHost) {
+    return res.status(400).json({ error: '非法域名', detail: hostname });
+  }
+  const allowedPath = /\/open-apis\/drive\/v1\/medias\//.test(targetUrl.pathname);
+  if (!allowedPath) {
+    return res.status(400).json({ error: '非法资源路径', detail: targetUrl.pathname });
+  }
+  try {
+    const token = await getFeishuTenantToken();
+    const upstream = await fetch(targetUrl.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!upstream.ok) {
+      const text = await upstream.text();
+      return res.status(upstream.status).send(text);
+    }
+    const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.setHeader('Content-Type', contentType);
+    return res.status(200).send(buffer);
+  } catch (e) {
+    return res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // 受保护的数据文件（从项目 public 目录读取）
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
 // 允许的子目录前缀
@@ -115,6 +287,7 @@ app.get('/api/data/:filename', verifyAuth, (req, res) => {
   // 根目录文件白名单
   const ALLOWED_ROOT_FILES = new Set([
     'competitor_data.db',
+    'wechatdouyin.db',
     'videos.db',
     '周报谷歌表单.csv',
     '热点日报.md',

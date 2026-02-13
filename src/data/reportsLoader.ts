@@ -6,7 +6,7 @@
  */
 
 import Papa from 'papaparse';
-import type { GameRanking, GameRankingItem, GameRankingType } from '../types';
+import type { GameRanking, GameRankingItem, GameRankingType, WechatDouyinRankingsByWeek } from '../types';
 import type { MonitorItem, ReportDocument, CasualGameMainCategory } from '../types';
 import type { GamePlatformKey } from '../types';
 
@@ -20,6 +20,8 @@ export interface ReportsIndex {
 
 export interface ReportsLoadResult {
   wechatDouyinRankings: GameRanking[];
+  /** 按周聚合的微信/抖音三榜单，用于周选择器（多周数据） */
+  wechatDouyinRankingsByWeek: WechatDouyinRankingsByWeek[];
   newGameItems: MonitorItem[];
   newPlayItems: MonitorItem[];
   weeklyBriefItems: MonitorItem[];
@@ -157,9 +159,12 @@ function parseRankingsCsv(text: string, csvId: string): GameRanking[] {
   return result;
 }
 
-/** 加载所有 rankings CSV，合并为微信小游戏榜单 + 抖音小游戏榜单 */
-export async function loadWechatDouyinRankings(getDataUrl?: GetDataUrl): Promise<GameRanking[]> {
-  const index = await loadReportsIndex(getDataUrl);
+/** 加载所有 rankings CSV，合并为微信小游戏榜单 + 抖音小游戏榜单；可选传入已加载的 index 避免重复请求 */
+export async function loadWechatDouyinRankings(
+  getDataUrl?: GetDataUrl,
+  cachedIndex?: ReportsIndex | null
+): Promise<GameRanking[]> {
+  const index = cachedIndex ?? (await loadReportsIndex(getDataUrl));
   if (!index || index.rankings.length === 0) return [];
 
   const allWechat: GameRankingItem[] = [];
@@ -219,6 +224,193 @@ export async function loadWechatDouyinRankings(getDataUrl?: GetDataUrl): Promise
   return out;
 }
 
+/** week_range 可能为 "2026-2-2~2026-2-8" 或 "2026-2-2～2026-2-8"，统一按起始日期排序，最新（2026-2-2～2026-2-8）在前 */
+const WEEK_RANGE_SEP = /[~～]/;
+function parseWeekRangeStart(weekRange: string): string {
+  const start = weekRange.split(WEEK_RANGE_SEP)[0]?.trim() ?? '';
+  return start || weekRange;
+}
+function sortWeekRangesLatestFirst(weekRanges: string[]): string[] {
+  return [...weekRanges].sort((a, b) => {
+    const startA = parseWeekRangeStart(a);
+    const startB = parseWeekRangeStart(b);
+    return startB.localeCompare(startA, undefined, { numeric: true });
+  });
+}
+
+/** 从 wechatdouyin.db 的 top20_ranking、rank_changes 两张表加载三榜单：只从这两张表取 week_range，用这些日期在两张表内做精确匹配（WHERE week_range = ?），不参与任何时间计算。 */
+export async function loadWechatDouyinRankingsFromDb(
+  getDataUrl?: GetDataUrl
+): Promise<WechatDouyinRankingsByWeek[]> {
+  const db = await getGameplayDatabase(getDataUrl);
+  if (!db) return [];
+
+  /** 取第一列的值（即 week_range），不依赖列名，避免 sql.js 列名大小写导致只读到一周 */
+  const getWeekFromRow = (stmt: { getAsObject: () => Record<string, unknown> }): string | null => {
+    const row = stmt.getAsObject() as Record<string, unknown>;
+    if (!row || typeof row !== 'object') return null;
+    const firstKey = Object.keys(row)[0];
+    const v = firstKey != null ? row[firstKey] : (row.week_range ?? (row as Record<string, unknown>).WEEK_RANGE);
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s || null;
+  };
+
+  /** 仅从 top20_ranking、rank_changes 两张表取 DISTINCT week_range，得到所有需要匹配的日期 */
+  const getAllWeekRanges = (): string[] => {
+    const set = new Set<string>();
+    try {
+      const stmt = db.prepare(
+        `SELECT DISTINCT week_range FROM top20_ranking`
+      );
+      while (stmt.step()) {
+        const w = getWeekFromRow(stmt);
+        if (w) set.add(w);
+      }
+      stmt.free();
+    } catch {
+      // 忽略单表错误，继续从 rank_changes 取
+    }
+    try {
+      const stmt2 = db.prepare(
+        `SELECT DISTINCT week_range FROM rank_changes`
+      );
+      while (stmt2.step()) {
+        const w = getWeekFromRow(stmt2);
+        if (w) set.add(w);
+      }
+      stmt2.free();
+    } catch {
+      // 忽略
+    }
+    const list = sortWeekRangesLatestFirst(Array.from(set));
+    if (typeof console !== 'undefined' && console.info && list.length > 0) {
+      console.info('[微信/抖音排行榜] 从 DB 读取到周数:', list.length, '周区间:', list);
+    }
+    return list;
+  };
+
+  const weekRanges = getAllWeekRanges();
+  if (weekRanges.length === 0) return [];
+
+  const result: WechatDouyinRankingsByWeek[] = [];
+
+  /** 用同一 week_range 在 top20_ranking、rank_changes 两张表中分别做精确匹配查询 */
+  const buildRankingsForWeek = (weekRange: string): GameRanking[] => {
+    const rankings: GameRanking[] = [];
+    const startPart = parseWeekRangeStart(weekRange);
+    const updateTime = startPart ? `${startPart} 12:00` : '';
+
+    try {
+      const wxStmt = db.prepare(
+        `SELECT rank, game_name, company, rank_change, monitor_date FROM top20_ranking
+         WHERE platform_key = 'wx' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC`
+      );
+      wxStmt.bind([weekRange]);
+      const wxItems: GameRankingItem[] = [];
+      while (wxStmt.step()) {
+        const row = wxStmt.getAsObject() as Record<string, unknown>;
+        const rank = parseInt(String(row?.rank ?? 0), 10) || wxItems.length + 1;
+        wxItems.push({
+          id: `wx-db-${weekRange}-${rank}-${row?.game_name ?? ''}`,
+          rank,
+          name: String(row?.game_name ?? ''),
+          developer: row?.company != null ? String(row.company) : undefined,
+          change: row?.rank_change != null ? String(row.rank_change) : '--',
+          updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
+        });
+      }
+      wxStmt.free();
+      if (wxItems.length > 0) {
+        rankings.push({
+          type: '微信小游戏',
+          title: '微信小游戏 Top20',
+          updateTime,
+          period: '周榜',
+          items: wxItems,
+        });
+      }
+
+      const dyStmt = db.prepare(
+        `SELECT rank, game_name, company, rank_change, monitor_date FROM top20_ranking
+         WHERE platform_key = 'dy' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC`
+      );
+      dyStmt.bind([weekRange]);
+      const dyItems: GameRankingItem[] = [];
+      while (dyStmt.step()) {
+        const row = dyStmt.getAsObject() as Record<string, unknown>;
+        const rank = parseInt(String(row?.rank ?? 0), 10) || dyItems.length + 1;
+        dyItems.push({
+          id: `dy-db-${weekRange}-${rank}-${row?.game_name ?? ''}`,
+          rank,
+          name: String(row?.game_name ?? ''),
+          developer: row?.company != null ? String(row.company) : undefined,
+          change: row?.rank_change != null ? String(row.rank_change) : '--',
+          updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
+        });
+      }
+      dyStmt.free();
+      if (dyItems.length > 0) {
+        rankings.push({
+          type: '抖音小游戏',
+          title: '抖音小游戏 Top20',
+          updateTime,
+          period: '周榜',
+          items: dyItems,
+        });
+      }
+
+      const changeStmt = db.prepare(
+        `SELECT rank, game_name, company, rank_change, platform_key, platform, monitor_date FROM rank_changes
+         WHERE week_range = ? ORDER BY platform_key, CAST(rank AS INTEGER) ASC`
+      );
+      changeStmt.bind([weekRange]);
+      const changeItems: GameRankingItem[] = [];
+      let idx = 0;
+      while (changeStmt.step()) {
+        const row = changeStmt.getAsObject() as Record<string, unknown>;
+        const rank = parseInt(String(row?.rank ?? 0), 10) || idx + 1;
+        changeItems.push({
+          id: `change-db-${weekRange}-${idx}-${rank}-${row?.game_name ?? ''}`,
+          rank,
+          name: String(row?.game_name ?? ''),
+          developer: row?.company != null ? String(row.company) : undefined,
+          change: row?.rank_change != null ? String(row.rank_change) : '--',
+          updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
+          platformLabel: row?.platform != null ? String(row.platform) : (row?.platform_key != null ? String(row.platform_key) : undefined),
+        });
+        idx++;
+      }
+      changeStmt.free();
+      if (changeItems.length > 0) {
+        rankings.push({
+          type: '榜单异动' as GameRankingType,
+          title: '榜单异动',
+          updateTime,
+          period: '周榜',
+          items: changeItems,
+        });
+      }
+    } catch {
+      // skip this week
+    }
+    return rankings;
+  };
+
+  for (const weekRange of weekRanges) {
+    try {
+      const rankings = buildRankingsForWeek(weekRange);
+      result.push({ weekRange, rankings });
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[微信/抖音排行榜] 该周查询失败，跳过:', weekRange, e);
+      }
+      result.push({ weekRange, rankings: [] });
+    }
+  }
+
+  return result;
+}
+
 /** 响应内容是否为 HTML（如 SPA  fallback 返回的 index.html），不应当作 Markdown */
 function isHtmlResponse(text: string): boolean {
   const t = text.trim().toLowerCase();
@@ -257,7 +449,7 @@ const GAME_NAME_TO_DB_ALIAS: Record<string, string> = {
 
 let gameplayDbPromise: Promise<any | null> | null = null;
 
-/** 初始化并缓存 videos.db（本地玩法与素材数据库） */
+/** 初始化并缓存 wechatdouyin.db（微信/抖音小游戏数据库，含 games / top20_ranking / rank_changes） */
 async function getGameplayDatabase(getDataUrl?: GetDataUrl): Promise<any | null> {
   if (!gameplayDbPromise) {
     gameplayDbPromise = (async () => {
@@ -267,17 +459,25 @@ async function getGameplayDatabase(getDataUrl?: GetDataUrl): Promise<any | null>
         const SQL = await initSqlJs({
           locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
         });
-        const dbPath = getDataUrl ? getDataUrl('videos.db') : 'videos.db';
-        const opts = dbPath.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-        const res = await fetch(dbPath, opts);
+        const opts = { credentials: 'include' as RequestCredentials };
+        let dbPath = getDataUrl ? getDataUrl('wechatdouyin.db') : 'wechatdouyin.db';
+        let res = await fetch(dbPath, dbPath.startsWith('/api') ? opts : {});
+        if (!res.ok && typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+          dbPath = '/wechatdouyin.db';
+          res = await fetch(dbPath);
+        }
         if (!res.ok) {
-          console.error('Failed to fetch videos.db:', res.status, res.statusText);
+          console.error('[wechatdouyin.db] 请求失败:', dbPath, res.status, res.statusText);
           return null;
         }
         const buffer = await res.arrayBuffer();
-        return new SQL.Database(new Uint8Array(buffer));
+        const db = new SQL.Database(new Uint8Array(buffer));
+        if (typeof console !== 'undefined' && console.info) {
+          console.info('[wechatdouyin.db] 已加载，路径:', dbPath);
+        }
+        return db;
       } catch (e) {
-        console.error('Error initializing videos.db with sql.js:', e);
+        console.error('[wechatdouyin.db] 初始化失败:', e);
         return null;
       }
     })();
@@ -425,7 +625,7 @@ function formatGameplayJsonToMarkdown(rawText: string): string | null {
   return parts.length > 0 ? parts.join('\n') : null;
 }
 
-/** 从本地 videos.db 的 games 表中读取玩法说明（gameplay_analysis），并将 JSON 转为 Markdown 文本 */
+/** 从本地 wechatdouyin.db 的 games 表中读取玩法说明（gameplay_analysis），并将 JSON 转为 Markdown 文本 */
 async function loadGameplayContent(getDataUrl: GetDataUrl | undefined, gameName: string): Promise<string | null> {
   const db = await getGameplayDatabase(getDataUrl);
   if (!db) return null;
@@ -458,12 +658,20 @@ async function loadGameplayContent(getDataUrl: GetDataUrl | undefined, gameName:
         stmt.free();
       }
     } catch (e) {
-      console.warn(`Error querying gameplay_analysis from videos.db for "${name}":`, e);
+      console.warn(`Error querying gameplay_analysis from wechatdouyin.db for "${name}":`, e);
     }
   }
 
-  console.warn(`No gameplay_analysis found in videos.db for "${gameName}" (including aliases).`);
+  console.warn(`No gameplay_analysis found in wechatdouyin.db for "${gameName}" (including aliases).`);
   return null;
+}
+
+/** 按游戏名加载玩法解析（供玩法详情页等调用）。getDataUrl 与 loadReportsData 一致（已登录或静态模式时传入）。 */
+export async function loadGameplayByGameName(
+  getDataUrl: GetDataUrl | undefined,
+  gameName: string
+): Promise<string | null> {
+  return loadGameplayContent(getDataUrl, gameName);
 }
 
 /** 从 CSV 行生成新游戏/新玩法 MonitorItem，并拉取对应玩法 md */
@@ -520,12 +728,12 @@ async function buildItemsFromCsv(
   return items;
 }
 
-/** 加载新游戏、新玩法列表（玩法 md 分别挂在对应项下） */
-export async function loadNewGamesAndNewPlay(getDataUrl?: GetDataUrl): Promise<{
-  newGameItems: MonitorItem[];
-  newPlayItems: MonitorItem[];
-}> {
-  const index = await loadReportsIndex(getDataUrl);
+/** 加载新游戏、新玩法列表（玩法 md 分别挂在对应项下）；可选传入已加载的 index 避免重复请求 */
+export async function loadNewGamesAndNewPlay(
+  getDataUrl?: GetDataUrl,
+  cachedIndex?: ReportsIndex | null
+): Promise<{ newGameItems: MonitorItem[]; newPlayItems: MonitorItem[] }> {
+  const index = cachedIndex ?? (await loadReportsIndex(getDataUrl));
   if (!index) return { newGameItems: [], newPlayItems: [] };
 
   const newGameItems: MonitorItem[] = [];
@@ -565,26 +773,25 @@ const WEEKLY_BRIEF_PLATFORM_LABEL: Record<string, string> = {
   抖音: '抖音小游戏',
 };
 
-/** 从 videos.db 的 weekly_report_simple 表读取 wx/dy 数据，按周生成周报（带监控时间），仅微信+抖音 */
+/** 从 wechatdouyin.db 的 rank_changes 表按周生成周报简要（仅微信+抖音，仅使用 rank_changes 表） */
 export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   const db = await getGameplayDatabase(getDataUrl);
   if (!db) return [];
 
-  const rows: { week_range: string; platform: string; game_name: string; change_type: string; rank: string; rank_change: string }[] = [];
+  const rows: { week_range: string; platform_key: string; game_name: string; rank: string; rank_change: string }[] = [];
   try {
     const stmt = db.prepare(
-      `SELECT week_range, platform, game_name, change_type, rank, rank_change 
-       FROM weekly_report_simple 
-       WHERE platform IN ('wx','dy') 
-       ORDER BY week_range DESC, platform, change_type, CAST(rank AS INTEGER)`
+      `SELECT week_range, platform_key, game_name, rank, rank_change 
+       FROM rank_changes 
+       WHERE platform_key IN ('wx','dy') 
+       ORDER BY week_range DESC, platform_key, CAST(rank AS INTEGER)`
     );
     while (stmt.step()) {
       const row: any = stmt.getAsObject();
       rows.push({
         week_range: String(row.week_range ?? ''),
-        platform: String(row.platform ?? ''),
+        platform_key: String(row.platform_key ?? ''),
         game_name: String(row.game_name ?? ''),
-        change_type: String(row.change_type ?? ''),
         rank: String(row.rank ?? ''),
         rank_change: String(row.rank_change ?? ''),
       });
@@ -604,36 +811,24 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
 
   const items: MonitorItem[] = [];
   for (const [weekRange, weekRows] of byWeek) {
-    const newIn = weekRows.filter((r) => r.change_type === '新进榜');
-    const surge = weekRows.filter((r) => r.change_type === '飙升');
     const lines: string[] = [];
     lines.push(`**监控时间**：${weekRange}`);
     lines.push('');
-    if (newIn.length > 0) {
-      lines.push('## 本周新进榜');
-      lines.push('');
-      newIn.forEach((r) => {
-        const platformLabel = WEEKLY_BRIEF_PLATFORM_LABEL[r.platform] || r.platform;
-        lines.push(`- **${r.game_name}**（${platformLabel}）`);
+    lines.push('## 本周榜单异动');
+    lines.push('');
+    if (weekRows.length > 0) {
+      weekRows.forEach((r) => {
+        const platformLabel = WEEKLY_BRIEF_PLATFORM_LABEL[r.platform_key] || r.platform_key;
+        lines.push(`- **${r.game_name}**（${platformLabel}，排名 ${r.rank}，变化 ${r.rank_change || '—'}）`);
       });
       lines.push('');
-    }
-    if (surge.length > 0) {
-      lines.push('## 本周排名飙升');
-      lines.push('');
-      surge.forEach((r) => {
-        const platformLabel = WEEKLY_BRIEF_PLATFORM_LABEL[r.platform] || r.platform;
-        lines.push(`- **${r.game_name}**（${platformLabel}，排名变化 ${r.rank_change}）`);
-      });
-      lines.push('');
-    }
-    if (newIn.length === 0 && surge.length === 0) {
-      lines.push('该周暂无新进榜或排名飙升记录。');
+    } else {
+      lines.push('该周暂无异动记录。');
       lines.push('');
     }
     lines.push('---');
     lines.push('');
-    lines.push('详细玩法请登录 [监测汇总平台](https://olivr-hzk.github.io/monitor-web/) 查看。');
+    lines.push('详细玩法请登录 [游戏监测网站](https://sites.google.com/castbox.fm/overwatch2/home?authuser=1) 查看。');
 
     const content = lines.join('\n');
     const doc: ReportDocument = {
@@ -641,7 +836,7 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
       tags: ['周报简要', '休闲游戏', '微信小游戏', '抖音小游戏'],
       date: weekRange.split('~')[0]?.replace(/-/g, '-') ?? weekRange,
       source: '引力引擎',
-      summary: `监控时间 ${weekRange}，新进榜 ${newIn.length} 款，飙升 ${surge.length} 款。详细玩法请登录监测汇总平台查看。`,
+      summary: `监控时间 ${weekRange}，异动 ${weekRows.length} 款。详细玩法请登录游戏监测网站查看。`,
       content,
     };
     const dateStr = doc.date ?? '';
@@ -666,9 +861,12 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
   return items;
 }
 
-/** 加载按监控日期命名的完整报告（周报简要），放在首页/周报简要（仅微信/抖音来源，标记 wechat_douyin） */
-export async function loadFullReportsByDate(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
-  const index = await loadReportsIndex(getDataUrl);
+/** 加载按监控日期命名的完整报告（周报简要）；可选传入已加载的 index 避免重复请求 */
+export async function loadFullReportsByDate(
+  getDataUrl?: GetDataUrl,
+  cachedIndex?: ReportsIndex | null
+): Promise<MonitorItem[]> {
+  const index = cachedIndex ?? (await loadReportsIndex(getDataUrl));
   if (!index || !index.reports.length) return [];
 
   const items: MonitorItem[] = [];
@@ -713,18 +911,61 @@ export async function loadFullReportsByDate(getDataUrl?: GetDataUrl): Promise<Mo
   return items;
 }
 
-/** 一次性加载 reports 全部数据；周报仅来自数据库 weekly_report_simple（wx+dy），与 SensorTower 隔离 */
+/** 将多周数据合并为一份榜单（与 SensorTower 一致：全部展示，每项带 weekRange 便于筛选） */
+function mergeWechatDouyinRankingsAllWeeks(byWeek: WechatDouyinRankingsByWeek[]): GameRanking[] {
+  const byType = new Map<GameRankingType, GameRankingItem[]>();
+  for (const { weekRange, rankings } of byWeek) {
+    for (const r of rankings) {
+      const items = r.items.map((it) => ({ ...it, weekRange }));
+      const existing = byType.get(r.type) ?? [];
+      byType.set(r.type, [...existing, ...items]);
+    }
+  }
+  const result: GameRanking[] = [];
+  const order: GameRankingType[] = ['微信小游戏', '抖音小游戏', '榜单异动'];
+  const titles: Record<string, string> = { '微信小游戏': '微信小游戏 Top20', '抖音小游戏': '抖音小游戏 Top20', '榜单异动': '榜单异动' };
+  for (const type of order) {
+    const items = byType.get(type);
+    if (items && items.length > 0) {
+      result.push({
+        type,
+        title: titles[type] ?? type,
+        updateTime: byWeek[0]?.weekRange?.split(WEEK_RANGE_SEP)[0] ? `${byWeek[0].weekRange.split(WEEK_RANGE_SEP)[0]} 12:00` : '',
+        period: '周榜',
+        items,
+      });
+    }
+  }
+  return result;
+}
+
+/** 一次性加载 reports 全部数据；微信/抖音三榜单优先从 wechatdouyin.db 加载多周并合并为一份展示（与 SensorTower 一致），否则回退 CSV */
 export async function loadReportsData(getDataUrl?: GetDataUrl): Promise<ReportsLoadResult> {
-  const [wechatDouyinRankings, { newGameItems, newPlayItems }, weeklyBriefFromDb, weeklyBriefFromFiles] =
+  const index = await loadReportsIndex(getDataUrl);
+  const [wechatDouyinByWeek, { newGameItems, newPlayItems }, weeklyBriefFromDb, weeklyBriefFromFiles] =
     await Promise.all([
-      loadWechatDouyinRankings(getDataUrl),
-      loadNewGamesAndNewPlay(getDataUrl),
+      loadWechatDouyinRankingsFromDb(getDataUrl),
+      loadNewGamesAndNewPlay(getDataUrl, index),
       loadWeeklyBriefFromDb(getDataUrl),
-      loadFullReportsByDate(getDataUrl),
+      loadFullReportsByDate(getDataUrl, index),
     ]);
+  let wechatDouyinRankings: GameRanking[];
+  let wechatDouyinRankingsByWeek: WechatDouyinRankingsByWeek[];
+  if (wechatDouyinByWeek.length > 0) {
+    wechatDouyinRankingsByWeek = wechatDouyinByWeek;
+    wechatDouyinRankings = mergeWechatDouyinRankingsAllWeeks(wechatDouyinByWeek);
+  } else {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[微信/抖音排行榜] wechatdouyin.db 未返回多周数据，使用 CSV 回退。请确认 public/wechatdouyin.db 可访问且含 top20_ranking、rank_changes 表。');
+    }
+    const csvRankings = await loadWechatDouyinRankings(getDataUrl, index);
+    wechatDouyinRankings = csvRankings;
+    wechatDouyinRankingsByWeek = csvRankings.length > 0 ? [{ weekRange: '当前', rankings: csvRankings }] : [];
+  }
   const weeklyBriefItems = [...weeklyBriefFromDb, ...weeklyBriefFromFiles];
   return {
     wechatDouyinRankings,
+    wechatDouyinRankingsByWeek,
     newGameItems,
     newPlayItems,
     weeklyBriefItems,

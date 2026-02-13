@@ -59,14 +59,14 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
   const screenshots = parseScreenshotUrls(info?.screenshot_urls);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-200 bg-slate-900 border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -74,8 +74,8 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
               返回
             </button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-white truncate">{card.gameName}</h1>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <h1 className="text-xl font-bold text-slate-900 truncate">{card.gameName}</h1>
+              <p className="text-sm text-slate-500 mt-0.5">
                 {card.country} · {card.platform} · 新进榜排名 #{card.currentRank}
               </p>
             </div>
@@ -85,13 +85,13 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!info ? (
-          <div className="bg-slate-900/70 rounded-xl border border-slate-800 p-8 text-center text-slate-500">
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
             暂无该应用的商店信息
           </div>
         ) : (
           <div className="space-y-6">
             {/* 头部卡片：图标 + 名称 + 开发者 + 评分 + 分类 */}
-            <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-6 flex flex-col sm:flex-row gap-6">
                 {info.icon_url && (
                   <img
@@ -101,21 +101,21 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
                   />
                 )}
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-bold text-white mb-1">
+                  <h2 className="text-2xl font-bold text-slate-900 mb-1">
                     {isAppStoreInfo(info) ? info.app_name : info.title}
                   </h2>
                   {isAppStoreInfo(info) && info.subtitle && (
-                    <p className="text-slate-300 mb-2">{decodeHtml(info.subtitle)}</p>
+                    <p className="text-slate-600 mb-2">{decodeHtml(info.subtitle)}</p>
                   )}
                   {info.developer && (
-                    <p className="text-sm text-slate-400 mb-2">
-                      <span className="font-medium text-slate-200">开发者：</span>
+                    <p className="text-sm text-slate-500 mb-2">
+                      <span className="font-medium text-slate-700">开发者：</span>
                       {decodeHtml(info.developer)}
                     </p>
                   )}
                   <div className="flex flex-wrap items-center gap-4 text-sm">
                     {info.rating != null && (
-                      <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
+                      <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
                         ★ {info.rating.toFixed(1)}
                       </span>
                     )}
@@ -123,7 +123,7 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
                       <span className="text-slate-500">（{info.rating_count.toLocaleString()} 评分）</span>
                     )}
                     {info.category && (
-                      <span className="px-2 py-0.5 bg-slate-800 text-slate-200 rounded border border-slate-700">{info.category}</span>
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">{info.category}</span>
                     )}
                     {isAppStoreInfo(info) && info.age_rating && (
                       <span className="text-slate-500">{info.age_rating}</span>
@@ -136,7 +136,7 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
                     )}
                   </div>
                   {isAppStoreInfo(info) && info.price_type && (
-                    <p className="text-sm text-slate-300 mt-2">{info.price_type}</p>
+                  <p className="text-sm text-slate-600 mt-2">{info.price_type}</p>
                   )}
                 </div>
               </div>
@@ -144,9 +144,9 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
 
             {/* 简短描述（Android short_description / iOS description_short） */}
             {(isAppStoreInfo(info) ? info.description_short : (info as GameStoreInfo).short_description) && (
-              <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-white mb-3">简介</h3>
-                <p className="text-slate-200 leading-relaxed whitespace-pre-line">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">简介</h3>
+                <p className="text-slate-700 leading-relaxed whitespace-pre-line">
                   {formatDescription(
                     isAppStoreInfo(info)
                       ? (info.description_short ?? '')
@@ -158,15 +158,15 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
 
             {/* 截图 */}
             {screenshots.length > 0 && (
-              <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-white mb-3">截图</h3>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">截图</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {screenshots.map((url, idx) => (
                     <img
                       key={`${url}-${idx}`}
                       src={url}
                       alt={`${card.gameName} 截图 ${idx + 1}`}
-                      className="w-full h-40 object-cover rounded-lg border border-slate-800"
+                      className="w-full h-40 object-cover rounded-lg border border-slate-200"
                       loading="lazy"
                     />
                   ))}
@@ -176,10 +176,10 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
 
             {/* 完整描述 */}
             {(isAppStoreInfo(info) ? info.description : (info as GameStoreInfo).full_description) && (
-              <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-white mb-3">应用描述</h3>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">应用描述</h3>
                 <div
-                  className="text-slate-200 leading-relaxed whitespace-pre-line prose prose-invert prose-sm max-w-none"
+                  className="text-slate-700 leading-relaxed whitespace-pre-line prose prose-sm max-w-none"
                   style={{ wordBreak: 'break-word' }}
                 >
                   {formatDescription(
@@ -201,12 +201,12 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
 
             {/* 商店链接 */}
             {info.store_url && (
-              <div className="bg-slate-900/70 rounded-xl border border-slate-800 shadow-sm p-6">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                 <a
                   href={info.store_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-500/20 text-cyan-200 text-sm font-medium hover:bg-cyan-500/30 transition-colors border border-cyan-500/30"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
                 >
                   {isIos ? '在 App Store 中查看' : '在 Google Play 中查看'}
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

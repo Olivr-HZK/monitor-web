@@ -12,20 +12,128 @@ type GetDataUrl = (filename: string) => string;
  * 解析热点日报 MD 文件
  */
 export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
-  // 优先读取 public/热点/final_json.json；如果失败则回退到 热点日报.md
-  const jsonUrl = getDataUrl ? getDataUrl('热点/final_json.json') : '热点/final_json.json';
+  // 同时加载按日期命名的 JSON 与旧版 JSON，合并后返回，失败再回退到 MD
+  const formatDate = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
   const mdUrl = getDataUrl ? getDataUrl('热点/热点日报.md') : '热点/热点日报.md';
   const opts = (url: string) => (url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {});
+  const baseUrl = (() => {
+    const env = (import.meta as { env?: { BASE_URL?: string } }).env;
+    return env?.BASE_URL ? String(env.BASE_URL).replace(/\/$/, '') : '';
+  })();
 
-  try {
-    const response = await fetch(jsonUrl, opts(jsonUrl));
-    if (response.ok) {
-      const data = await response.json();
-      const items = parseHotTrendReportJson(data);
-      if (items.length > 0) return items;
+  const mergedItems: MonitorItem[] = [];
+  const seenKeys = new Set<string>();
+
+  const pushItems = (items: MonitorItem[]) => {
+    items.forEach((item) => {
+      const key = `${item.type}|${item.title}|${item.url ?? ''}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      mergedItems.push(item);
+    });
+  };
+
+  const buildCandidateUrls = (filename: string) => {
+    if (getDataUrl) {
+      return [getDataUrl(filename)];
     }
-  } catch (error) {
-    console.warn('Failed to load 热点/final_json.json, fallback to MD:', error);
+    const baseUrlCandidate = baseUrl ? `${baseUrl}/${filename}` : filename;
+    const absoluteCandidate = `/${filename}`;
+    const rawCandidate = filename;
+    const urls = [baseUrlCandidate, absoluteCandidate, rawCandidate];
+    return Array.from(new Set(urls.flatMap((url) => [url, encodeURI(url)])));
+  };
+
+  const normalizeIndexEntry = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.includes('/')) return trimmed;
+    if (trimmed.endsWith('.json')) return `热点/${trimmed}`;
+    return `热点/${trimmed}.json`;
+  };
+
+  const indexFiles: string[] = [];
+  const indexCandidates = ['热点/index.json'];
+  for (const indexName of indexCandidates) {
+    const urls = buildCandidateUrls(indexName);
+    for (const indexUrl of urls) {
+      try {
+        const res = await fetch(indexUrl, opts(indexUrl));
+        if (!res.ok) continue;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) continue;
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          json.forEach((entry) => {
+            if (typeof entry !== 'string') return;
+            const normalized = normalizeIndexEntry(entry);
+            if (normalized) indexFiles.push(normalized);
+          });
+          break;
+        }
+      } catch {
+        // ignore index failures
+      }
+    }
+    if (indexFiles.length > 0) break;
+  }
+
+  // 有 index 时不再按日期扫 120 天；无 index 时只尝试最近 14 天，避免大量 404
+  const dateCandidates: string[] = [];
+  const maxDays = indexFiles.length > 0 ? 0 : 14;
+  const today = new Date();
+  for (let i = 0; i < maxDays; i += 1) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    dateCandidates.push(`热点/${formatDate(d)}.json`);
+  }
+
+  const jsonCandidates = Array.from(
+    new Set([
+      ...indexFiles,
+      ...dateCandidates,
+      '热点/final_json_from_csv.json',
+      '热点/final_result.json',
+      '热点/final_json.json',
+    ])
+  );
+
+  for (const filename of jsonCandidates) {
+    const urls = buildCandidateUrls(filename);
+    let loaded = false;
+    for (const jsonUrl of urls) {
+      try {
+        const response = await fetch(jsonUrl, opts(jsonUrl));
+        if (!response.ok) {
+          console.warn(`Failed to load ${jsonUrl} (status ${response.status}).`);
+          continue;
+        }
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const text = await response.text();
+          console.warn(`Failed to parse ${jsonUrl}: expected JSON, got ${contentType || 'unknown'}`, text.slice(0, 120));
+          continue;
+        }
+        const data = await response.json();
+        const items = parseHotTrendReportJson(data, { useFeishuProxy: !!getDataUrl });
+        if (items.length > 0) {
+          pushItems(items);
+          loaded = true;
+        }
+      } catch (error) {
+        console.warn(`Failed to load ${jsonUrl}, fallback to next.`, error);
+      }
+    }
+    if (loaded) continue;
+  }
+
+  if (mergedItems.length > 0) {
+    return mergedItems;
   }
 
   try {
@@ -102,7 +210,7 @@ function parseHotTrendReport(text: string): MonitorItem[] {
   if (uaInspiration) contentParts.push(`## UA灵感\n\n${uaInspiration}\n`);
 
   const doc: ReportDocument = {
-    title: `热点日报：${title}`,
+    title,
     tags: contentType ? [contentType, '热点', 'UA灵感'] : ['热点', 'UA灵感'],
     date: dateStr,
     time: '09:00',
@@ -140,7 +248,10 @@ function parseHotTrendReport(text: string): MonitorItem[] {
 /**
  * 解析热点日报 JSON（public/热点/final_json.json）
  */
-function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
+function parseHotTrendReportJson(
+  raw: unknown,
+  options?: { useFeishuProxy?: boolean }
+): MonitorItem[] {
   const items: MonitorItem[] = [];
   if (!raw || typeof raw !== 'object') return items;
 
@@ -154,11 +265,16 @@ function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
         summary?: string;
         score?: number;
         coverImage?: string;
+        source?: string;
         meta?: {
           heat?: number;
           url?: string;
           image_base64?: string;
           image_type?: string;
+          views?: number;
+          likes?: number;
+          source?: string;
+          cover_url?: string;
         };
       }>;
     };
@@ -179,10 +295,37 @@ function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
     .filter((title): title is string => !!title);
 
   if (titles.length > 0) {
-    const topCount = 5;
-    const topTitles = titles.slice(0, topCount);
-    const summaryLines = topTitles.map((title, index) => `${index + 1}. ${title}`).join('\n');
-    const summaryTextRaw = `以下是本周 Google Trends Top ${topTitles.length} 热点，详情进入网站查看。`;
+    const sources = documents.map((doc) => {
+      const metaSource =
+        typeof doc.meta === 'object' && doc.meta && 'source' in doc.meta && typeof doc.meta.source === 'string'
+          ? doc.meta.source
+          : '';
+      return (doc.source ?? metaSource ?? '').trim() || 'Google Trends';
+    });
+    const grouped: Record<string, Array<{ title: string; entryId: string }>> = {};
+    const sourceOrder: string[] = [];
+    titles.forEach((title, index) => {
+      const source = sources[index] || 'Google Trends';
+      if (!grouped[source]) {
+        grouped[source] = [];
+        sourceOrder.push(source);
+      }
+      grouped[source].push({
+        title,
+        entryId: `hot-trend-json-${dateStr.replace(/-/g, '')}-${index}`,
+      });
+    });
+
+    const summaryLines: string[] = [];
+    sourceOrder.forEach((source, sourceIndex) => {
+      if (sourceIndex > 0) summaryLines.push('');
+      summaryLines.push(`### ${source}`);
+      grouped[source].forEach((entry, idx) => {
+        summaryLines.push(`${idx + 1}. [${entry.title}](#entry:${entry.entryId})`);
+      });
+    });
+
+    const summaryTextRaw = `以下为昨天热点共 ${titles.length} 条，按来源分组展示，点击标题可查看对应卡片详情。`;
     const summaryText =
       summaryTextRaw.length > 240 ? `${summaryTextRaw.slice(0, 240)}...` : summaryTextRaw;
 
@@ -193,7 +336,7 @@ function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
       time: baseTime,
       source: '热点监测',
       summary: summaryText,
-      content: `## 摘要\n${summaryText}\n\n## 本周 Google Trends Top ${topTitles.length} 热点\n${summaryLines}\n\n详情进入网站查看：\nhttps://olivr-hzk.github.io/monitor-web/`,
+      content: `## 摘要\n${summaryText}\n\n## 本日热点\n${summaryLines.join('\n')}\n`,
       meta: {
         kind: 'daily_summary',
         titles,
@@ -225,19 +368,24 @@ function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
   documents.forEach((doc, index) => {
     const title = doc.title?.trim() || `热点日报条目 ${index + 1}`;
     const summary = doc.summary?.trim() || '';
+    const views = typeof doc.meta?.views === 'number' ? doc.meta.views : undefined;
+    const likes = typeof doc.meta?.likes === 'number' ? doc.meta.likes : undefined;
     const heat = doc.meta?.heat ?? 0;
     const coverImage =
       doc.coverImage ||
+      (doc.meta?.cover_url
+        ? (options?.useFeishuProxy ? `/api/feishu-media?url=${encodeURIComponent(doc.meta.cover_url)}` : doc.meta.cover_url)
+        : undefined) ||
       (doc.meta?.image_base64
         ? `data:image/${doc.meta.image_type ?? 'jpg'};base64,${doc.meta.image_base64}`
         : undefined);
 
     const reportDoc: ReportDocument = {
-      title: `热点日报：${title}`,
+      title,
       tags: doc.tags && doc.tags.length > 0 ? doc.tags : ['热点'],
       date: dateStr,
       time: baseTime,
-      source: '热点监测',
+      source: doc.source ?? (typeof doc.meta === 'object' && doc.meta && 'source' in doc.meta ? (doc.meta.source as string) : undefined) ?? '热点监测',
       summary: summary || title,
       content: doc.content || summary || title,
       score: doc.score,
@@ -252,8 +400,8 @@ function parseHotTrendReportJson(raw: unknown): MonitorItem[] {
       platform: '全网',
       date: reportDoc.date ?? dateStr,
       time: reportDoc.time ?? baseTime,
-      views: heat * 1000,
-      engagement: heat * 100,
+      views: views ?? heat * 1000,
+      engagement: likes ?? heat * 100,
       description: (reportDoc.summary ?? summary) || title,
       tags: reportDoc.tags ?? [],
       language: '中文',

@@ -6,7 +6,7 @@
 import type { SensorTowerRankChangeItem, SensorTowerStoreChangeItem } from '../types';
 import type { MonitorItem } from '../types';
 
-const DETAIL_LINK = 'https://olivr-hzk.github.io/monitor-web/';
+const DETAIL_LINK = 'https://sites.google.com/castbox.fm/overwatch2/home?authuser=1';
 
 function parseSurgeValue(change: string): number {
   if (!change || change === 'NEW') return 0;
@@ -24,6 +24,21 @@ function formatRevenue(r: number | undefined | null): string {
   if (r == null) return '—';
   if (r >= 10000) return `$${(r / 10000).toFixed(2)}万`;
   return `$${r.toFixed(0)}`;
+}
+
+function formatNameWithLink(name: string, url?: string): string {
+  if (!url) return name;
+  return `[${name}](${url})`;
+}
+
+function groupByAppId(items: SensorTowerRankChangeItem[]): Map<string, SensorTowerRankChangeItem[]> {
+  const map = new Map<string, SensorTowerRankChangeItem[]>();
+  for (const item of items) {
+    const key = item.appId || item.appName || item.metadataAppName || item.id;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(item);
+  }
+  return map;
 }
 
 /** 从异动数据中按周生成周报 Markdown 内容（含新进 Top50、排名飙升 Top10 + 底部详情链接） */
@@ -45,12 +60,33 @@ function buildWeekReportMd(
     '| 排名 | 产品名 | 开发者 | 国家/地区 | 平台 | 下载量 | 收入 |',
     '|------|--------|--------|-----------|------|--------|------|',
   ];
-  for (const row of newTop50) {
-    const name = row.metadataAppName || row.appName || row.appId;
-    const publisher = row.publisherName || '—';
-    lines.push(
-      `| ${row.currentRank} | ${name} | ${publisher} | ${row.country} | ${row.platform} | ${formatNum(row.downloads)} | ${formatRevenue(row.revenue)} |`
-    );
+  const top50Groups = groupByAppId(newTop50);
+  for (const [, group] of top50Groups) {
+    const base = group[0];
+    const nameRaw = base.metadataAppName || base.appName || base.appId;
+    const name = formatNameWithLink(nameRaw, base.appUrl);
+    const publisher = base.publisherName || '—';
+    if (group.length === 1) {
+      lines.push(
+        `| ${base.currentRank} | ${name} | ${publisher} | ${base.country} | ${base.platform} | ${formatNum(base.downloads)} | ${formatRevenue(base.revenue)} |`
+      );
+    } else {
+      const regionRanks = group
+        .map((row) => `${row.country}：${row.currentRank}`)
+        .join('<br>');
+      const regionCountries = group
+        .map((row) => `${row.country}`)
+        .join('<br>');
+      const regionDownloads = group
+        .map((row) => `${row.country}：${formatNum(row.downloads)}`)
+        .join('<br>');
+      const regionRevenue = group
+        .map((row) => `${row.country}：${formatRevenue(row.revenue)}`)
+        .join('<br>');
+      lines.push(
+        `| ${regionRanks} | ${name} | ${publisher} | ${regionCountries} | ${base.platform} | ${regionDownloads} | ${regionRevenue} |`
+      );
+    }
   }
   if (newTop50.length === 0) {
     lines.push('| — | 本周无新进 Top50 记录 | — | — | — | — | — |');
@@ -66,12 +102,39 @@ function buildWeekReportMd(
     '| 当前排名 | 上周排名 | 上升幅度 | 产品名 | 开发者 | 国家/地区 | 平台 | 下载量 | 收入 |',
     '|----------|----------|----------|--------|--------|-----------|------|--------|------|',
   );
-  for (const row of surgeTop10) {
-    const name = row.metadataAppName || row.appName || row.appId;
-    const publisher = row.publisherName || '—';
-    lines.push(
-      `| ${row.currentRank} | ${row.lastWeekRank} | ${row.change} | ${name} | ${publisher} | ${row.country} | ${row.platform} | ${formatNum(row.downloads)} | ${formatRevenue(row.revenue)} |`
-    );
+  const surgeGroups = groupByAppId(surgeTop10);
+  for (const [, group] of surgeGroups) {
+    const base = group[0];
+    const nameRaw = base.metadataAppName || base.appName || base.appId;
+    const name = formatNameWithLink(nameRaw, base.appUrl);
+    const publisher = base.publisherName || '—';
+    if (group.length === 1) {
+      lines.push(
+        `| ${base.currentRank} | ${base.lastWeekRank} | ${base.change} | ${name} | ${publisher} | ${base.country} | ${base.platform} | ${formatNum(base.downloads)} | ${formatRevenue(base.revenue)} |`
+      );
+    } else {
+      const regionRanks = group
+        .map((row) => `${row.country}：${row.currentRank}`)
+        .join('<br>');
+      const regionLastRanks = group
+        .map((row) => `${row.country}：${row.lastWeekRank || '—'}`)
+        .join('<br>');
+      const regionChanges = group
+        .map((row) => `${row.country}：${row.change || '—'}`)
+        .join('<br>');
+      const regionCountries = group
+        .map((row) => `${row.country}`)
+        .join('<br>');
+      const regionDownloads = group
+        .map((row) => `${row.country}：${formatNum(row.downloads)}`)
+        .join('<br>');
+      const regionRevenue = group
+        .map((row) => `${row.country}：${formatRevenue(row.revenue)}`)
+        .join('<br>');
+      lines.push(
+        `| ${regionRanks} | ${regionLastRanks} | ${regionChanges} | ${name} | ${publisher} | ${regionCountries} | ${base.platform} | ${regionDownloads} | ${regionRevenue} |`
+      );
+    }
   }
   if (surgeTop10.length === 0) {
     lines.push('| — | — | — | 本周无排名飙升记录 | — | — | — | — | — |');

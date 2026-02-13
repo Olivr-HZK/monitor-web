@@ -17,8 +17,13 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
   const [countryFilter, setCountryFilter] = useState<'all' | string>('all');
   const [chartTypeFilter, setChartTypeFilter] = useState<'all' | string>('all');
   const [changeTypeFilter, setChangeTypeFilter] = useState<'all' | string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 100;
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const matchesSearch = (value?: string) =>
+    normalizedSearch ? (value ?? '').toLowerCase().includes(normalizedSearch) : true;
 
   // Top100 筛选与选项
   const top100 = useMemo(() => {
@@ -27,6 +32,9 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     const chartTypes = new Set<string>();
     let filtered = items;
     if (platformFilter !== 'all') filtered = filtered.filter((it) => it.platform === platformFilter);
+    if (normalizedSearch) {
+      filtered = filtered.filter((it) => matchesSearch(it.appId) || matchesSearch(it.appName));
+    }
     filtered.forEach((it) => {
       if (it.rankDate) dates.add(it.rankDate);
       if (it.country) countries.add(it.country);
@@ -41,7 +49,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       uniqueCountries: Array.from(countries).sort(),
       uniqueChartTypes: Array.from(chartTypes).sort(),
     };
-  }, [items, platformFilter, dateFilter, countryFilter, chartTypeFilter]);
+  }, [items, platformFilter, dateFilter, countryFilter, chartTypeFilter, normalizedSearch]);
 
   // 异动榜单筛选与选项（平台、日期=当前榜单日期、国家、异动类型）
   const changes = useMemo(() => {
@@ -50,6 +58,11 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     const changeTypes = new Set<string>();
     let filtered = rankChangeItems;
     if (platformFilter !== 'all') filtered = filtered.filter((it) => it.platform === platformFilter);
+    if (normalizedSearch) {
+      filtered = filtered.filter(
+        (it) => matchesSearch(it.appId) || matchesSearch(it.metadataAppName) || matchesSearch(it.appName)
+      );
+    }
     filtered.forEach((it) => {
       if (it.rankDateCurrent) dates.add(it.rankDateCurrent);
       if (it.country) countries.add(it.country);
@@ -64,12 +77,15 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       uniqueCountries: Array.from(countries).sort(),
       uniqueChangeTypes: Array.from(changeTypes).sort(),
     };
-  }, [rankChangeItems, platformFilter, dateFilter, countryFilter, changeTypeFilter]);
+  }, [rankChangeItems, platformFilter, dateFilter, countryFilter, changeTypeFilter, normalizedSearch]);
 
   const storeChangeList = useMemo(() => {
     const dates = new Set<string>();
     let filtered = storeChanges;
     if (platformFilter !== 'all') filtered = filtered.filter((it) => it.platform === platformFilter);
+    if (normalizedSearch) {
+      filtered = filtered.filter((it) => matchesSearch(it.appId) || matchesSearch(it.appName));
+    }
     filtered.forEach((it) => {
       if (it.rankDate) dates.add(it.rankDate);
     });
@@ -84,7 +100,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       filteredItems: filtered,
       uniqueDates: Array.from(dates).sort().reverse(),
     };
-  }, [storeChanges, platformFilter, dateFilter]);
+  }, [storeChanges, platformFilter, dateFilter, normalizedSearch]);
 
   const isTop100 = activeTab === 'top100';
   const isRankChanges = activeTab === 'changes';
@@ -127,7 +143,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 hover:underline"
+        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
         title={title}
       >
         {name}
@@ -148,8 +164,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     <div className="w-full">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-1">SensorTower 排行榜</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-3xl font-bold text-slate-900 mb-1">SensorTower 排行榜</h1>
+          <p className="text-sm text-slate-600">
             Top100 榜单与异动榜单，支持按日期、国家、平台及榜单类型/异动类型筛选，每页 10 条。
           </p>
         </div>
@@ -157,7 +173,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center px-3 py-2 rounded-md border border-slate-700 text-sm font-medium text-slate-200 bg-slate-900 hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7 7-7M3 12h18" />
@@ -168,14 +184,14 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       </div>
 
       {/* Tab：Top100 | 异动榜单 */}
-      <div className="mb-4 flex gap-2 border-b border-slate-800">
+      <div className="mb-4 flex gap-2 border-b border-slate-200">
         <button
           type="button"
           onClick={() => handleTabChange('top100')}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
             activeTab === 'top100'
-              ? 'border-cyan-400 text-cyan-300'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
           Top100 榜单
@@ -185,8 +201,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           onClick={() => handleTabChange('changes')}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
             activeTab === 'changes'
-              ? 'border-cyan-400 text-cyan-300'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
           异动榜单
@@ -196,8 +212,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           onClick={() => handleTabChange('store_changes')}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
             activeTab === 'store_changes'
-              ? 'border-cyan-400 text-cyan-300'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
           商店页变化
@@ -207,11 +223,24 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       {/* 筛选：平台、日期、国家、榜单类型( Top100 ) / 异动类型( 异动榜单 ) */}
       <div className="mb-4 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-300">平台</span>
+          <span className="text-sm text-slate-300">关键词</span>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
+            placeholder="搜索 App ID / 游戏名"
+            className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 w-56"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-600">平台</span>
           <select
             value={platformFilter}
             onChange={(e) => handleFilterChange(setPlatformFilter, e.target.value as 'all' | 'iOS' | 'Android')}
-            className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">全部</option>
             <option value="iOS">iOS</option>
@@ -219,11 +248,11 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-300">日期</span>
+          <span className="text-sm text-slate-600">日期</span>
           <select
             value={dateFilter}
             onChange={(e) => handleFilterChange(setDateFilter, e.target.value === 'all' ? 'all' : e.target.value)}
-            className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">全部</option>
             {uniqueDates.map((d) => (
@@ -235,11 +264,11 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         </div>
         {!isStoreChanges && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-300">国家</span>
+            <span className="text-sm text-slate-600">国家</span>
             <select
               value={countryFilter}
               onChange={(e) => handleFilterChange(setCountryFilter, e.target.value === 'all' ? 'all' : e.target.value)}
-              className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
               {uniqueCountries.map((c) => (
@@ -252,13 +281,13 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         )}
         {isTop100 ? (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-300">榜单类型</span>
+            <span className="text-sm text-slate-600">榜单类型</span>
             <select
               value={chartTypeFilter}
               onChange={(e) =>
                 handleFilterChange(setChartTypeFilter, e.target.value === 'all' ? 'all' : e.target.value)
               }
-              className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
               {top100.uniqueChartTypes.map((t) => (
@@ -270,13 +299,13 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           </div>
         ) : isRankChanges ? (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-300">异动类型</span>
+            <span className="text-sm text-slate-600">异动类型</span>
             <select
               value={changeTypeFilter}
               onChange={(e) =>
                 handleFilterChange(setChangeTypeFilter, e.target.value === 'all' ? 'all' : e.target.value)
               }
-              className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
               {changes.uniqueChangeTypes.map((t) => (
@@ -289,45 +318,12 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         ) : null}
       </div>
 
-      <div className="mb-3 flex items-center justify-between text-sm text-slate-400">
-        <div>
-          共 <span className="font-semibold text-white">{filteredItems.length}</span> 条记录，当前第{' '}
-          <span className="font-semibold text-white">{currentPage}</span> / {totalPages} 页
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={currentPage <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className={`px-3 py-1.5 rounded-md border text-sm ${
-              currentPage <= 1
-                ? 'border-slate-800 text-slate-600 cursor-not-allowed'
-                : 'border-slate-700 text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            上一页
-          </button>
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className={`px-3 py-1.5 rounded-md border text-sm ${
-              currentPage >= totalPages
-                ? 'border-slate-800 text-slate-600 cursor-not-allowed'
-                : 'border-slate-700 text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            下一页
-          </button>
-        </div>
-      </div>
-
       {isTop100 ? (
-        <div className="overflow-x-auto -mx-6">
+        <div className="overflow-x-auto -mx-6 max-h-[560px] overflow-y-auto">
           <table className="w-full min-w-[1000px]">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/80">
-                <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">排名</th>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏名</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">开发公司</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">发行日期</th>
@@ -338,36 +334,36 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">榜单日期</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-slate-200">
               {pageItems.length > 0 ? (
                 (pageItems as SensorTowerTopItem[]).map((item, index) => (
                   <tr
                     key={item.id}
-                    className={`hover:bg-slate-800/60 transition-colors ${
-                      index % 2 === 0 ? 'bg-slate-950/40' : 'bg-slate-900/40'
+                    className={`hover:bg-slate-50 transition-colors ${
+                      index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                     }`}
                   >
                     <td className="py-3 px-6 whitespace-nowrap">
-                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold bg-slate-800 text-slate-200">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold bg-slate-100 text-slate-700">
                         {item.rank}
                       </span>
                     </td>
-                    <td className="py-3 px-6 text-sm text-slate-200 max-w-[180px] truncate" title={item.appName ?? item.appId}>
+                    <td className="py-3 px-6 text-sm text-slate-700 max-w-[180px] truncate" title={item.appName ?? item.appId}>
                       {renderAppName(item.appName, item.appUrl, item.appName ?? item.appId)}
                     </td>
-                    <td className="py-3 px-6 text-sm text-slate-200 max-w-[140px] truncate" title={item.publisherName}>
+                    <td className="py-3 px-6 text-sm text-slate-700 max-w-[140px] truncate" title={item.publisherName}>
                       {item.publisherName || '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">
                       {item.releaseDate || '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm font-mono text-slate-200">
+                    <td className="py-3 px-6 whitespace-nowrap text-sm font-mono text-slate-700">
                       {item.appId}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.platform}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.country}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.chartType}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.rankDate}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.platform}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.country}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.chartType}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.rankDate}</td>
                   </tr>
                 ))
               ) : (
@@ -381,10 +377,10 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           </table>
         </div>
       ) : isRankChanges ? (
-        <div className="overflow-x-auto -mx-6">
+        <div className="overflow-x-auto -mx-6 max-h-[560px] overflow-y-auto">
           <table className="w-full min-w-[1000px]">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/80">
+              <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">当前排名</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">上周排名</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">变化</th>
@@ -400,42 +396,42 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">当前榜单日期</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-slate-200">
               {pageItems.length > 0 ? (
                 (pageItems as SensorTowerRankChangeItem[]).map((item, index) => (
                   <tr
                     key={item.id}
-                    className={`hover:bg-slate-800/60 transition-colors ${
-                      index % 2 === 0 ? 'bg-slate-950/40' : 'bg-slate-900/40'
+                    className={`hover:bg-slate-50 transition-colors ${
+                      index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                     }`}
                   >
                     <td className="py-3 px-6 whitespace-nowrap">
-                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold bg-slate-800 text-slate-200">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold bg-slate-100 text-slate-700">
                         {item.currentRank}
                       </span>
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.lastWeekRank || '—'}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm font-medium text-slate-200">{item.change}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.changeType}</td>
-                    <td className="py-3 px-6 text-sm text-slate-200 max-w-[180px] truncate" title={item.metadataAppName ?? item.appName}>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.lastWeekRank || '—'}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm font-medium text-slate-700">{item.change}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.changeType}</td>
+                    <td className="py-3 px-6 text-sm text-slate-700 max-w-[180px] truncate" title={item.metadataAppName ?? item.appName}>
                       {renderAppName(item.metadataAppName || item.appName, item.appUrl, item.metadataAppName ?? item.appName ?? item.appId)}
                     </td>
-                    <td className="py-3 px-6 text-sm text-slate-200 max-w-[140px] truncate" title={item.publisherName}>
+                    <td className="py-3 px-6 text-sm text-slate-700 max-w-[140px] truncate" title={item.publisherName}>
                       {item.publisherName || '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">
                       {item.releaseDate || '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm font-mono text-slate-200">{item.appId}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-200">
+                    <td className="py-3 px-6 whitespace-nowrap text-sm font-mono text-slate-700">{item.appId}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-700">
                       {item.downloads != null ? item.downloads.toLocaleString() : '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-200">
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-700">
                       {item.revenue != null ? item.revenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.country}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.platform}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-200">{item.rankDateCurrent}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.country}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.platform}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.rankDateCurrent}</td>
                   </tr>
                 ))
               ) : (
@@ -449,21 +445,21 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           </table>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[560px] overflow-y-auto pr-1">
           {pageItems.length > 0 ? (
             (pageItems as SensorTowerStoreChangeItem[]).map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-sm"
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{item.appName}</h3>
-                    <p className="text-sm text-slate-400">
+                    <h3 className="text-lg font-semibold text-slate-900">{item.appName}</h3>
+                    <p className="text-sm text-slate-600">
                       {item.developer ? `${item.developer} · ` : ''}{item.platform}
                     </p>
                   </div>
-                  <div className="text-sm text-slate-400">
+                  <div className="text-sm text-slate-600">
                     变动时间：{item.changedAt || item.rankDate}
                   </div>
                 </div>
@@ -473,7 +469,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                       href={item.storeUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-cyan-300 hover:text-cyan-200 hover:underline"
+                      className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
                     >
                       商店页链接
                     </a>
@@ -483,25 +479,25 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium border ${
                       item.priority === 2
-                        ? 'bg-red-500/10 text-red-300 border-red-500/30'
+                        ? 'bg-red-50 text-red-700 border-red-200'
                         : item.priority === 1
-                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          : 'bg-slate-500/10 text-slate-300 border-slate-600/30'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}
                   >
                     优先级：{item.priorityLabel}
                   </span>
                 </div>
-                <div className="mt-4 space-y-2 text-sm text-slate-200">
+                <div className="mt-4 space-y-2 text-sm text-slate-700">
                   {item.summaries.length > 0 ? (
                     item.summaries.map((s, idx) => (
                       <div key={`${item.id}-summary-${idx}`} className="flex items-start gap-2">
-                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
                         <span>{s}</span>
                       </div>
                     ))
                   ) : (
-                    <div className="text-slate-400">未解析到具体变化内容。</div>
+                    <div className="text-slate-500">未解析到具体变化内容。</div>
                   )}
                 </div>
               </div>
@@ -513,6 +509,39 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           )}
         </div>
       )}
+
+      <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+        <div>
+          共 <span className="font-semibold text-slate-900">{filteredItems.length}</span> 条记录，当前第{' '}
+          <span className="font-semibold text-slate-900">{currentPage}</span> / {totalPages} 页
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={`px-3 py-1.5 rounded-md border text-sm ${
+              currentPage <= 1
+                ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                : 'border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            上一页
+          </button>
+          <button
+            type="button"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            className={`px-3 py-1.5 rounded-md border text-sm ${
+              currentPage >= totalPages
+                ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                : 'border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            下一页
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

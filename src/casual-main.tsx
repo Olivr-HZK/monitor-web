@@ -1,0 +1,20 @@
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { HashRouter } from 'react-router-dom';
+import './index.css';
+import { AuthProvider } from './context/AuthContext';
+import { DataProvider } from './context/DataContext';
+import CasualApp from './casual/CasualApp';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <AuthProvider>
+      <DataProvider>
+        <HashRouter>
+          <CasualApp />
+        </HashRouter>
+      </DataProvider>
+    </AuthProvider>
+  </StrictMode>
+);
+

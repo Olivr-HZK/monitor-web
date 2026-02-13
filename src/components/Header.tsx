@@ -22,14 +22,14 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-800/70 bg-slate-950/80 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2">
+            <div className="flex items-center space-x-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2">
               <span className="text-xl">⚡</span>
-              <span className="font-bold text-lg text-white">监测汇总</span>
+              <span className="font-bold text-lg text-slate-900">监测汇总</span>
             </div>
           </div>
 
@@ -41,8 +41,8 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
                 onClick={() => onTypeSelect?.(item.type as MonitorType | '全部')}
                 className={`px-4 py-2 text-sm font-medium transition-colors rounded-full ${
                   item.active
-                    ? 'text-white bg-white/10 border border-white/20'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ? 'text-slate-900 bg-blue-100 border border-blue-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 {item.label}
@@ -53,7 +53,7 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
           {/* Right side actions */}
           <div className="flex items-center space-x-3">
             {/* Search */}
-            <div className="hidden sm:flex items-center space-x-2 bg-slate-900/70 border border-slate-800 rounded-lg px-3 py-2">
+            <div className="hidden sm:flex items-center space-x-2 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2">
               <svg
                 className="w-4 h-4 text-slate-400"
                 fill="none"
@@ -70,13 +70,13 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
               <input
                 type="text"
                 placeholder="搜索监测内容..."
-                className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder-slate-500 w-32"
+                className="bg-transparent border-none outline-none text-sm text-slate-700 placeholder-slate-400 w-32"
               />
-              <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">K</span>
+              <span className="text-xs text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded">K</span>
             </div>
 
             {/* Notifications */}
-            <button className="p-2 text-slate-300 hover:text-white transition-colors relative">
+            <button className="p-2 text-slate-500 hover:text-slate-900 transition-colors relative">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -96,7 +96,7 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
             {/* Dark mode toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2 text-slate-300 hover:text-white transition-colors"
+              className="p-2 text-slate-500 hover:text-slate-900 transition-colors"
             >
               {isDarkMode ? (
                 <svg
@@ -132,17 +132,17 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
             {/* User / Logout */}
             {user && onLogout ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-300">{user}</span>
+                <span className="text-sm text-slate-600">{user}</span>
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="px-3 py-1.5 text-sm text-slate-200 hover:text-white border border-slate-700 rounded hover:bg-slate-800"
+                  className="px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded hover:bg-slate-100"
                 >
                   退出
                 </button>
               </div>
             ) : (
-              <span className="px-4 py-2 text-sm text-slate-500">登录</span>
+              <span className="px-4 py-2 text-sm text-slate-400">登录</span>
             )}
           </div>
         </div>

@@ -49,6 +49,18 @@ const MonitorList = ({
   const [sortBy, setSortBy] = useState('默认排序');
   /** 休闲游戏监测：按平台筛选（左侧筛选栏），仅当 selectedType === 休闲游戏监测 时生效 */
   const [platformFilter, setPlatformFilter] = useState<GamePlatformKey | '全部'>('全部');
+  /** 热点趋势监测：按平台筛选 */
+  const [hotTrendPlatformFilter, setHotTrendPlatformFilter] = useState<string>('全部');
+  /** AI 热点监测：按平台筛选（微信/小红书） */
+  const [aiPlatformFilter, setAiPlatformFilter] = useState<string>('全部');
+
+  const hotTrendPlatformOptions = useMemo(() => {
+    const platforms = items
+      .filter((item) => item.type === '热点趋势监测')
+      .map((item) => item.platform)
+      .filter(Boolean);
+    return Array.from(new Set(platforms)).sort();
+  }, [items]);
 
   // 使用prop中的selectedType，如果没有则使用内部状态
   const selectedType = propSelectedType !== undefined ? propSelectedType : internalSelectedType;
@@ -108,6 +120,16 @@ const MonitorList = ({
     } else if (selectedType !== '全部') {
       // 其他类型：按类型筛选
       filtered = filtered.filter(item => item.type === selectedType);
+      if (selectedType === '热点趋势监测' && hotTrendPlatformFilter !== '全部') {
+        filtered = filtered.filter((item) => item.platform === hotTrendPlatformFilter);
+      }
+      if (selectedType === 'ai热点监测' && aiPlatformFilter !== '全部') {
+        filtered = filtered.filter((item) => {
+          if (aiPlatformFilter === '微信') return item.platform === '微信公众号' || item.platform?.includes('微信');
+          if (aiPlatformFilter === '小红书') return item.platform === '小红书' || item.platform?.includes('小红书');
+          return true;
+        });
+      }
     }
 
     // 按时间范围筛选（这里简化处理，实际应该根据date字段计算）
@@ -146,6 +168,8 @@ const MonitorList = ({
     selectedAiProductSub,
     selectedCasualSourceSection,
     platformFilter,
+    hotTrendPlatformFilter,
+    aiPlatformFilter,
     sortBy
   ]);
 
@@ -153,40 +177,22 @@ const MonitorList = ({
     <div className="flex-1">
       {/* Title + optional action */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-white">
+        <h1 className="text-3xl font-bold text-slate-900">
           {pageTitle ?? '监测汇总'}
         </h1>
         {headerAction}
       </div>
-
-      {/* 简单调试：在 AI 热点监测页打印一条卡片信息，帮助确认解析是否成功 */}
-      {selectedType === 'ai热点监测' && filteredAndSortedItems.length > 0 && (
-        <div className="mb-4 text-xs text-slate-400 bg-slate-900/70 border border-dashed border-slate-800 rounded-lg p-3 space-y-2">
-          <div>调试信息（仅本地可见）：当前筛选结果前 3 条卡片实际数据</div>
-          {filteredAndSortedItems.slice(0, 3).map((item, idx) => (
-            <div key={item.id} className="mt-1 border-t border-dashed border-slate-800 pt-1">
-              <div className="font-semibold text-slate-200">第 {idx + 1} 条：</div>
-              <div>id：{item.id}</div>
-              <div>type：{item.type}</div>
-              <div>title：{item.title || '（空）'}</div>
-              <div>description：{item.description || '（空）'}</div>
-              <div>url：{item.url || '（无 url）'}</div>
-              <div>tags：{item.tags && item.tags.length ? item.tags.join(', ') : '（无）'}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Filters：休闲游戏-新游戏「按平台筛选」；竞品动态-社媒监控「按公司筛选」 */}
       <div className="mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-start gap-4">
           {selectedType === '休闲游戏监测' && selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新' && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-300 whitespace-nowrap">按公司筛选</span>
+              <span className="text-sm text-slate-600 whitespace-nowrap">按公司筛选</span>
               <select
                 value={selectedCompanyName ?? ''}
                 onChange={(e) => onCompanySelect?.(e.target.value || null)}
-                className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">全部公司</option>
                 {companies.map((name) => (
@@ -200,11 +206,11 @@ const MonitorList = ({
               selectedCasualGameCategory === '新玩法' ||
               selectedCasualGameCategory === '玩法拆解')) && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-300 whitespace-nowrap">按平台筛选</span>
+              <span className="text-sm text-slate-600 whitespace-nowrap">按平台筛选</span>
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value as GamePlatformKey | '全部')}
-                className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="全部">全部</option>
                 <option value="微信">微信</option>
@@ -214,10 +220,39 @@ const MonitorList = ({
               </select>
             </div>
           )}
+          {selectedType === 'ai热点监测' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600 whitespace-nowrap">按平台筛选</span>
+              <select
+                value={aiPlatformFilter}
+                onChange={(e) => setAiPlatformFilter(e.target.value)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="全部">全部</option>
+                <option value="微信">微信</option>
+                <option value="小红书">小红书</option>
+              </select>
+            </div>
+          )}
+          {selectedType === '热点趋势监测' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600 whitespace-nowrap">按平台筛选</span>
+              <select
+                value={hotTrendPlatformFilter}
+                onChange={(e) => setHotTrendPlatformFilter(e.target.value)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="全部">全部</option>
+                {hotTrendPlatformOptions.map((platform) => (
+                  <option key={platform} value={platform}>{platform}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option>过去1周内</option>
             <option>过去1个月内</option>
@@ -233,7 +268,7 @@ const MonitorList = ({
                 setInternalSelectedType(newType);
               }
             }}
-            className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option>全部分类</option>
             {monitorTypes.map(type => (
@@ -244,7 +279,7 @@ const MonitorList = ({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-slate-700 rounded-lg text-sm text-slate-200 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option>默认排序</option>
             <option>最新发布</option>
@@ -257,7 +292,7 @@ const MonitorList = ({
           <button
             type="button"
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
           >
           <svg
             className={`w-4 h-4 transition-transform ${
@@ -298,11 +333,11 @@ const MonitorList = ({
         </div>
 
         {showAdvancedFilters && (
-          <div className="p-4 bg-slate-900/70 rounded-lg border border-slate-800">
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">情感分析</label>
-                <select className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200">
+                <label className="block text-sm font-medium text-slate-700 mb-2">情感分析</label>
+                <select className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700">
                   <option>全部</option>
                   <option>正面</option>
                   <option>中性</option>
@@ -310,8 +345,8 @@ const MonitorList = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">趋势方向</label>
-                <select className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200">
+                <label className="block text-sm font-medium text-slate-700 mb-2">趋势方向</label>
+                <select className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700">
                   <option>全部</option>
                   <option>上升</option>
                   <option>稳定</option>
@@ -324,8 +359,8 @@ const MonitorList = ({
       </div>
 
       {/* Results Count */}
-      <div className="mb-4 text-sm text-slate-400">
-        共找到 <span className="font-semibold text-white">{filteredAndSortedItems.length}</span> 条监测数据
+      <div className="mb-4 text-sm text-slate-600">
+        共找到 <span className="font-semibold text-slate-900">{filteredAndSortedItems.length}</span> 条监测数据
       </div>
 
       {/* Monitor List */}

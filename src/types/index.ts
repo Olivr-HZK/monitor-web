@@ -52,6 +52,8 @@ export interface GameRankingItem {
   updateDate: string; // 更新时间
   /** 可选的数值评分 / 热度指数 */
   score?: number;
+  /** 周区间（如 2026-2-2~2026-2-8），多周合并展示时用于列显示与筛选 */
+  weekRange?: string;
 }
 
 export interface GameRanking {
@@ -60,6 +62,12 @@ export interface GameRanking {
   updateTime: string; // 更新时间
   period: string; // 周期（如"周榜"）
   items: GameRankingItem[];
+}
+
+/** 微信/抖音排行榜按周聚合（用于多周切换） */
+export interface WechatDouyinRankingsByWeek {
+  weekRange: string;
+  rankings: GameRanking[];
 }
 
 /** SensorTower Top100 榜单单条记录（可含 app_metadata 补充信息） */

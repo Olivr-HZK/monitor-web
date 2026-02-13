@@ -58,13 +58,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** 静态模式下的访问密码哈希（来自 auth-config.json 或构建时 env） */
   const [staticHash, setStaticHash] = useState('');
 
+  // 静态模式（无后端 / 托管页）：直接请求静态资源路径，与 public 拷贝到 dist 一致
   const getDataUrl = useCallback((filename: string) => {
     const base = typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL
       ? import.meta.env.BASE_URL.replace(/\/$/, '')
       : '';
+    if (authMode === 'static') {
+      const path = filename.split('/').map(encodeURIComponent).join('/');
+      return base ? `${base}/${path}` : `/${path}`;
+    }
     const prefix = base ? `${base}/api/data` : '/api/data';
     return `${prefix}/${encodeURIComponent(filename)}`;
-  }, []);
+  }, [authMode]);
 
   const checkAuth = useCallback(async () => {
     setLoading(true);

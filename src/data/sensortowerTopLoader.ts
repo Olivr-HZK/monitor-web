@@ -278,7 +278,7 @@ function parseChangesJson(
       screenshotAfter = newArr.filter((url) => !oldSet.has(url));
       if (oldArr.length !== newArr.length) hasScreenshotCountChange = true;
       hasMeaningfulChange = true;
-      return `截图从 ${oldArr.length} 张变为 ${newArr.length} 张`;
+      return '截图已更新';
     }
     if (field === 'icon_url') {
       const oldUrl = normalizeValue(oldVal);
@@ -319,7 +319,11 @@ function parseChangesJson(
       return '图标已更新';
     }
     if (field === 'store_url') {
-      return summarizeTextChange('商店链接', oldVal || '', newVal || '');
+      const oldText = normalizeValue(oldVal);
+      const newText = normalizeValue(newVal);
+      if (oldText === newText) return '';
+      hasMeaningfulChange = true;
+      return '商店链接已更新';
     }
     if (field === 'description' || field === 'full_description' || field === 'description_short' || field === 'short_description') {
       return summarizeTextChange(label, oldVal || '', newVal || '');

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "cd server && npm run start",
+    "dev:casual": "vite --open /casual.html",
     "build": "tsc -b && vite build",
     "start": "npm run build && node server/server.js",
     "lint": "eslint .",
@@ -19,6 +20,7 @@
     "papaparse": "^5.5.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.0",
     "sql.js": "^1.13.0"
   },
   "devDependencies": {

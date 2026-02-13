@@ -12,6 +12,8 @@ dist
 .env
 .env.local
 server/.env
+# 用户反馈数据（玩法解析申请等）
+data/
 dist-ssr
 *.local
 

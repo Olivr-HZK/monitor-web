@@ -24,6 +24,10 @@ interface SidebarProps {
   /** 休闲游戏监测：当前选中的数据块（微信/抖音 与 SensorTower 隔离） */
   selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
   onCasualSourceSectionSelect?: (section: 'wechat_douyin' | 'sensortower') => void;
+  /** 控制在侧边栏中展示哪些监测类型（默认展示全部） */
+  visibleTypes?: (MonitorType | '全部')[];
+  /** 是否显示最上方的「全部」按钮（默认显示） */
+  showAllTypeButton?: boolean;
 }
 
 const Sidebar = ({
@@ -43,6 +47,8 @@ const Sidebar = ({
   onAiProductSubSelect,
   selectedCasualSourceSection: propCasualSourceSection,
   onCasualSourceSectionSelect,
+  visibleTypes,
+  showAllTypeButton = true,
 }: SidebarProps) => {
   const [internalCasualSourceSection, setInternalCasualSourceSection] = useState<'wechat_douyin' | 'sensortower'>('wechat_douyin');
   const activeCasualSourceSection = propCasualSourceSection ?? internalCasualSourceSection;
@@ -90,39 +96,43 @@ const Sidebar = ({
 
   return (
     <aside className="w-64 flex-shrink-0">
-      <div className="sticky top-20 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-        <h2 className="text-lg font-semibold text-white mb-4">监测源</h2>
+      <div className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">监测源</h2>
 
         {/* All option */}
-        <div className="mb-4">
-          <button
-            onClick={() => onTypeSelect?.('全部')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              selectedType === '全部'
-                ? 'bg-white/10 text-white border border-white/10'
-                : 'text-slate-300 hover:bg-slate-900/60'
-            }`}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {showAllTypeButton && (
+          <div className="mb-4">
+            <button
+              onClick={() => onTypeSelect?.('全部')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                selectedType === '全部'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <span className="font-medium">全部</span>
-          </button>
-        </div>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+              <span className="font-medium">全部</span>
+            </button>
+          </div>
+        )}
 
         {/* 监测类型：AI热点、热点趋势、休闲游戏、AI产品监测 并列 */}
         <div className="space-y-4">
-          {(['ai热点监测', '热点趋势监测', '休闲游戏监测', 'AI产品监测'] as MonitorType[]).map((type) => {
+          {(visibleTypes ?? (['ai热点监测', '热点趋势监测', '休闲游戏监测', 'AI产品监测'] as MonitorType[]))
+            .filter((t): t is MonitorType => t !== '全部')
+            .map((type) => {
             const groupSources = typeGroups[type];
             // AI热点监测和热点趋势监测始终显示，即使没有 sources
             if (
@@ -158,13 +168,13 @@ const Sidebar = ({
                     onClick={() => onTypeSelect?.(type)}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
                       selectedType === type
-                        ? 'bg-white/10 text-white border border-white/10'
-                        : 'text-slate-300 hover:bg-slate-900/60'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                        : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
                     <span className="text-lg">{getTypeIcon(type)}</span>
                     <span>{getTypeLabel(type)}</span>
-                    <span className="ml-auto text-xs text-slate-500">
+                    <span className="ml-auto text-xs text-slate-400">
                       {groupSources.reduce((sum, s) => sum + s.count, 0)}
                     </span>
                   </button>
@@ -175,7 +185,7 @@ const Sidebar = ({
                       {casualSourceSections.map((section) => (
                         <div key={section.id} className="space-y-1">
                           <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
+                            <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                               {section.icon}
                             </span>
                             <span className="font-semibold">{section.label}</span>
@@ -198,14 +208,14 @@ const Sidebar = ({
                                   key={key}
                                   type="button"
                                   className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition-colors text-left ${
-                                    isSelected ? 'bg-white/10 text-white border border-white/10' : 'text-slate-300 hover:bg-slate-900/60'
+                                    isSelected ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-700 hover:bg-slate-100'
                                   }`}
                                   onClick={() => {
                                     setActiveCasualSourceSection(section.id);
                                     onCasualGameCategorySelect?.(key);
                                   }}
                                 >
-                                  <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs flex-shrink-0">
+                                  <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">
                                     {icon}
                                   </span>
                                   <span className="flex-1 truncate font-medium">{label}</span>
@@ -217,9 +227,9 @@ const Sidebar = ({
                       ))}
 
                       {/* 竞品监测块：社媒监控 / UA素材 */}
-                      <div className="space-y-1 pt-2 border-t border-slate-800 mt-1">
+                      <div className="space-y-1 pt-2 border-t border-slate-200 mt-1">
                         <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
+                          <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                             📊
                           </span>
                           <span className="font-semibold">竞品监测</span>
@@ -233,14 +243,14 @@ const Sidebar = ({
                                 key={subKey}
                                 type="button"
                                 className={`w-full flex items-center gap-2 py-1.5 pl-2 rounded text-xs transition-colors text-left ${
-                                  isSubSelected ? 'bg-white/10 text-white border border-white/10' : 'text-slate-300 hover:bg-slate-900/60'
+                                  isSubSelected ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-700 hover:bg-slate-100'
                                 }`}
                                 onClick={() => {
                                   onCasualGameCategorySelect?.('竞品');
                                   onCasualGameCompetitorSubSelect?.(subKey);
                                 }}
                               >
-                                <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs flex-shrink-0">
+                                <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">
                                   {subIcon}
                                 </span>
                                 <span className="flex-1 truncate font-medium">{subLabel}</span>
@@ -263,13 +273,13 @@ const Sidebar = ({
                     onClick={() => onTypeSelect?.(type)}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
                       selectedType === type
-                        ? 'bg-white/10 text-white border border-white/10'
-                        : 'text-slate-300 hover:bg-slate-900/60'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                        : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
                     <span className="text-lg">{getTypeIcon(type)}</span>
                     <span>{getTypeLabel(type)}</span>
-                    <span className="ml-auto text-xs text-slate-500">
+                    <span className="ml-auto text-xs text-slate-400">
                       {groupSources.reduce((sum, s) => sum + s.count, 0)}
                     </span>
                   </button>
@@ -288,11 +298,11 @@ const Sidebar = ({
                             key={key}
                             type="button"
                             className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition-colors text-left ${
-                              isSelected ? 'bg-white/10 text-white border border-white/10' : 'text-slate-300 hover:bg-slate-900/60'
+                              isSelected ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-700 hover:bg-slate-100'
                             }`}
                             onClick={() => onAiProductSubSelect?.(key)}
                           >
-                            <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs flex-shrink-0">
+                            <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">
                               {icon}
                             </span>
                             <span className="flex-1 truncate font-medium">{label}</span>
@@ -312,13 +322,13 @@ const Sidebar = ({
                   onClick={() => onTypeSelect?.(type)}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
                     selectedType === type
-                      ? 'bg-white/10 text-white border border-white/10'
-                      : 'text-slate-300 hover:bg-slate-900/60'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                      : 'text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <span className="text-lg">{getTypeIcon(type)}</span>
                   <span>{getTypeLabel(type)}</span>
-                  <span className="ml-auto text-xs text-slate-500">
+                  <span className="ml-auto text-xs text-slate-400">
                     {groupSources.reduce((sum, s) => sum + s.count, 0)}
                   </span>
                 </button>
@@ -328,13 +338,13 @@ const Sidebar = ({
                     {groupSources.map((source) => (
                       <div
                         key={source.id}
-                        className="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-900/60 transition-colors cursor-pointer"
+                        className="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                       >
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs">
                           {source.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-100 truncate">{source.name}</p>
+                          <p className="text-xs font-medium text-slate-900 truncate">{source.name}</p>
                           {source.platform && (
                             <p className="text-xs text-slate-500 mt-0.5">{source.platform}</p>
                           )}

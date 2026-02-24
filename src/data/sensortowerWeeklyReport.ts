@@ -199,7 +199,13 @@ export function buildSensorTowerWeeklyItems(
     const surgeTop10 = surgeAll.slice(0, 10);
 
     const content = buildWeekReportMd(rankDateCurrent, rankDateLast, newTop50, surgeTop10);
-    const storeChangesForWeek = storeChangeItems.filter((c) => c.rankDate === rankDateCurrent);
+    const storeChangesForWeek = storeChangeItems
+      .filter((c) => c.rankDate === rankDateCurrent)
+      .map((c) => ({
+        ...c,
+        summaries: (c.summaries || []).filter((s) => !/similar_app_ids|similar app|相似/i.test(s)),
+      }))
+      .filter((c) => (c.summaries || []).length > 0);
 
     result.push({
       id: `sensortower-weekly-${rankDateCurrent}`,

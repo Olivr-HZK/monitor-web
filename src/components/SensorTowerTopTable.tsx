@@ -12,18 +12,35 @@ type TabKind = 'top100' | 'changes' | 'store_changes';
 
 const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], onBack }: SensorTowerTopTableProps) => {
   const [activeTab, setActiveTab] = useState<TabKind>('top100');
-  const [platformFilter, setPlatformFilter] = useState<'all' | 'iOS' | 'Android'>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | string>('all');
-  const [countryFilter, setCountryFilter] = useState<'all' | string>('all');
-  const [chartTypeFilter, setChartTypeFilter] = useState<'all' | string>('all');
-  const [changeTypeFilter, setChangeTypeFilter] = useState<'all' | string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(1);
+  const [top100Filters, setTop100Filters] = useState({
+    platform: 'all' as 'all' | 'iOS' | 'Android',
+    date: 'all' as 'all' | string,
+    country: 'all' as 'all' | string,
+    chartType: 'all' as 'all' | string,
+    search: '',
+    page: 1,
+  });
+  const [changesFilters, setChangesFilters] = useState({
+    platform: 'all' as 'all' | 'iOS' | 'Android',
+    date: 'all' as 'all' | string,
+    country: 'all' as 'all' | string,
+    changeType: 'all' as 'all' | string,
+    search: '',
+    page: 1,
+  });
+  const [storeFilters, setStoreFilters] = useState({
+    platform: 'all' as 'all' | 'iOS' | 'Android',
+    date: 'all' as 'all' | string,
+    search: '',
+    page: 1,
+  });
   const pageSize = 100;
 
-  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const normalizedTop100Search = top100Filters.search.trim().toLowerCase();
+  const normalizedChangesSearch = changesFilters.search.trim().toLowerCase();
+  const normalizedStoreSearch = storeFilters.search.trim().toLowerCase();
   const matchesSearch = (value?: string) =>
-    normalizedSearch ? (value ?? '').toLowerCase().includes(normalizedSearch) : true;
+    (value ?? '').toLowerCase();
 
   // Top100 筛选与选项
   const top100 = useMemo(() => {
@@ -31,25 +48,29 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     const countries = new Set<string>();
     const chartTypes = new Set<string>();
     let filtered = items;
-    if (platformFilter !== 'all') filtered = filtered.filter((it) => it.platform === platformFilter);
-    if (normalizedSearch) {
-      filtered = filtered.filter((it) => matchesSearch(it.appId) || matchesSearch(it.appName));
+    if (top100Filters.platform !== 'all') filtered = filtered.filter((it) => it.platform === top100Filters.platform);
+    if (normalizedTop100Search) {
+      filtered = filtered.filter(
+        (it) =>
+          matchesSearch(it.appId).includes(normalizedTop100Search) ||
+          matchesSearch(it.appName).includes(normalizedTop100Search)
+      );
     }
     filtered.forEach((it) => {
       if (it.rankDate) dates.add(it.rankDate);
       if (it.country) countries.add(it.country);
       if (it.chartType) chartTypes.add(it.chartType);
     });
-    if (dateFilter !== 'all') filtered = filtered.filter((it) => it.rankDate === dateFilter);
-    if (countryFilter !== 'all') filtered = filtered.filter((it) => it.country === countryFilter);
-    if (chartTypeFilter !== 'all') filtered = filtered.filter((it) => it.chartType === chartTypeFilter);
+    if (top100Filters.date !== 'all') filtered = filtered.filter((it) => it.rankDate === top100Filters.date);
+    if (top100Filters.country !== 'all') filtered = filtered.filter((it) => it.country === top100Filters.country);
+    if (top100Filters.chartType !== 'all') filtered = filtered.filter((it) => it.chartType === top100Filters.chartType);
     return {
       filteredItems: filtered,
       uniqueDates: Array.from(dates).sort().reverse(),
       uniqueCountries: Array.from(countries).sort(),
       uniqueChartTypes: Array.from(chartTypes).sort(),
     };
-  }, [items, platformFilter, dateFilter, countryFilter, chartTypeFilter, normalizedSearch]);
+  }, [items, top100Filters, normalizedTop100Search]);
 
   // 异动榜单筛选与选项（平台、日期=当前榜单日期、国家、异动类型）
   const changes = useMemo(() => {
@@ -57,10 +78,13 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     const countries = new Set<string>();
     const changeTypes = new Set<string>();
     let filtered = rankChangeItems;
-    if (platformFilter !== 'all') filtered = filtered.filter((it) => it.platform === platformFilter);
-    if (normalizedSearch) {
+    if (changesFilters.platform !== 'all') filtered = filtered.filter((it) => it.platform === changesFilters.platform);
+    if (normalizedChangesSearch) {
       filtered = filtered.filter(
-        (it) => matchesSearch(it.appId) || matchesSearch(it.metadataAppName) || matchesSearch(it.appName)
+        (it) =>
+          matchesSearch(it.appId).includes(normalizedChangesSearch) ||
+          matchesSearch(it.metadataAppName).includes(normalizedChangesSearch) ||
+          matchesSearch(it.appName).includes(normalizedChangesSearch)
       );
     }
     filtered.forEach((it) => {
@@ -68,28 +92,32 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       if (it.country) countries.add(it.country);
       if (it.changeType) changeTypes.add(it.changeType);
     });
-    if (dateFilter !== 'all') filtered = filtered.filter((it) => it.rankDateCurrent === dateFilter);
-    if (countryFilter !== 'all') filtered = filtered.filter((it) => it.country === countryFilter);
-    if (changeTypeFilter !== 'all') filtered = filtered.filter((it) => it.changeType === changeTypeFilter);
+    if (changesFilters.date !== 'all') filtered = filtered.filter((it) => it.rankDateCurrent === changesFilters.date);
+    if (changesFilters.country !== 'all') filtered = filtered.filter((it) => it.country === changesFilters.country);
+    if (changesFilters.changeType !== 'all') filtered = filtered.filter((it) => it.changeType === changesFilters.changeType);
     return {
       filteredItems: filtered,
       uniqueDates: Array.from(dates).sort().reverse(),
       uniqueCountries: Array.from(countries).sort(),
       uniqueChangeTypes: Array.from(changeTypes).sort(),
     };
-  }, [rankChangeItems, platformFilter, dateFilter, countryFilter, changeTypeFilter, normalizedSearch]);
+  }, [rankChangeItems, changesFilters, normalizedChangesSearch]);
 
   const storeChangeList = useMemo(() => {
     const dates = new Set<string>();
     let filtered = storeChanges;
-    if (platformFilter !== 'all') filtered = filtered.filter((it) => it.platform === platformFilter);
-    if (normalizedSearch) {
-      filtered = filtered.filter((it) => matchesSearch(it.appId) || matchesSearch(it.appName));
+    if (storeFilters.platform !== 'all') filtered = filtered.filter((it) => it.platform === storeFilters.platform);
+    if (normalizedStoreSearch) {
+      filtered = filtered.filter(
+        (it) =>
+          matchesSearch(it.appId).includes(normalizedStoreSearch) ||
+          matchesSearch(it.appName).includes(normalizedStoreSearch)
+      );
     }
     filtered.forEach((it) => {
       if (it.rankDate) dates.add(it.rankDate);
     });
-    if (dateFilter !== 'all') filtered = filtered.filter((it) => it.rankDate === dateFilter);
+    if (storeFilters.date !== 'all') filtered = filtered.filter((it) => it.rankDate === storeFilters.date);
     filtered = [...filtered].sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
       const bt = new Date(b.changedAt || b.rankDate).getTime();
@@ -100,7 +128,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       filteredItems: filtered,
       uniqueDates: Array.from(dates).sort().reverse(),
     };
-  }, [storeChanges, platformFilter, dateFilter, normalizedSearch]);
+  }, [storeChanges, storeFilters, normalizedStoreSearch]);
 
   const isTop100 = activeTab === 'top100';
   const isRankChanges = activeTab === 'changes';
@@ -117,22 +145,52 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       : storeChangeList.uniqueDates;
   const uniqueCountries = isTop100 ? top100.uniqueCountries : changes.uniqueCountries;
 
+  const currentPage = isTop100 ? top100Filters.page : isRankChanges ? changesFilters.page : storeFilters.page;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const startIndex = (currentPage - 1) * pageSize;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
   const pageItems = filteredItems.slice(startIndex, startIndex + pageSize);
 
-  const handleFilterChange = <T extends string>(
-    setter: (value: T | 'all') => void,
-    value: T | 'all'
-  ) => {
-    setter(value);
-    setPage(1);
+  const setTabPage = (nextPage: number) => {
+    if (isTop100) setTop100Filters((prev) => ({ ...prev, page: nextPage }));
+    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, page: nextPage }));
+    else setStoreFilters((prev) => ({ ...prev, page: nextPage }));
   };
 
   const handleTabChange = (tab: TabKind) => {
     setActiveTab(tab);
-    setPage(1);
+    setTabPage(1);
+  };
+
+  const setSearch = (value: string) => {
+    if (isTop100) setTop100Filters((prev) => ({ ...prev, search: value, page: 1 }));
+    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, search: value, page: 1 }));
+    else setStoreFilters((prev) => ({ ...prev, search: value, page: 1 }));
+  };
+
+  const setPlatform = (value: 'all' | 'iOS' | 'Android') => {
+    if (isTop100) setTop100Filters((prev) => ({ ...prev, platform: value, page: 1 }));
+    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, platform: value, page: 1 }));
+    else setStoreFilters((prev) => ({ ...prev, platform: value, page: 1 }));
+  };
+
+  const setDate = (value: 'all' | string) => {
+    if (isTop100) setTop100Filters((prev) => ({ ...prev, date: value, page: 1 }));
+    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, date: value, page: 1 }));
+    else setStoreFilters((prev) => ({ ...prev, date: value, page: 1 }));
+  };
+
+  const setCountry = (value: 'all' | string) => {
+    if (isTop100) setTop100Filters((prev) => ({ ...prev, country: value, page: 1 }));
+    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, country: value, page: 1 }));
+  };
+
+  const setChartType = (value: 'all' | string) => {
+    if (isTop100) setTop100Filters((prev) => ({ ...prev, chartType: value, page: 1 }));
+  };
+
+  const setChangeType = (value: 'all' | string) => {
+    if (isRankChanges) setChangesFilters((prev) => ({ ...prev, changeType: value, page: 1 }));
   };
 
   const renderAppName = (name: string | undefined, url: string | undefined, title: string) => {
@@ -226,10 +284,9 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           <span className="text-sm text-slate-300">关键词</span>
           <input
             type="text"
-            value={searchTerm}
+            value={isTop100 ? top100Filters.search : isRankChanges ? changesFilters.search : storeFilters.search}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(1);
+              setSearch(e.target.value);
             }}
             placeholder="搜索 App ID / 游戏名"
             className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 w-56"
@@ -238,8 +295,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-600">平台</span>
           <select
-            value={platformFilter}
-            onChange={(e) => handleFilterChange(setPlatformFilter, e.target.value as 'all' | 'iOS' | 'Android')}
+            value={isTop100 ? top100Filters.platform : isRankChanges ? changesFilters.platform : storeFilters.platform}
+            onChange={(e) => setPlatform(e.target.value as 'all' | 'iOS' | 'Android')}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">全部</option>
@@ -250,8 +307,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-600">日期</span>
           <select
-            value={dateFilter}
-            onChange={(e) => handleFilterChange(setDateFilter, e.target.value === 'all' ? 'all' : e.target.value)}
+            value={isTop100 ? top100Filters.date : isRankChanges ? changesFilters.date : storeFilters.date}
+            onChange={(e) => setDate(e.target.value === 'all' ? 'all' : e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">全部</option>
@@ -266,8 +323,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">国家</span>
             <select
-              value={countryFilter}
-              onChange={(e) => handleFilterChange(setCountryFilter, e.target.value === 'all' ? 'all' : e.target.value)}
+              value={isTop100 ? top100Filters.country : changesFilters.country}
+              onChange={(e) => setCountry(e.target.value === 'all' ? 'all' : e.target.value)}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
@@ -283,10 +340,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">榜单类型</span>
             <select
-              value={chartTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setChartTypeFilter, e.target.value === 'all' ? 'all' : e.target.value)
-              }
+              value={top100Filters.chartType}
+              onChange={(e) => setChartType(e.target.value === 'all' ? 'all' : e.target.value)}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
@@ -301,10 +356,8 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">异动类型</span>
             <select
-              value={changeTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setChangeTypeFilter, e.target.value === 'all' ? 'all' : e.target.value)
-              }
+              value={changesFilters.changeType}
+              onChange={(e) => setChangeType(e.target.value === 'all' ? 'all' : e.target.value)}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
@@ -513,15 +566,15 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
         <div>
           共 <span className="font-semibold text-slate-900">{filteredItems.length}</span> 条记录，当前第{' '}
-          <span className="font-semibold text-slate-900">{currentPage}</span> / {totalPages} 页
+          <span className="font-semibold text-slate-900">{safeCurrentPage}</span> / {totalPages} 页
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={currentPage <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setTabPage(Math.max(1, safeCurrentPage - 1))}
             className={`px-3 py-1.5 rounded-md border text-sm ${
-              currentPage <= 1
+              safeCurrentPage <= 1
                 ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                 : 'border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
@@ -530,10 +583,10 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           </button>
           <button
             type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setTabPage(Math.min(totalPages, safeCurrentPage + 1))}
             className={`px-3 py-1.5 rounded-md border text-sm ${
-              currentPage >= totalPages
+              safeCurrentPage >= totalPages
                 ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                 : 'border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}

@@ -325,6 +325,14 @@ function parseChangesJson(
       hasMeaningfulChange = true;
       return '商店链接已更新';
     }
+    if (field === 'rating') {
+      const oldNum = parseFloat(normalizeValue(oldVal));
+      const newNum = parseFloat(normalizeValue(newVal));
+      if (Number.isNaN(oldNum) || Number.isNaN(newNum)) return '';
+      if (Math.abs(oldNum - newNum) <= 0.1) return '';
+      hasMeaningfulChange = true;
+      return `评分：${oldNum.toFixed(2)} → ${newNum.toFixed(2)}`;
+    }
     if (field === 'description' || field === 'full_description' || field === 'description_short' || field === 'short_description') {
       return summarizeTextChange(label, oldVal || '', newVal || '');
     }

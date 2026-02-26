@@ -45,6 +45,7 @@ ALLOWED_PREFIXES = ("ai产品/", "ai热点/", "休闲游戏检测/")
 ALLOWED_ROOT_FILES = {
     "competitor_data.db",
     "sensortower_applist.db",
+    "ai_products_ua.db",
     "wechatdouyin.db",
     "videos.db",
     "周报谷歌表单.csv",

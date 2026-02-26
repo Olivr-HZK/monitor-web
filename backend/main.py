@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-import passlib.hash as ph
+from passlib.hash import pbkdf2_sha256
 
 from config import (
     PORT,
@@ -51,30 +51,73 @@ app.add_middleware(
 
 IS_DEV_NO_PASSWORD = not LOGIN_PASSWORD_HASH
 GAMEPLAY_REQUESTS_FILE = DATA_DIR / "gameplay_requests.json"
+USERS_FILE = DATA_DIR / "users.json"
 _feishu_token_cache: dict = {"token": "", "expire_at": 0}
 
 
-# ---------- 登录 / 登出 / 当前用户 ----------
+def _ensure_data_dir():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _read_users() -> list[dict]:
+    _ensure_data_dir()
+    if not USERS_FILE.exists():
+        return []
+    try:
+        raw = USERS_FILE.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _write_users(users: list[dict]) -> None:
+    _ensure_data_dir()
+    USERS_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _find_user(username: str) -> dict | None:
+    name = (username or "").strip()
+    if not name:
+        return None
+    for u in _read_users():
+        if u.get("username") == name:
+            return u
+    return None
+
+
+# ---------- 登录 /（暂不开放）注册 / 登出 / 当前用户 ----------
 class LoginBody(BaseModel):
     username: str = ""
     password: str = ""
 
 
+class RegisterBody(BaseModel):
+    username: str = ""
+    password: str = ""
+
+
+@app.post("/api/register")
+async def register(body: RegisterBody):
+    # 当前版本不开放自助注册，如需新账号请由管理员在服务器侧创建或直接修改配置。
+    raise HTTPException(status_code=403, detail="当前暂未开放注册，请联系管理员开通账号")
+
+
 @app.post("/api/login")
 async def login(body: LoginBody, request: Request):
-    if not body.username or not body.password:
+    username = (body.username or "").strip()
+    password = (body.password or "").strip()
+    if not username or not password:
         raise HTTPException(status_code=400, detail="请填写用户名和密码")
-    if body.username != LOGIN_USERNAME:
+    # 仅支持单一管理员账号 LOGIN_USERNAME / 管理员明文密码（本地和小团队内网使用足够）
+    if username != LOGIN_USERNAME:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    if IS_DEV_NO_PASSWORD:
-        token = create_token(body.username)
-        resp = JSONResponse(content={"user": body.username})
-        resp.set_cookie("token", token, httponly=True, max_age=7 * 24 * 3600, samesite="lax")
-        return resp
-    if not ph.bcrypt.verify(body.password, LOGIN_PASSWORD_HASH):
+    # 优先从环境变量 ADMIN_PASSWORD 读取；未设置时默认 guru666
+    admin_pwd = os.environ.get("ADMIN_PASSWORD", "guru666")
+    if password != admin_pwd:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    token = create_token(body.username)
-    resp = JSONResponse(content={"user": body.username})
+    token = create_token(username)
+    resp = JSONResponse(content={"user": username})
     resp.set_cookie("token", token, httponly=True, max_age=7 * 24 * 3600, samesite="lax")
     return resp
 
@@ -103,10 +146,6 @@ class GameplayRequestBody(BaseModel):
     gameName: str = ""
     source: str = "wechat_douyin"
     remark: str = ""
-
-
-def _ensure_data_dir():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _read_gameplay_requests() -> list:

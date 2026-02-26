@@ -16,7 +16,7 @@ server/.env
 data/
 dist-ssr
 *.local
-
+public/*.db
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

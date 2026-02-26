@@ -8,7 +8,13 @@ import {
   loadSensorTowerStoreChanges,
 } from '../data/sensortowerTopLoader';
 import { buildSensorTowerWeeklyItems } from '../data/sensortowerWeeklyReport';
-import { loadCompetitorReportMd, loadAiSalesRankingFromCsv, loadAiProductUADailyReport } from '../data/aiProductLoader';
+import {
+  loadCompetitorReportMd,
+  loadAiSalesRankingFromCsv,
+  loadAiProductUADailyReport,
+  loadAiProductUATopAdReport,
+  loadAiUaCreativeCardsFromDb,
+} from '../data/aiProductLoader';
 import { loadAiCompetitorWeeklyFromDb, buildAiCompetitorWeeklyMonitorItem } from '../data/sensortowerApplistLoader';
 import { loadReportsData } from '../data/reportsLoader';
 import { loadWeeklyReportsFromDatabase } from '../data/weeklyReportLoader';
@@ -195,6 +201,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           competitorReportItem,
           aiSalesRankings,
           aiProductUADailyReport,
+          aiUaCreativeCards,
           aiCompetitorWeeklyPayload,
           sensorTowerTop,
           sensorTowerRankChanges,
@@ -227,6 +234,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
             return [];
           }),
           loadAiProductUADailyReport(getDataUrlFn).catch(() => null),
+          loadAiUaCreativeCardsFromDb(getDataUrlFn).catch((error) => {
+            console.error('Failed to load AI UA creative cards from DB:', error);
+            return [];
+          }),
           loadAiCompetitorWeeklyFromDb(getDataUrlFn).catch(() => null),
           loadSensorTowerTop100(getDataUrlFn).catch((error) => {
             console.error('Failed to load SensorTower top100 from DB:', error);
@@ -286,6 +297,13 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         const aiProductItems: MonitorItem[] = [];
         if (aiProductUADailyReport) {
           aiProductItems.push(aiProductUADailyReport);
+        }
+        const aiProductUATopAdReport = await loadAiProductUATopAdReport(getDataUrlFn).catch(() => null);
+        if (aiProductUATopAdReport) {
+          aiProductItems.push(aiProductUATopAdReport);
+        }
+        if (aiUaCreativeCards && aiUaCreativeCards.length > 0) {
+          aiProductItems.push(...aiUaCreativeCards);
         }
         const aiCompetitorWeeklyItem = buildAiCompetitorWeeklyMonitorItem(aiCompetitorWeeklyPayload ?? null);
         const competitorDynamicItems: MonitorItem[] = [

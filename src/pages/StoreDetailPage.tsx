@@ -1,12 +1,27 @@
 import { useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StoreInfoDetail from '../components/StoreInfoDetail';
 import { useData } from '../context/DataContext';
 
-const StoreDetailPage = () => {
+interface StoreDetailPageProps {
+  /** 子项目内使用时传入：从列表点进时返回该路径，从其他详情内链点进仍用 history 后退 */
+  backTo?: string;
+}
+
+const StoreDetailPage = ({ backTo }: StoreDetailPageProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const { dataLoading, sensorTowerStoreCards } = useData();
+
+  const fromList = (location.state as { from?: string } | null)?.from === 'list';
+  const handleBack = () => {
+    if (backTo !== undefined && fromList) {
+      navigate(backTo);
+    } else {
+      navigate(-1);
+    }
+  };
 
   const card = useMemo(() => {
     if (!id) return undefined;
@@ -28,7 +43,7 @@ const StoreDetailPage = () => {
         <div className="text-slate-600">未找到该应用</div>
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100"
         >
           返回
@@ -37,7 +52,7 @@ const StoreDetailPage = () => {
     );
   }
 
-  return <StoreInfoDetail card={card} onBack={() => navigate(-1)} />;
+  return <StoreInfoDetail card={card} onBack={handleBack} />;
 };
 
 export default StoreDetailPage;

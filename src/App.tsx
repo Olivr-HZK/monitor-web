@@ -8,6 +8,7 @@ import AiRankingPage from './pages/AiRankingPage';
 import ReportDetailPage from './pages/ReportDetailPage';
 import StoreDetailPage from './pages/StoreDetailPage';
 import GameplayDetailPage from './pages/GameplayDetailPage';
+import AiChatWidget from './components/AiChatWidget';
 
 function App() {
   const { authMode, user, loading: authLoading, staticPasswordRequired } = useAuth();
@@ -25,16 +26,19 @@ function App() {
     return <Login />;
   }
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/type/:monitorType" element={<MonitorTypePage />} />
-      <Route path="/rankings/ai" element={<AiRankingPage />} />
-      <Route path="/rankings/casual/:section" element={<CasualRankingPage />} />
-      <Route path="/report/:id" element={<ReportDetailPage />} />
-      <Route path="/store/:id" element={<StoreDetailPage />} />
-      <Route path="/gameplay/:source/:gameName" element={<GameplayDetailPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/type/:monitorType" element={<MonitorTypePage />} />
+        <Route path="/rankings/ai" element={<AiRankingPage />} />
+        <Route path="/rankings/casual/:section" element={<CasualRankingPage />} />
+        <Route path="/report/:id" element={<ReportDetailPage />} />
+        <Route path="/store/:id" element={<StoreDetailPage />} />
+        <Route path="/gameplay/:source/:gameName" element={<GameplayDetailPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <AiChatWidget />
+    </>
   );
 }
 

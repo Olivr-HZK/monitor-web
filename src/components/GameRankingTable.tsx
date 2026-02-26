@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
 import type { GameRankingItem, GameRankingType } from '../types';
+import { formatCountryToZh, formatChartTypeToZh } from '../utils/rankingLabels';
 
 interface GameRankingTableProps {
   items: GameRankingItem[];
   rankingType: GameRankingType;
+  /** 平台筛选（仅微信/抖音小游戏排行榜时传入，榜单异动按此过滤） */
+  platformFilter?: 'all' | '微信小游戏' | '抖音小游戏';
   /** 点击游戏名时回调（仅微信/抖音小游戏榜单时使用，用于跳转玩法解析页） */
   onGameNameClick?: (item: GameRankingItem) => void;
 }
 
-const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTableProps) => {
+const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick }: GameRankingTableProps) => {
   const hasWeekRange = items.some((it) => it.weekRange);
   const uniqueWeeks = useMemo(() => {
     const set = new Set<string>();
@@ -22,6 +25,14 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
     if (weekFilter !== 'all' && hasWeekRange) {
       list = list.filter((it) => it.weekRange === weekFilter);
     }
+    if (rankingType === '榜单异动' && platformFilter && platformFilter !== 'all') {
+      list = list.filter((it) => {
+        const label = (it.platformLabel || '').trim();
+        if (platformFilter === '微信小游戏') return label === '微信小游戏' || label === 'wx';
+        if (platformFilter === '抖音小游戏') return label === '抖音小游戏' || label === 'dy';
+        return true;
+      });
+    }
     const q = searchTerm.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -30,58 +41,73 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
         (it.developer && it.developer.toLowerCase().includes(q)) ||
         (it.category && it.category.toLowerCase().includes(q))
     );
-  }, [items, weekFilter, hasWeekRange, searchTerm]);
+  }, [items, weekFilter, hasWeekRange, searchTerm, rankingType, platformFilter]);
+  /** 排名变化展示：数据库带 ↑/↓ 则原样显示；否则按数字或「上升/下降」文案显示为 ↑/↓（没箭头时按上升算） */
   const getRankChangeDisplay = (change: string) => {
-    if (!change || change === '--' || change.trim() === '') {
+    const raw = (change || '').toString().trim();
+    if (!raw || raw === '--') {
       return (
         <span className="flex items-center text-slate-400">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-          </svg>
+          <span className="mr-1" aria-hidden>—</span>
           —
         </span>
       );
     }
-
-    // 如果包含"新进榜"
-    if (change.includes('新进榜')) {
+    if (raw.includes('新进榜')) {
       return (
         <span className="flex items-center text-blue-600 font-semibold">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-          </svg>
-          新进榜
+          {raw}
         </span>
       );
     }
-
-    // 如果包含"↑"
-    if (change.includes('↑')) {
-      return (
-        <span className="flex items-center text-green-500 font-semibold">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-          {change}
-        </span>
-      );
-    }
-
-    // 如果包含"↓"
-    if (change.includes('↓')) {
+    if (raw.includes('↓')) {
       return (
         <span className="flex items-center text-red-500 font-semibold">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-          {change}
+          {raw}
         </span>
       );
     }
-
-    // 其他情况直接显示
+    if (raw.includes('↑')) {
+      return (
+        <span className="flex items-center text-green-500 font-semibold">
+          {raw}
+        </span>
+      );
+    }
+    if (/下降/.test(raw)) {
+      const num = raw.replace(/[^\d-]/g, '');
+      const n = parseInt(num, 10);
+      const abs = (Number.isNaN(n) ? raw : Math.abs(n)).toString();
+      return (
+        <span className="flex items-center text-red-500 font-semibold">
+          {'↓ '}{abs === '' ? raw : abs}
+        </span>
+      );
+    }
+    if (/上升/.test(raw) || /^\d+$/.test(raw)) {
+      const num = raw.replace(/[^\d]/g, '');
+      const n = parseInt(num, 10);
+      const val = (Number.isNaN(n) || n === 0) ? (num || raw) : String(Math.abs(n));
+      return (
+        <span className="flex items-center text-green-500 font-semibold">
+          {'↑ '}{val}
+        </span>
+      );
+    }
+    const num = parseInt(raw, 10);
+    if (!Number.isNaN(num) && num !== 0) {
+      const abs = Math.abs(num).toString();
+      const isDown = num < 0;
+      return (
+        <span className={`flex items-center font-semibold ${isDown ? 'text-red-500' : 'text-green-500'}`}>
+          {isDown ? '↓ ' : '↑ '}{abs}
+        </span>
+      );
+    }
     return (
-        <span className="text-slate-700 font-medium">{change}</span>
+      <span className="flex items-center text-green-500 font-semibold">
+        {'↑ '}{raw}
+      </span>
     );
   };
 
@@ -123,14 +149,19 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
           )}
           <span className="text-sm text-slate-500">共 {filteredItems.length} 条</span>
         </div>
-        <div className="overflow-x-auto -mx-6">
+        <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
           <table className="w-full min-w-[800px]">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏名称</th>
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏类型</th>
-                <th className="text-center py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">排名变化</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏名称</th>
+              <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏类型</th>
+              <th className="text-center py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-green-500" aria-hidden>↑</span>
+                  排名变化
+                </span>
+              </th>
                 <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">监控日期</th>
                 {hasWeekRange && <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">周区间</th>}
                 <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">开发公司</th>
@@ -161,7 +192,7 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
                   )}
                 </td>
                 <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
-                  {item.category || '—'}
+                  休闲
                 </td>
                 <td className="py-4 px-6 text-center whitespace-nowrap">
                   {getRankChangeDisplay(item.change)}
@@ -189,9 +220,9 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
   // 竞品动态（AI 品类销售）：排名、产品名称、品类、App ID、Android 下载量、Android 收入
   if (isCompetitorRanking) {
     return (
-      <div className="overflow-x-auto -mx-6">
+      <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
         <table className="w-full min-w-[1000px]">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
             <tr className="border-b border-slate-200 bg-slate-50">
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">产品名称</th>
@@ -235,7 +266,7 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
     );
   }
 
-  // 榜单异动：本周 / 上周 / 异动类型；多周合并时加周区间列与筛选；支持游戏名搜索
+  // 榜单异动：与 SensorTower 一致 — 当前排名、上周排名、变化、异动类型、游戏名、开发公司、平台、国家、周区间；无信号列
   if (isChangeRanking) {
     return (
       <div>
@@ -269,76 +300,97 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
           )}
           <span className="text-sm text-slate-500">共 {filteredItems.length} 条</span>
         </div>
-        <div className="overflow-x-auto -mx-6">
-          <table className="w-full min-w-[1200px]">
-            <thead>
+        <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
+          <table className="w-full min-w-[1000px]">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">信号</th>
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">应用名称</th>
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">App ID</th>
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">国家</th>
-                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">平台</th>
-                <th className="text-right py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">本周排名</th>
-                <th className="text-right py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">上周排名</th>
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">当前排名</th>
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">上周排名</th>
                 <th className="text-center py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">变化</th>
                 <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">异动类型</th>
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏名</th>
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">开发公司</th>
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">平台</th>
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">国家</th>
                 {hasWeekRange && <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">周区间</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredItems.map((item, index) => (
-              <tr
-                key={item.id}
-                className={`hover:bg-slate-50 transition-colors ${
-                  index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
-                }`}
-              >
-                <td className="py-4 px-6 whitespace-nowrap text-lg text-slate-700">
-                  {item.signal || '—'}
-                </td>
-                <td className="py-4 px-6">
-                  <div className="font-semibold text-slate-900 text-base">{item.name}</div>
-                </td>
-                <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
-                  {item.appId || '—'}
-                </td>
-                <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
-                  {item.country || '—'}
-                </td>
-                <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
-                  {item.platformLabel || '—'}
-                </td>
-                <td className="py-4 px-6 text-right whitespace-nowrap font-semibold text-slate-900">
-                  {item.rank}
-                </td>
-                <td className="py-4 px-6 text-right whitespace-nowrap text-sm text-slate-600">
-                  {item.lastRankRaw || '-'}
-                </td>
-                <td className="py-4 px-6 text-center whitespace-nowrap">
-                  {getRankChangeDisplay(item.change)}
-                </td>
-                <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
-                  {item.changeType || '—'}
-                </td>
-                {hasWeekRange && (
-                  <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
-                    {item.weekRange || '—'}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              {filteredItems.map((item, index) => {
+                const rawChange = (item.change || '').toString().trim();
+                const isNew = rawChange.includes('新进榜');
+                const isDown = rawChange.includes('↓');
+                const numericChange = parseInt(rawChange.replace(/[^\d]/g, ''), 10);
+                const hasNumericChange = !Number.isNaN(numericChange) && numericChange > 0;
+                const lastWeekRank = isNew
+                  ? '—'
+                  : hasNumericChange
+                    ? isDown
+                      ? item.rank - numericChange
+                      : item.rank + numericChange
+                    : '—';
+                // 异动类型：参考 SensorTower — 上升>20 为飙升，上升 1~20 为上升，新进榜、下降单独
+                const derivedChangeType = isNew
+                  ? '🆕 新进榜'
+                  : isDown
+                    ? '📉 排名下降'
+                    : hasNumericChange
+                      ? numericChange > 20
+                        ? '🚀 排名飙升'
+                        : '📈 排名上升'
+                      : '—';
+
+                return (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-slate-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                  >
+                    <td className="py-4 px-6 whitespace-nowrap">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold bg-slate-100 text-slate-700">
+                        {item.rank}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
+                      {lastWeekRank}
+                    </td>
+                    <td className="py-4 px-6 text-center whitespace-nowrap">
+                      {getRankChangeDisplay(item.change)}
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
+                      {derivedChangeType}
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-slate-900 text-base">{item.name}</div>
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
+                      {item.developer || '—'}
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
+                      {item.platformLabel || '—'}
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
+                      {formatCountryToZh(item.country) || item.country || '—'}
+                    </td>
+                    {hasWeekRange && (
+                      <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
+                        {item.weekRange || '—'}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
     );
   }
 
   // Top Charts：完全按榜单 CSV 字段展示
   return (
-    <div className="overflow-x-auto -mx-6">
+    <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
       <table className="w-full min-w-[1200px]">
-        <thead>
+        <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
             <tr className="border-b border-slate-200 bg-slate-50">
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">应用名称</th>
@@ -376,10 +428,10 @@ const GameRankingTable = ({ items, rankingType, onGameNameClick }: GameRankingTa
               </td>
 
               <td className="py-4 px-6 whitespace-nowrap">
-                <span className="text-sm text-slate-600">{item.country || '—'}</span>
+                <span className="text-sm text-slate-600">{formatCountryToZh(item.country) || item.country || '—'}</span>
               </td>
               <td className="py-4 px-6 whitespace-nowrap">
-                <span className="text-sm text-slate-600">{item.listType || '—'}</span>
+                <span className="text-sm text-slate-600">{formatChartTypeToZh(item.listType) || item.listType || '—'}</span>
               </td>
               <td className="py-4 px-6 whitespace-nowrap">
                 <span className="text-sm text-slate-600">{item.category || '—'}</span>

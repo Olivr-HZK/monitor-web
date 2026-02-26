@@ -1,21 +1,33 @@
 import { useMemo, useState } from 'react';
-import type { SensorTowerTopItem, SensorTowerRankChangeItem, SensorTowerStoreChangeItem } from '../types';
+import type { SensorTowerTopItem, SensorTowerRankChangeItem } from '../types';
+import { formatCountryToZh, formatChartTypeToZh, buildSensorTowerOverviewUrl } from '../utils/rankingLabels';
+
+/** 导出 CSV 时去掉表情等符号，避免 Excel/旧工具打开乱码或解析错误 */
+function sanitizeForCsv(s: string): string {
+  return s
+    .replace(
+      /[\u{1F300}-\u{1F9FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}]/gu,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 interface SensorTowerTopTableProps {
   items: SensorTowerTopItem[];
   rankChangeItems?: SensorTowerRankChangeItem[];
-  storeChanges?: SensorTowerStoreChangeItem[];
   onBack?: () => void;
 }
 
-type TabKind = 'top100' | 'changes' | 'store_changes';
+type TabKind = 'top100' | 'changes';
 
-const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], onBack }: SensorTowerTopTableProps) => {
+const SensorTowerTopTable = ({ items, rankChangeItems = [], onBack }: SensorTowerTopTableProps) => {
   const [activeTab, setActiveTab] = useState<TabKind>('top100');
   const [top100Filters, setTop100Filters] = useState({
     platform: 'all' as 'all' | 'iOS' | 'Android',
     date: 'all' as 'all' | string,
-    country: 'all' as 'all' | string,
+    // Top100 使用国家代码（如 US），这里默认美国
+    country: 'US' as 'all' | string,
     chartType: 'all' as 'all' | string,
     search: '',
     page: 1,
@@ -23,14 +35,9 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
   const [changesFilters, setChangesFilters] = useState({
     platform: 'all' as 'all' | 'iOS' | 'Android',
     date: 'all' as 'all' | string,
-    country: 'all' as 'all' | string,
+    // 默认展示美国数据
+    country: '🇺🇸 美国' as 'all' | string,
     changeType: 'all' as 'all' | string,
-    search: '',
-    page: 1,
-  });
-  const [storeFilters, setStoreFilters] = useState({
-    platform: 'all' as 'all' | 'iOS' | 'Android',
-    date: 'all' as 'all' | string,
     search: '',
     page: 1,
   });
@@ -38,7 +45,6 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
 
   const normalizedTop100Search = top100Filters.search.trim().toLowerCase();
   const normalizedChangesSearch = changesFilters.search.trim().toLowerCase();
-  const normalizedStoreSearch = storeFilters.search.trim().toLowerCase();
   const matchesSearch = (value?: string) =>
     (value ?? '').toLowerCase();
 
@@ -63,7 +69,12 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     });
     if (top100Filters.date !== 'all') filtered = filtered.filter((it) => it.rankDate === top100Filters.date);
     if (top100Filters.country !== 'all') filtered = filtered.filter((it) => it.country === top100Filters.country);
-    if (top100Filters.chartType !== 'all') filtered = filtered.filter((it) => it.chartType === top100Filters.chartType);
+    if (top100Filters.chartType !== 'all') {
+      filtered = filtered.filter(
+        (it) =>
+          formatChartTypeToZh(it.chartType) === top100Filters.chartType || it.chartType === top100Filters.chartType
+      );
+    }
     return {
       filteredItems: filtered,
       uniqueDates: Array.from(dates).sort().reverse(),
@@ -72,7 +83,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     };
   }, [items, top100Filters, normalizedTop100Search]);
 
-  // 异动榜单筛选与选项（平台、日期=当前榜单日期、国家、异动类型）
+  // 异动榜单筛选与选项（平台、日期=当前榜单日期、国家、异动类型；异动类型含 Top5 登顶/掉出第一）
   const changes = useMemo(() => {
     const dates = new Set<string>();
     const countries = new Set<string>();
@@ -91,61 +102,38 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
       if (it.rankDateCurrent) dates.add(it.rankDateCurrent);
       if (it.country) countries.add(it.country);
       if (it.changeType) changeTypes.add(it.changeType);
+      if (it.top5Movement) changeTypes.add(it.top5Movement);
     });
     if (changesFilters.date !== 'all') filtered = filtered.filter((it) => it.rankDateCurrent === changesFilters.date);
     if (changesFilters.country !== 'all') filtered = filtered.filter((it) => it.country === changesFilters.country);
-    if (changesFilters.changeType !== 'all') filtered = filtered.filter((it) => it.changeType === changesFilters.changeType);
+    if (changesFilters.changeType !== 'all') {
+      if (changesFilters.changeType === '登顶') {
+        filtered = filtered.filter((it) => it.top5Movement === '登顶');
+      } else if (changesFilters.changeType === '掉出第一') {
+        filtered = filtered.filter((it) => it.top5Movement === '掉出第一');
+      } else {
+        filtered = filtered.filter((it) => it.changeType === changesFilters.changeType);
+      }
+    }
+    const changeTypesArr = Array.from(changeTypes).sort();
+    const top5First = ['登顶', '掉出第一'].filter((x) => changeTypes.has(x));
+    const restTypes = changeTypesArr.filter((x) => x !== '登顶' && x !== '掉出第一');
+    const uniqueChangeTypes = [...top5First, ...restTypes];
     return {
       filteredItems: filtered,
       uniqueDates: Array.from(dates).sort().reverse(),
       uniqueCountries: Array.from(countries).sort(),
-      uniqueChangeTypes: Array.from(changeTypes).sort(),
+      uniqueChangeTypes,
     };
   }, [rankChangeItems, changesFilters, normalizedChangesSearch]);
 
-  const storeChangeList = useMemo(() => {
-    const dates = new Set<string>();
-    let filtered = storeChanges;
-    if (storeFilters.platform !== 'all') filtered = filtered.filter((it) => it.platform === storeFilters.platform);
-    if (normalizedStoreSearch) {
-      filtered = filtered.filter(
-        (it) =>
-          matchesSearch(it.appId).includes(normalizedStoreSearch) ||
-          matchesSearch(it.appName).includes(normalizedStoreSearch)
-      );
-    }
-    filtered.forEach((it) => {
-      if (it.rankDate) dates.add(it.rankDate);
-    });
-    if (storeFilters.date !== 'all') filtered = filtered.filter((it) => it.rankDate === storeFilters.date);
-    filtered = [...filtered].sort((a, b) => {
-      if (b.priority !== a.priority) return b.priority - a.priority;
-      const bt = new Date(b.changedAt || b.rankDate).getTime();
-      const at = new Date(a.changedAt || a.rankDate).getTime();
-      return bt - at;
-    });
-    return {
-      filteredItems: filtered,
-      uniqueDates: Array.from(dates).sort().reverse(),
-    };
-  }, [storeChanges, storeFilters, normalizedStoreSearch]);
-
   const isTop100 = activeTab === 'top100';
   const isRankChanges = activeTab === 'changes';
-  const isStoreChanges = activeTab === 'store_changes';
-  const filteredItems = isTop100
-    ? top100.filteredItems
-    : isRankChanges
-      ? changes.filteredItems
-      : storeChangeList.filteredItems;
-  const uniqueDates = isTop100
-    ? top100.uniqueDates
-    : isRankChanges
-      ? changes.uniqueDates
-      : storeChangeList.uniqueDates;
+  const filteredItems = isTop100 ? top100.filteredItems : changes.filteredItems;
+  const uniqueDates = isTop100 ? top100.uniqueDates : changes.uniqueDates;
   const uniqueCountries = isTop100 ? top100.uniqueCountries : changes.uniqueCountries;
 
-  const currentPage = isTop100 ? top100Filters.page : isRankChanges ? changesFilters.page : storeFilters.page;
+  const currentPage = isTop100 ? top100Filters.page : changesFilters.page;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const startIndex = (safeCurrentPage - 1) * pageSize;
@@ -153,8 +141,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
 
   const setTabPage = (nextPage: number) => {
     if (isTop100) setTop100Filters((prev) => ({ ...prev, page: nextPage }));
-    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, page: nextPage }));
-    else setStoreFilters((prev) => ({ ...prev, page: nextPage }));
+    else setChangesFilters((prev) => ({ ...prev, page: nextPage }));
   };
 
   const handleTabChange = (tab: TabKind) => {
@@ -164,20 +151,17 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
 
   const setSearch = (value: string) => {
     if (isTop100) setTop100Filters((prev) => ({ ...prev, search: value, page: 1 }));
-    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, search: value, page: 1 }));
-    else setStoreFilters((prev) => ({ ...prev, search: value, page: 1 }));
+    else setChangesFilters((prev) => ({ ...prev, search: value, page: 1 }));
   };
 
   const setPlatform = (value: 'all' | 'iOS' | 'Android') => {
     if (isTop100) setTop100Filters((prev) => ({ ...prev, platform: value, page: 1 }));
-    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, platform: value, page: 1 }));
-    else setStoreFilters((prev) => ({ ...prev, platform: value, page: 1 }));
+    else setChangesFilters((prev) => ({ ...prev, platform: value, page: 1 }));
   };
 
   const setDate = (value: 'all' | string) => {
     if (isTop100) setTop100Filters((prev) => ({ ...prev, date: value, page: 1 }));
-    else if (isRankChanges) setChangesFilters((prev) => ({ ...prev, date: value, page: 1 }));
-    else setStoreFilters((prev) => ({ ...prev, date: value, page: 1 }));
+    else setChangesFilters((prev) => ({ ...prev, date: value, page: 1 }));
   };
 
   const setCountry = (value: 'all' | string) => {
@@ -218,6 +202,98 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
     );
   };
 
+  const handleExportCsv = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const isTop = activeTab === 'top100';
+    let header: string[];
+    let rows: (string | number)[][];
+
+    if (isTop) {
+      header = [
+        'rank_date',
+        'country',
+        'chart_type',
+        'platform',
+        'rank',
+        'app_id',
+        'app_name',
+        'publisher',
+        'release_date',
+        'downloads',
+        'revenue',
+        'app_url',
+      ];
+      rows = (top100.filteredItems as SensorTowerTopItem[]).map((it) => [
+        it.rankDate,
+        it.country,
+        it.chartType,
+        it.platform,
+        it.rank,
+        it.appId,
+        it.appName ?? '',
+        it.publisherName ?? '',
+        it.releaseDate ?? '',
+        it.downloads ?? '',
+        it.revenue ?? '',
+        it.appUrl ?? '',
+      ]);
+    } else {
+      header = [
+        'rank_date_current',
+        'rank_date_last',
+        'country',
+        'platform',
+        'current_rank',
+        'last_week_rank',
+        'change',
+        'change_type',
+        'app_id',
+        'app_name',
+        'publisher',
+        'downloads',
+        'revenue',
+      ];
+      rows = (changes.filteredItems as SensorTowerRankChangeItem[]).map((it) => [
+        it.rankDateCurrent,
+        it.rankDateLast,
+        it.country,
+        it.platform,
+        it.currentRank,
+        it.lastWeekRank,
+        it.change,
+        it.changeType,
+        it.appId,
+        it.metadataAppName ?? it.appName ?? '',
+        it.publisherName ?? '',
+        it.downloads ?? '',
+        it.revenue ?? '',
+      ]);
+    }
+
+    const lines = [header, ...rows].map((row) =>
+      row
+        .map((v) => {
+          const raw = String(v ?? '');
+          const s = sanitizeForCsv(raw);
+          return `"${s.replace(/"/g, '""')}"`;
+        })
+        .join(',')
+    );
+    const csv = lines.join('\n');
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `sensortower_${isTop ? 'top100' : 'changes'}_${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="w-full">
       <div className="mb-6 flex items-center justify-between">
@@ -227,18 +303,27 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
             Top100 榜单与异动榜单，支持按日期、国家、平台及榜单类型/异动类型筛选，每页 10 条。
           </p>
         </div>
-        {onBack && (
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleExportCsv}
             className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
           >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7 7-7M3 12h18" />
-            </svg>
-            返回
+            导出 CSV
           </button>
-        )}
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7 7-7M3 12h18" />
+              </svg>
+              返回
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tab：Top100 | 异动榜单 */}
@@ -265,17 +350,6 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         >
           异动榜单
         </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange('store_changes')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            activeTab === 'store_changes'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          商店页变化
-        </button>
       </div>
 
       {/* 筛选：平台、日期、国家、榜单类型( Top100 ) / 异动类型( 异动榜单 ) */}
@@ -284,7 +358,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
           <span className="text-sm text-slate-300">关键词</span>
           <input
             type="text"
-            value={isTop100 ? top100Filters.search : isRankChanges ? changesFilters.search : storeFilters.search}
+            value={isTop100 ? top100Filters.search : changesFilters.search}
             onChange={(e) => {
               setSearch(e.target.value);
             }}
@@ -295,7 +369,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-600">平台</span>
           <select
-            value={isTop100 ? top100Filters.platform : isRankChanges ? changesFilters.platform : storeFilters.platform}
+            value={isTop100 ? top100Filters.platform : changesFilters.platform}
             onChange={(e) => setPlatform(e.target.value as 'all' | 'iOS' | 'Android')}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -307,7 +381,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-600">日期</span>
           <select
-            value={isTop100 ? top100Filters.date : isRankChanges ? changesFilters.date : storeFilters.date}
+            value={isTop100 ? top100Filters.date : changesFilters.date}
             onChange={(e) => setDate(e.target.value === 'all' ? 'all' : e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -319,8 +393,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
             ))}
           </select>
         </div>
-        {!isStoreChanges && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">国家</span>
             <select
               value={isTop100 ? top100Filters.country : changesFilters.country}
@@ -330,12 +403,11 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
               <option value="all">全部</option>
               {uniqueCountries.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {formatCountryToZh(c) || c}
                 </option>
               ))}
             </select>
           </div>
-        )}
         {isTop100 ? (
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">榜单类型</span>
@@ -345,14 +417,11 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
-              {top100.uniqueChartTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
+              <option value="免费榜">免费榜</option>
+              <option value="付费榜">付费榜</option>
             </select>
           </div>
-        ) : isRankChanges ? (
+        ) : (
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">异动类型</span>
             <select
@@ -368,13 +437,13 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
               ))}
             </select>
           </div>
-        ) : null}
+        )}
       </div>
 
       {isTop100 ? (
-        <div className="overflow-x-auto -mx-6 max-h-[560px] overflow-y-auto">
+        <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
           <table className="w-full min-w-[1000px]">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏名</th>
@@ -385,6 +454,9 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">国家</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">榜单类型</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">榜单日期</th>
+                <th className="text-right py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">下载量</th>
+                <th className="text-right py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">收入</th>
+                <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">SensorTower</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -414,14 +486,39 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                       {item.appId}
                     </td>
                     <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.platform}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.country}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.chartType}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{formatCountryToZh(item.country) || item.country}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">
+                      {formatChartTypeToZh(item.chartType) || item.chartType || '—'}
+                    </td>
                     <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.rankDate}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-700">
+                      {item.downloads != null ? item.downloads.toLocaleString() : '—'}
+                    </td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-700">
+                      {item.revenue != null ? item.revenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                    </td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">
+                      {(() => {
+                        const stUrl = buildSensorTowerOverviewUrl(item.appId, item.country);
+                        return stUrl ? (
+                          <a
+                            href={stUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            查看
+                          </a>
+                        ) : (
+                          '—'
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-sm text-slate-500">
+                  <td colSpan={12} className="py-8 text-center text-sm text-slate-500">
                     暂无符合筛选条件的记录
                   </td>
                 </tr>
@@ -429,10 +526,10 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
             </tbody>
           </table>
         </div>
-      ) : isRankChanges ? (
-        <div className="overflow-x-auto -mx-6 max-h-[560px] overflow-y-auto">
+      ) : (
+        <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
           <table className="w-full min-w-[1000px]">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">当前排名</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">上周排名</th>
@@ -447,6 +544,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">国家</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">平台</th>
                 <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">当前榜单日期</th>
+                <th className="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">SensorTower</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -465,7 +563,7 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                     </td>
                     <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.lastWeekRank || '—'}</td>
                     <td className="py-3 px-6 whitespace-nowrap text-sm font-medium text-slate-700">{item.change}</td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.changeType}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.top5Movement ?? item.changeType}</td>
                     <td className="py-3 px-6 text-sm text-slate-700 max-w-[180px] truncate" title={item.metadataAppName ?? item.appName}>
                       {renderAppName(item.metadataAppName || item.appName, item.appUrl, item.metadataAppName ?? item.appName ?? item.appId)}
                     </td>
@@ -482,84 +580,37 @@ const SensorTowerTopTable = ({ items, rankChangeItems = [], storeChanges = [], o
                     <td className="py-3 px-6 whitespace-nowrap text-sm text-right text-slate-700">
                       {item.revenue != null ? item.revenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
                     </td>
-                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.country}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{formatCountryToZh(item.country) || item.country}</td>
                     <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.platform}</td>
                     <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">{item.rankDateCurrent}</td>
+                    <td className="py-3 px-6 whitespace-nowrap text-sm text-slate-700">
+                      {(() => {
+                        const stUrl = buildSensorTowerOverviewUrl(item.appId, item.country);
+                        return stUrl ? (
+                          <a
+                            href={stUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            查看
+                          </a>
+                        ) : (
+                          '—'
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={13} className="py-8 text-center text-sm text-slate-500">
+                  <td colSpan={14} className="py-8 text-center text-sm text-slate-500">
                     暂无符合筛选条件的记录
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <div className="space-y-4 max-h-[560px] overflow-y-auto pr-1">
-          {pageItems.length > 0 ? (
-            (pageItems as SensorTowerStoreChangeItem[]).map((item) => (
-              <div
-                key={item.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{item.appName}</h3>
-                    <p className="text-sm text-slate-600">
-                      {item.developer ? `${item.developer} · ` : ''}{item.platform}
-                    </p>
-                  </div>
-                  <div className="text-sm text-slate-600">
-                    变动时间：{item.changedAt || item.rankDate}
-                  </div>
-                </div>
-                {item.storeUrl && (
-                  <div className="mt-2">
-                    <a
-                      href={item.storeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                    >
-                      商店页链接
-                    </a>
-                  </div>
-                )}
-                <div className="mt-3">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium border ${
-                      item.priority === 2
-                        ? 'bg-red-50 text-red-700 border-red-200'
-                        : item.priority === 1
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    优先级：{item.priorityLabel}
-                  </span>
-                </div>
-                <div className="mt-4 space-y-2 text-sm text-slate-700">
-                  {item.summaries.length > 0 ? (
-                    item.summaries.map((s, idx) => (
-                      <div key={`${item.id}-summary-${idx}`} className="flex items-start gap-2">
-                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        <span>{s}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-slate-500">未解析到具体变化内容。</div>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="py-8 text-center text-sm text-slate-500">
-              暂无符合筛选条件的记录
-            </div>
-          )}
         </div>
       )}
 

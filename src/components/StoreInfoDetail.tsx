@@ -4,6 +4,7 @@
  */
 
 import type { SensorTowerStoreCard, AppStoreInfo, GameStoreInfo } from '../types';
+import { formatCountryToZh } from '../utils/rankingLabels';
 
 interface StoreInfoDetailProps {
   card: SensorTowerStoreCard;
@@ -76,7 +77,7 @@ const StoreInfoDetail = ({ card, onBack }: StoreInfoDetailProps) => {
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold text-slate-900 truncate">{card.gameName}</h1>
               <p className="text-sm text-slate-500 mt-0.5">
-                {card.country} · {card.platform} · 新进榜排名 #{card.currentRank}
+                {formatCountryToZh(card.country) || card.country} · {card.platform} · 新进榜排名 #{card.currentRank}
               </p>
             </div>
           </div>

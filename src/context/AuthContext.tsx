@@ -3,6 +3,7 @@
  * 静态模式访问密码：优先从 public/auth-config.json 的 staticPasswordHash 读取，否则用构建时 VITE_STATIC_PASSWORD_HASH
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { getApiUrl } from '../utils/api';
 
 const STATIC_AUTH_KEY = 'static-auth';
 const AUTH_CONFIG_URL = 'auth-config.json';
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** 静态模式下的访问密码哈希（来自 auth-config.json 或构建时 env） */
   const [staticHash, setStaticHash] = useState('');
 
-  // 静态模式（无后端 / 托管页）：直接请求静态资源路径，与 public 拷贝到 dist 一致
+  // 静态模式（无后端 / 托管页）：直接请求静态资源路径；后端模式用可配置的 API 基地址
   const getDataUrl = useCallback((filename: string) => {
     const base = typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL
       ? import.meta.env.BASE_URL.replace(/\/$/, '')
@@ -67,8 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const path = filename.split('/').map(encodeURIComponent).join('/');
       return base ? `${base}/${path}` : `/${path}`;
     }
-    const prefix = base ? `${base}/api/data` : '/api/data';
-    return `${prefix}/${encodeURIComponent(filename)}`;
+    return getApiUrl(`/api/data/${encodeURIComponent(filename)}`);
   }, [authMode]);
 
   const checkAuth = useCallback(async () => {
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const res = await fetch('/api/me', { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/me'), { credentials: 'include' });
       // 404：明确没有后端；在本地开发时，通过 Vite 代理 /api 且后端未启动通常会返回 502，这里也视为“无后端”
       if (res.status === 404 || res.status === 502) {
         setAuthMode('static');
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (username: string, password: string): Promise<{ ok: boolean; error?: string }> => {
       try {
-        const res = await fetch('/api/login', {
+        const res = await fetch(getApiUrl('/api/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      await fetch(getApiUrl('/api/logout'), { method: 'POST', credentials: 'include' });
     } finally {
       setUser(null);
     }

@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import type { MonitorSource, MonitorType } from '../types';
-import type { GamePlatformKey, CasualGameMainCategory, CasualGameCompetitorSub, AiProductSubCategory } from '../types';
+import type {
+  GamePlatformKey,
+  CasualGameMainCategory,
+  CasualGameCompetitorSub,
+  AiProductSubCategory,
+} from '../types';
 
 interface SidebarProps {
   sources: MonitorSource[];
@@ -28,6 +33,8 @@ interface SidebarProps {
   visibleTypes?: (MonitorType | '全部')[];
   /** 是否显示最上方的「全部」按钮（默认显示） */
   showAllTypeButton?: boolean;
+  /** 控制 AI 产品监测下可选的子类（默认全部） */
+  aiProductVisibleSubs?: AiProductSubCategory[];
 }
 
 const Sidebar = ({
@@ -49,6 +56,7 @@ const Sidebar = ({
   onCasualSourceSectionSelect,
   visibleTypes,
   showAllTypeButton = true,
+  aiProductVisibleSubs,
 }: SidebarProps) => {
   const [internalCasualSourceSection, setInternalCasualSourceSection] = useState<'wechat_douyin' | 'sensortower'>('wechat_douyin');
   const activeCasualSourceSection = propCasualSourceSection ?? internalCasualSourceSection;
@@ -144,7 +152,7 @@ const Sidebar = ({
             )
               return null;
 
-            // 休闲游戏监测：右侧分为两个大块（微信/抖音 & SensorTower），每个下面都有 周报简要 / 玩法拆解，
+            // 休闲游戏监测：右侧分为两个大块（微信/抖音 & SensorTower），每个下面为 周报简要（玩法拆解已移除）
             // 另外保留「竞品监测」块（社媒监控 / UA素材）
             if (type === '休闲游戏监测') {
               const casualSourceSections: { id: 'wechat_douyin' | 'sensortower'; label: string; icon: string }[] = [
@@ -153,7 +161,6 @@ const Sidebar = ({
               ];
               const baseCasualSubItems: { key: CasualGameMainCategory; label: string; icon: string }[] = [
                 { key: '周报简要', label: '周报简要', icon: '📋' },
-                { key: '玩法拆解', label: '玩法拆解', icon: '🎲' },
               ];
               const sensortowerOnlySubItems: { key: CasualGameMainCategory; label: string; icon: string }[] = [
                 { key: '商店页变化', label: '商店页变化', icon: '🧾' },
@@ -195,12 +202,7 @@ const Sidebar = ({
                               ...baseCasualSubItems,
                               ...(section.id === 'sensortower' ? sensortowerOnlySubItems : []),
                             ].map(({ key, label, icon }) => {
-                              const isSelectedInCategory =
-                                key === '玩法拆解'
-                                  ? selectedCasualGameCategory === '玩法拆解' ||
-                                    selectedCasualGameCategory === '新游戏' ||
-                                    selectedCasualGameCategory === '新玩法'
-                                  : selectedCasualGameCategory === key;
+                              const isSelectedInCategory = selectedCasualGameCategory === key;
                               // UI 选中态需同时匹配当前大块，避免两个模块同时高亮
                               const isSelected = isSelectedInCategory && activeCasualSourceSection === section.id;
                               return (
@@ -267,6 +269,15 @@ const Sidebar = ({
 
             // AI产品监测：排行榜 / 产品周报 / UA素材
             if (type === 'AI产品监测') {
+              const allAiSubs: { key: AiProductSubCategory; label: string; icon: string }[] = [
+                { key: '产品周报', label: '产品周报', icon: '📋' },
+                { key: 'UA素材', label: 'UA素材', icon: '🎬' },
+                { key: '竞品动态', label: '竞品动态', icon: '🏆' },
+                { key: '新产品速览', label: '新产品速览', icon: '🆕' },
+              ];
+              const aiSubItems = aiProductVisibleSubs
+                ? allAiSubs.filter((item) => aiProductVisibleSubs.includes(item.key))
+                : allAiSubs;
               return (
                 <div key={type} className="space-y-2">
                   <button
@@ -286,12 +297,7 @@ const Sidebar = ({
 
                   {selectedType === type && (
                     <div className="ml-4 space-y-1">
-                      {[
-                        { key: '产品周报' as const, label: '产品周报', icon: '📋' },
-                        { key: 'UA素材' as const, label: 'UA素材', icon: '🎬' },
-                        { key: '竞品动态' as const, label: '竞品动态', icon: '🏆' },
-                        { key: '新产品速览' as const, label: '新产品速览', icon: '🆕' },
-                      ].map(({ key, label, icon }) => {
+                      {aiSubItems.map(({ key, label, icon }) => {
                         const isSelected = selectedAiProductSub === key;
                         return (
                           <button

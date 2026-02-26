@@ -236,17 +236,10 @@ function parseChangesJson(
     icon_url: '图标',
     screenshot_urls: '截图',
     languages: '语言',
-  };
-
-  const summarizeTextChange = (label: string, oldVal: string, newVal: string): string => {
-    const oldText = normalizeValue(oldVal);
-    const newText = normalizeValue(newVal);
-    const oldLen = oldText === '空' ? 0 : oldText.length;
-    const newLen = newText === '空' ? 0 : newText.length;
-    if (oldLen <= 80 && newLen <= 80) {
-      return `${label}：${oldText} → ${newText}`;
-    }
-    return `${label}更新（长度 ${oldLen} → ${newLen}）`;
+    'video id': '视频',
+    video_id: '视频',
+    'video thumbnail url': '视频封面',
+    video_thumbnail_url: '视频封面',
   };
 
   let hasScreenshotChange = false;
@@ -263,7 +256,20 @@ function parseChangesJson(
   let hasMeaningfulChange = false;
 
   const summarizeFieldChange = (field: string, oldVal?: string, newVal?: string): string => {
-    const label = labelMap[field] || field;
+    const lowerField = field.toLowerCase();
+    // similar_app_ids / similar_apps 只用于内部参考，不在前端卡片和详情中展示
+    if (lowerField === 'similar_app_ids' || lowerField === 'similar_apps') {
+      return '';
+    }
+    // 活动结束时间等纯时间字段不展示（例如 event end time / event_end_time）
+    if (lowerField === 'event end time' || lowerField === 'event_end_time') {
+      return '';
+    }
+    // size / sizebytes 不展示
+    if (lowerField === 'size' || lowerField === 'sizebytes') {
+      return '';
+    }
+    const label = labelMap[field] || labelMap[lowerField] || field;
     if (field === 'screenshot_urls') {
       const oldArr = normalizeList(parseArray(oldVal));
       const newArr = normalizeList(parseArray(newVal));
@@ -290,6 +296,7 @@ function parseChangesJson(
       hasMeaningfulChange = true;
       return '图标已更新';
     }
+    // 视频相关：只有「视频封面 URL」才写入 videoImagesBefore/After；video_id 等只生成摘要，不覆盖 URL
     if (field.toLowerCase().includes('video')) {
       const oldArr = normalizeList(parseArray(oldVal));
       const newArr = normalizeList(parseArray(newVal));
@@ -298,32 +305,29 @@ function parseChangesJson(
       const oldList = oldArr.length ? oldArr : (isUrlLike(oldUrl) ? [oldUrl] : []);
       const newList = newArr.length ? newArr : (isUrlLike(newUrl) ? [newUrl] : []);
       if (sameStringList(oldList, newList)) return '';
-      videoImagesBefore = oldList.length ? oldList : undefined;
-      videoImagesAfter = newList.length ? newList : undefined;
+      // 仅当字段是 video_thumbnail_url（或值像 URL）时才写入封面链接，避免 video_id 覆盖
+      const isThumbnailUrlField =
+        lowerField === 'video_thumbnail_url' || lowerField === 'video thumbnail url';
+      const oldAreUrls = oldList.length > 0 && oldList.every((u) => isUrlLike(u));
+      const newAreUrls = newList.length > 0 && newList.every((u) => isUrlLike(u));
+      if (isThumbnailUrlField && (oldAreUrls || newAreUrls)) {
+        videoImagesBefore = oldAreUrls ? oldList : undefined;
+        videoImagesAfter = newAreUrls ? newList : undefined;
+      }
       hasVideoChange = true;
       hasMeaningfulChange = true;
       return `${label}有更新`;
     }
+    // 语言变更暂不关注
     if (field === 'languages') {
-      const oldArr = normalizeList(parseArray(oldVal)).map((v) => v.toLowerCase());
-      const newArr = normalizeList(parseArray(newVal)).map((v) => v.toLowerCase());
-      const oldSet = Array.from(new Set(oldArr)).sort();
-      const newSet = Array.from(new Set(newArr)).sort();
-      if (sameStringList(oldSet, newSet)) return '';
-      const oldText = oldSet.length <= 5 ? oldSet.join('、') : `共 ${oldSet.length} 种`;
-      const newText = newSet.length <= 5 ? newSet.join('、') : `共 ${newSet.length} 种`;
-      hasMeaningfulChange = true;
-      return `语言：${oldText || '空'} → ${newText || '空'}`;
+      return '';
     }
     if (field === 'icon_url') {
       return '图标已更新';
     }
+    // 商店链接变更暂不在摘要中展示
     if (field === 'store_url') {
-      const oldText = normalizeValue(oldVal);
-      const newText = normalizeValue(newVal);
-      if (oldText === newText) return '';
-      hasMeaningfulChange = true;
-      return '商店链接已更新';
+      return '';
     }
     if (field === 'rating') {
       const oldNum = parseFloat(normalizeValue(oldVal));
@@ -333,14 +337,22 @@ function parseChangesJson(
       hasMeaningfulChange = true;
       return `评分：${oldNum.toFixed(2)} → ${newNum.toFixed(2)}`;
     }
-    if (field === 'description' || field === 'full_description' || field === 'description_short' || field === 'short_description') {
-      return summarizeTextChange(label, oldVal || '', newVal || '');
+    if (field === 'rating_count') {
+      return '';
     }
-    const oldText = normalizeValue(oldVal);
-    const newText = normalizeValue(newVal);
-    if (oldText === newText) return '';
-    hasMeaningfulChange = true;
-    return `${label}：${oldText} → ${newText}`;
+    // 描述、名称、分类等通用文案暂不在摘要中展示，只保留「下载量」这类核心数值
+    if (field === 'description' || field === 'full_description' || field === 'description_short' || field === 'short_description') {
+      return '';
+    }
+    // 仅保留 installs（下载量）这类关心的数值变更
+    if (lowerField === 'installs') {
+      const oldText = normalizeValue(oldVal);
+      const newText = normalizeValue(newVal);
+      if (oldText === newText) return '';
+      hasMeaningfulChange = true;
+      return `${label}：${oldText} → ${newText}`;
+    }
+    return '';
   };
 
   const topMap = parseLooseMap(changesJson);
@@ -404,7 +416,25 @@ function loadStoreInfoMap(
   return map;
 }
 
-/** 从 sensortower_top100.db 读取 iOS / Android Top100 榜单，并关联 app_metadata 补全游戏名、开发公司、发行日期 */
+/** 最近 N 周的 rank_date 列表（用于只展示最近四周） */
+const RANK_WEEKS_LIMIT = 4;
+
+function getLastRankDates(db: any, tableName: string): string[] {
+  const dates: string[] = [];
+  try {
+    const stmt = db.prepare(`SELECT DISTINCT rank_date FROM ${tableName} ORDER BY rank_date DESC LIMIT ${RANK_WEEKS_LIMIT}`);
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as { rank_date: string };
+      if (row.rank_date) dates.push(String(row.rank_date));
+    }
+    stmt.free();
+  } catch {
+    // ignore
+  }
+  return dates;
+}
+
+/** 从 sensortower_top100.db 读取 iOS / Android Top100 榜单（仅最近四周），并关联 app_metadata */
 export async function loadSensorTowerTop100(getDataUrl?: GetDataUrl): Promise<SensorTowerTopItem[]> {
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
@@ -419,9 +449,13 @@ export async function loadSensorTowerTop100(getDataUrl?: GetDataUrl): Promise<Se
 
   for (const { name, platform } of tables) {
     try {
+      const allowedDates = getLastRankDates(db, name);
+      if (allowedDates.length === 0) continue;
+      const placeholders = allowedDates.map(() => '?').join(',');
       const stmt = db.prepare(
-        `SELECT rank_date, country, chart_type, rank, app_id FROM ${name} ORDER BY rank_date DESC, country, chart_type, rank ASC`
+        `SELECT rank_date, country, chart_type, rank, app_id, downloads, revenue FROM ${name} WHERE rank_date IN (${placeholders}) ORDER BY rank_date DESC, country, chart_type, rank ASC`
       );
+      stmt.bind(allowedDates);
       while (stmt.step()) {
         const row: any = stmt.getAsObject();
         const appId = String(row.app_id);
@@ -439,6 +473,8 @@ export async function loadSensorTowerTop100(getDataUrl?: GetDataUrl): Promise<Se
           appUrl: meta?.url || undefined,
           publisherName: meta?.publisher_name || undefined,
           releaseDate: meta?.release_date ? formatReleaseDate(meta.release_date) : undefined,
+          downloads: row.downloads != null ? Number(row.downloads) : undefined,
+          revenue: row.revenue != null ? Number(row.revenue) : undefined,
         });
       }
       stmt.free();
@@ -450,7 +486,7 @@ export async function loadSensorTowerTop100(getDataUrl?: GetDataUrl): Promise<Se
   return result;
 }
 
-/** 从 sensortower_top100.db 读取异动榜单 rank_changes，并关联 app_metadata */
+/** 从 sensortower_top100.db 读取异动榜单 rank_changes（仅最近四周），并关联 app_metadata */
 export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promise<SensorTowerRankChangeItem[]> {
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
@@ -459,9 +495,22 @@ export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promi
   const result: SensorTowerRankChangeItem[] = [];
 
   try {
-    const stmt = db.prepare(
-      `SELECT rank_date_current, rank_date_last, signal, app_name, app_id, country, platform, current_rank, last_week_rank, "change", change_type, downloads, revenue, publisher_name FROM rank_changes ORDER BY rank_date_current DESC, country, platform, current_rank ASC`
+    const dateStmt = db.prepare(
+      `SELECT DISTINCT rank_date_current FROM rank_changes ORDER BY rank_date_current DESC LIMIT ${RANK_WEEKS_LIMIT}`
     );
+    const allowedDates: string[] = [];
+    while (dateStmt.step()) {
+      const row = dateStmt.getAsObject() as { rank_date_current: string };
+      if (row.rank_date_current) allowedDates.push(String(row.rank_date_current));
+    }
+    dateStmt.free();
+    if (allowedDates.length === 0) return result;
+
+    const placeholders = allowedDates.map(() => '?').join(',');
+    const stmt = db.prepare(
+      `SELECT rank_date_current, rank_date_last, signal, app_name, app_id, country, platform, current_rank, last_week_rank, "change", change_type, downloads, revenue, publisher_name FROM rank_changes WHERE rank_date_current IN (${placeholders}) ORDER BY rank_date_current DESC, country, platform, current_rank ASC`
+    );
+    stmt.bind(allowedDates);
     while (stmt.step()) {
       const row: any = stmt.getAsObject();
       const appId = String(row.app_id ?? '');
@@ -469,6 +518,15 @@ export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promi
       const platform: 'iOS' | 'Android' = platformRaw === 'ANDROID' ? 'Android' : 'iOS';
       const key = metadataKey(appId, platform);
       const meta = metaMap.get(key);
+      const currentRank = Number(row.current_rank) || 0;
+      const lastWeekRank = String(row.last_week_rank ?? '').trim();
+      // Top5 异动：上周第一本周 2～5 为「掉出第一」；上周 2～5 本周第一为「登顶」
+      let top5Movement: '登顶' | '掉出第一' | undefined;
+      if (lastWeekRank === '1' && currentRank >= 2 && currentRank <= 5) {
+        top5Movement = '掉出第一';
+      } else if (['2', '3', '4', '5'].includes(lastWeekRank) && currentRank === 1) {
+        top5Movement = '登顶';
+      }
       result.push({
         id: `rc-${row.rank_date_current}-${row.country}-${platform}-${row.current_rank}-${appId}`,
         rankDateCurrent: String(row.rank_date_current),
@@ -478,7 +536,7 @@ export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promi
         appId,
         country: String(row.country ?? ''),
         platform,
-        currentRank: Number(row.current_rank) || 0,
+        currentRank,
         lastWeekRank: String(row.last_week_rank ?? ''),
         change: String(row['change'] ?? row.change ?? ''),
         changeType: String(row.change_type ?? ''),
@@ -490,6 +548,7 @@ export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promi
         releaseDate: meta?.release_date ? formatReleaseDate(meta.release_date) : undefined,
         downloads: row.downloads != null ? Number(row.downloads) : undefined,
         revenue: row.revenue != null ? Number(row.revenue) : undefined,
+        top5Movement,
       });
     }
     stmt.free();
@@ -650,66 +709,71 @@ export async function loadSensorTowerStoreChanges(
   for (const { name, platform } of tables) {
     try {
       const infoMap = loadStoreInfoMap(db, platform);
-      const dateStmt = db.prepare(`SELECT rank_date FROM ${name} ORDER BY rank_date DESC LIMIT 1`);
-      let rankDate = '';
-      if (dateStmt.step()) {
-        rankDate = String((dateStmt.getAsObject() as any).rank_date ?? '');
+      // 读取最近若干个 rank_date（放宽到最近 30 天），而不是只取最新一天
+      const dateStmt = db.prepare(`SELECT DISTINCT rank_date FROM ${name} ORDER BY rank_date DESC LIMIT 30`);
+      const rankDates: string[] = [];
+      while (dateStmt.step()) {
+        const row = dateStmt.getAsObject() as any;
+        const d = String(row.rank_date ?? '');
+        if (d) rankDates.push(d);
       }
       dateStmt.free();
-      if (!rankDate) continue;
+      if (rankDates.length === 0) continue;
 
-      const stmt = db.prepare(
-        `SELECT app_id, rank_date, changed_at, changes_json
-         FROM ${name}
-         WHERE rank_date = ?
-         ORDER BY changed_at DESC, id DESC`
-      );
-      stmt.bind([rankDate]);
       let index = 0;
-      while (stmt.step()) {
-        const row = stmt.getAsObject() as any;
-        const appId = String(row.app_id ?? '');
-        const info = infoMap.get(appId);
-        const appName = info?.name || appId;
-        const developer = info?.developer;
-        const storeUrl = info?.storeUrl;
-        const changedAt = String(row.changed_at ?? '');
-        const {
-          summaries,
-          screenshotUrls,
-          screenshotBefore,
-          screenshotAfter,
-          iconBefore,
-          iconAfter,
-          videoImagesBefore,
-          videoImagesAfter,
-          priority,
-          priorityLabel,
-          hasMeaningfulChange,
-        } = parseChangesJson(String(row.changes_json ?? ''));
-        if (!hasMeaningfulChange && summaries.length === 0) continue;
-        results.push({
-          id: `st-store-change-${platform}-${rankDate}-${appId}-${index++}`,
-          appId,
-          platform,
-          rankDate,
-          changedAt,
-          appName,
-          developer,
-          summaries,
-          storeUrl,
-          screenshotUrls,
-          screenshotBefore,
-          screenshotAfter,
-          iconBefore,
-          iconAfter,
-          videoImagesBefore,
-          videoImagesAfter,
-          priority,
-          priorityLabel,
-        });
+      for (const rankDate of rankDates) {
+        const stmt = db.prepare(
+          `SELECT app_id, rank_date, changed_at, changes_json
+           FROM ${name}
+           WHERE rank_date = ?
+           ORDER BY changed_at DESC, id DESC`
+        );
+        stmt.bind([rankDate]);
+        while (stmt.step()) {
+          const row = stmt.getAsObject() as any;
+          const appId = String(row.app_id ?? '');
+          const info = infoMap.get(appId);
+          const appName = info?.name || appId;
+          const developer = info?.developer;
+          const storeUrl = info?.storeUrl;
+          const changedAt = String(row.changed_at ?? '');
+          const {
+            summaries,
+            screenshotUrls,
+            screenshotBefore,
+            screenshotAfter,
+            iconBefore,
+            iconAfter,
+            videoImagesBefore,
+            videoImagesAfter,
+            priority,
+            priorityLabel,
+            hasMeaningfulChange,
+          } = parseChangesJson(String(row.changes_json ?? ''));
+          if (!hasMeaningfulChange && summaries.length === 0) continue;
+          results.push({
+            id: `st-store-change-${platform}-${rankDate}-${appId}-${index++}`,
+            appId,
+            platform,
+            rankDate,
+            changedAt,
+            appName,
+            developer,
+            summaries,
+            storeUrl,
+            screenshotUrls,
+            screenshotBefore,
+            screenshotAfter,
+            iconBefore,
+            iconAfter,
+            videoImagesBefore,
+            videoImagesAfter,
+            priority,
+            priorityLabel,
+          });
+        }
+        stmt.free();
       }
-      stmt.free();
     } catch (e) {
       console.error(`Error reading ${name} from sensortower_top100.db:`, e);
     }

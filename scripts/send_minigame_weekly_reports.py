@@ -29,7 +29,7 @@ import sys
 import urllib.error
 import urllib.request
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 try:
@@ -330,6 +330,69 @@ def _parse_store_changes_json(changes_json: str) -> list[str]:
     return [f"{f} 有更新" for f in sorted(fields)[:5]]
 
 
+def _store_change_brief(summaries: list[str]) -> str:
+    """
+    将商店页变化的字段列表压缩为简短中文说明，用于括号内展示，例如「截图、图标有更新」。
+    summaries 形如 ["screenshot_urls 有更新", "icon_url 有更新", ...]
+    """
+    if not summaries:
+        return ""
+    label_map: dict[str, str] = {
+        "screenshot": "截图",
+        "screenshot_urls": "截图",
+        "icon": "图标",
+        "icon_url": "图标",
+        "description": "文案",
+        "full_description": "文案",
+        "description_short": "文案",
+        "short_description": "文案",
+        "title": "标题",
+        "app_name": "标题",
+        "name": "标题",
+        "price": "价格",
+        "price_type": "价格",
+        "rating": "评分",
+        "rating_count": "评分",
+        "languages": "语言",
+        "video": "视频",
+        "store_url": "链接",
+        "url": "链接",
+    }
+
+    labels: list[str] = []
+    for s in summaries:
+        raw = (s or "").strip()
+        if not raw:
+            continue
+        # 取空格前的字段名部分（如 "screenshot_urls 有更新" -> "screenshot_urls"）
+        field = raw.split()[0]
+        key = field.lower()
+        # 跳过通用包装字段，如 new/old/https 等
+        if key in {"new", "old"} or key.startswith("http"):
+            continue
+        mapped = None
+        for k, v in label_map.items():
+            if k in key:
+                mapped = v
+                break
+        labels.append(mapped or field)
+
+    # 去重并保留顺序，只取前 3 个
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for lbl in labels:
+        if lbl and lbl not in seen:
+            seen.add(lbl)
+            uniq.append(lbl)
+        if len(uniq) >= 3:
+            break
+
+    if not uniq:
+        return ""
+    # 组装成「截图、图标有更新」这类短语
+    return "、".join(uniq) + "有更新"
+
+
 def _get_store_changes(
     conn: sqlite3.Connection,
     table: str,
@@ -395,6 +458,214 @@ def _get_store_changes(
             "summaries": summaries,
         })
     return rank_date, result
+
+
+def _pick_wechatdouyin_week_for_report_date(
+    conn: sqlite3.Connection,
+    report_date_iso: str,
+) -> str | None:
+    """
+    根据日报日期为微信/抖音榜单选择周区间：
+    - 期望锁定到「日期参数的前一周」，即 end_date = report_date - 1 所在的 week_range。
+    - week_range 形如 '2026-2-16~2026-2-22' 或 '2026-02-16～2026-02-22'。
+    """
+    try:
+        target_date = datetime.strptime(report_date_iso, "%Y-%m-%d")
+    except ValueError:
+        return None
+    target_end = target_date - timedelta(days=1)
+
+    # 收集所有 week_range
+    week_ranges: set[str] = set()
+    for table in ("top20_ranking", "rank_changes"):
+        try:
+            cur = conn.execute(f"SELECT DISTINCT week_range FROM {table}")
+            for (w,) in cur.fetchall():
+                if w:
+                    week_ranges.add(str(w).strip())
+        except sqlite3.OperationalError:
+            continue
+
+    if not week_ranges:
+        return None
+
+    def parse_end_date(week_range: str) -> datetime | None:
+        # "2026-2-16~2026-2-22" 或 "2026-2-16～2026-2-22"
+        parts = re.split(r"[~～]", week_range)
+        if len(parts) < 2:
+            return None
+        end_str = parts[1].strip()
+        if not end_str:
+            return None
+        try:
+            return datetime.strptime(end_str, "%Y-%m-%d")
+        except ValueError:
+            return None
+
+    candidates: list[tuple[datetime, str]] = []
+    for w in week_ranges:
+        end_dt = parse_end_date(w)
+        if end_dt is None:
+            continue
+        if end_dt.date() == target_end.date():
+            candidates.append((end_dt, w))
+
+    if not candidates:
+        return None
+
+    # 若有多个匹配，取 end_date 最大的那个
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
+
+
+def _build_wechat_douyin_push(
+    conn: sqlite3.Connection,
+    target_week_range: str | None = None,
+    max_top20: int = 5,
+    max_changes: int = 5,
+) -> tuple[str, str]:
+    """从 wechatdouyin.db 的 top20_ranking、rank_changes 构建微信/抖音小游戏周报 Markdown。
+    返回 (markdown, week_range)；无数据时返回 ('', '')。
+    target_week_range：若指定则只生成该周；否则取最新一周（按 week_range 排序取最大）。"""
+    lines: list[str] = []
+    week_range = ""
+
+    def get_latest_week() -> str | None:
+        for table in ("top20_ranking", "rank_changes"):
+            try:
+                cur = conn.execute(
+                    f"SELECT DISTINCT week_range FROM {table} ORDER BY week_range DESC LIMIT 1"
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return str(row[0]).strip()
+            except sqlite3.OperationalError:
+                continue
+        return None
+
+    if target_week_range and target_week_range.strip():
+        week_range = target_week_range.strip()
+    else:
+        w = get_latest_week()
+        if not w:
+            return "", ""
+        week_range = w
+
+    lines.append(f"# 微信/抖音小游戏周报-{week_range}")
+    lines.append("")
+
+    # 一、微信小游戏 Top20（真实总数 + 前 max_top20 条示例，仅展示排名与名称）
+    try:
+        cur = conn.execute(
+            "SELECT rank, game_name, company, rank_change FROM top20_ranking "
+            "WHERE platform_key = 'wx' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC",
+            (week_range,),
+        )
+        rows = cur.fetchall()
+        if rows:
+            lines.append("## 一、微信小游戏 Top20")
+            lines.append("")
+            total = len(rows)
+            lines.append(f"共 {total} 款，示例 {min(total, max_top20)} 款：")
+            lines.append("")
+            for r in rows[: max_top20]:
+                rank = r[0] if r[0] is not None else "—"
+                name = (r[1] or "—").strip()
+                lines.append(f"- 排名 {rank}：{name}")
+            if total > max_top20:
+                lines.append("- ……")
+            lines.append("")
+    except sqlite3.OperationalError:
+        pass
+
+    # 二、抖音小游戏 Top20（真实总数 + 前 max_top20 条示例，仅展示排名与名称）
+    try:
+        cur = conn.execute(
+            "SELECT rank, game_name, company, rank_change FROM top20_ranking "
+            "WHERE platform_key = 'dy' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC",
+            (week_range,),
+        )
+        rows = cur.fetchall()
+        if rows:
+            lines.append("## 二、抖音小游戏 Top20")
+            lines.append("")
+            total = len(rows)
+            lines.append(f"共 {total} 款，示例 {min(total, max_top20)} 款：")
+            lines.append("")
+            for r in rows[: max_top20]:
+                rank = r[0] if r[0] is not None else "—"
+                name = (r[1] or "—").strip()
+                lines.append(f"- 排名 {rank}：{name}")
+            if total > max_top20:
+                lines.append("- ……")
+            lines.append("")
+    except sqlite3.OperationalError:
+        pass
+
+    # 三、榜单异动（真实总数 + 前 max_changes 条示例）
+    try:
+        cur = conn.execute(
+            "SELECT rank, game_name, company, rank_change, platform_key FROM rank_changes "
+            "WHERE week_range = ? ORDER BY platform_key, CAST(rank AS INTEGER) ASC",
+            (week_range,),
+        )
+        rows = cur.fetchall()
+        if rows:
+            lines.append("## 三、榜单异动")
+            lines.append("")
+            platform_label = {"wx": "微信小游戏", "dy": "抖音小游戏"}
+            total = len(rows)
+            lines.append(f"共 {total} 条记录，示例 {min(total, max_changes)} 条：")
+            lines.append("")
+            for r in rows[:max_changes]:
+                rank = r[0] if r[0] is not None else "—"
+                name = (r[1] or "—").strip()
+                company = (r[2] or "—").strip()
+                change = (r[3] or "—").strip()
+                pk = (r[4] or "").strip().lower() if len(r) > 4 else ""
+                plat = platform_label.get(pk, pk or "—")
+                lines.append(f"- 排名 {rank}：{name}（{plat}，{company}，变化 {change}）")
+            if total > max_changes:
+                lines.append("- ……")
+            lines.append("")
+    except sqlite3.OperationalError:
+        pass
+
+    if len(lines) <= 2:
+        return "", ""
+
+    lines.append("---")
+    lines.append("")
+    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})")
+    return "\n".join(lines), week_range
+
+
+def build_minigame_weekly_report_doc(
+    week_range: str,
+    content_md: str,
+    *,
+    title_prefix: str = "微信/抖音小游戏周报",
+) -> dict:
+    """
+    构造「小游戏周报」的 ReportDocument 结构，供前端 WeeklyReportDetail 直接使用。
+    注意：这里只返回 dict，写入 JSON 的位置由调用方决定。
+    """
+    now = datetime.now()
+    title = f"{title_prefix}-{week_range}"
+    summary = f"{title_prefix}（{week_range}）周榜概览。"
+    return {
+        "title": title,
+        "tags": [title_prefix, "小游戏周报", "微信", "抖音"],
+        "date": now.strftime("%Y-%m-%d"),
+        "time": now.strftime("%H:%M"),
+        "source": "微信/抖音小游戏榜单",
+        "summary": summary,
+        "content": content_md,
+        "meta": {
+            "kind": "minigame_weekly",
+            "week_range": week_range,
+        },
+    }
 
 
 def _build_sensortower_only_push(
@@ -581,6 +852,22 @@ def _build_sensortower_only_push(
         except sqlite3.OperationalError:
             pass
 
+    # 异动简述（来自 top5_异动陈述_YYYY-MM-DD.json，若有）
+    _repo_root = Path(__file__).resolve().parents[1]
+    _insight_dir = _repo_root / "public/休闲游戏检测/sensortower_周报"
+    _insight_file = _insight_dir / f"top5_异动陈述_{st_date}.json"
+    if _insight_file.exists():
+        try:
+            _payload = json.loads(_insight_file.read_text(encoding="utf-8"))
+            _stmt = (_payload.get("statement") or "").strip()
+            if _stmt:
+                lines.append("## 异动简述")
+                lines.append("")
+                lines.append(_stmt)
+                lines.append("")
+        except (json.JSONDecodeError, OSError):
+            pass
+
     # 三、商店页的更新（指定周时只取该周 rank_date 的变更）
     lines.append("## 三、商店页的更新")
     lines.append("")
@@ -595,10 +882,14 @@ def _build_sensortower_only_push(
         for item in store_items[:max_items_per_section]:
             name = item.get("name") or "—"
             store_url = item.get("store_url") or ""
+            brief = _store_change_brief(item.get("summaries") or [])
             if store_url:
-                lines.append(f"- [{name}]({store_url})")
+                line = f"- [{name}]({store_url})"
             else:
-                lines.append(f"- {name}")
+                line = f"- {name}"
+            if brief:
+                line += f"（{brief}）"
+            lines.append(line)
         if len(store_items) > max_items_per_section:
             lines.append(f"- …… 共 {len(store_items)} 款有更新，详见平台")
     else:
@@ -821,6 +1112,45 @@ def main() -> int:
 
     # (title, body_feishu, body_wecom)；body_wecom 为 None 时与 body_feishu 相同
     messages: list[tuple[str, str, str | None]] = []
+
+    # 微信/抖音小游戏周报（wechatdouyin.db：top20_ranking + rank_changes）
+    if "game" in content_set and wechatdouyin_db.exists():
+        try:
+            conn_wd = sqlite3.connect(str(wechatdouyin_db))
+            try:
+                # 若指定 --date，则根据日期锁定到「前一周」的 week_range；否则用最新一周
+                target_week = None
+                if args.date:
+                    target_week = _pick_wechatdouyin_week_for_report_date(conn_wd, report_date_iso)
+                wd_md, wd_week = _build_wechat_douyin_push(conn_wd, target_week_range=target_week)
+                if wd_md and wd_week:
+                    # 1）推送用 Markdown
+                    messages.append((f"微信/抖音小游戏周报-{wd_week}", wd_md, None))
+
+                    # 2）写一份给前端用的 ReportDocument JSON（kind = minigame_weekly）
+                    try:
+                        weekly_doc = build_minigame_weekly_report_doc(wd_week, wd_md)
+                        reports_dir = repo_root / "public" / "ai热点"
+                        reports_dir.mkdir(parents=True, exist_ok=True)
+                        # 文件名中避免中文和波浪线，统一成 minigame_weekly_YYYYMMDD_YYYYMMDD.json 之类
+                        safe_week = (
+                            wd_week.replace("～", "~")
+                            .replace(" ", "")
+                            .replace("年", "-")
+                            .replace("月", "-")
+                            .replace("日", "")
+                        )
+                        safe_week = safe_week.replace("~", "_").replace("/", "_")
+                        json_path = reports_dir / f"minigame_weekly_{safe_week}.json"
+                        json_path.write_text(json.dumps(weekly_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+                    except Exception as e:  # noqa: BLE001
+                        print(f"[警告] 写入小游戏周报 JSON 失败：{e}", file=sys.stderr)
+                elif "game" in content_set and not wd_md:
+                    print("[跳过] 微信/抖音小游戏：wechatdouyin.db 中无 top20_ranking/rank_changes 数据或无匹配周", file=sys.stderr)
+            finally:
+                conn_wd.close()
+        except Exception as e:
+            print(f"[跳过] 微信/抖音小游戏：读取 wechatdouyin.db 失败：{e}", file=sys.stderr)
 
     if "game" in content_set and st_db.exists():
         conn_st = sqlite3.connect(str(st_db))

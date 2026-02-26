@@ -29,7 +29,7 @@ function renderInlineMarkdown(
     }
     parts.push(
       <strong key={currentIndex++} className="font-semibold text-slate-900">
-        {match[1]}
+        {renderInlineMarkdown(match[1], onInternalLinkClick)}
       </strong>
     );
     lastIndex = match.index + match[0].length;

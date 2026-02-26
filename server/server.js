@@ -68,6 +68,13 @@ function verifyAuth(req, res, next) {
   }
 }
 
+// 开发环境下 AI 对话不强制登录（前端可能是静态密码模式，没有 JWT）
+const aiChatRequireAuth = process.env.NODE_ENV === 'production' && process.env.AI_CHAT_REQUIRE_AUTH !== 'false';
+function aiChatAuth(req, res, next) {
+  if (!aiChatRequireAuth) return next();
+  return verifyAuth(req, res, next);
+}
+
 app.use(cookieParser());
 app.use(express.json());
 
@@ -256,6 +263,73 @@ app.get('/api/feishu-media', feishuMediaAuth, async (req, res) => {
   }
 });
 
+// AI 对话：代理到可配置的大模型服务（默认 OpenAI 兼容接口）
+app.post('/api/ai/chat', aiChatAuth, async (req, res) => {
+  try {
+    const { message, history } = req.body || {};
+    const text = typeof message === 'string' ? message.trim() : '';
+    if (!text) {
+      return res.status(400).json({ error: '缺少提问内容' });
+    }
+
+    const apiKey = (process.env.OPENAI_API_KEY || '').trim();
+    const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+    const model = (process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim();
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'AI 服务未配置，请先在 server/.env 中配置 OPENAI_API_KEY' });
+    }
+
+    const messages = [];
+    messages.push({
+      role: 'system',
+      content:
+        '你是「监测汇总」内部平台的智能助手，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。回答时尽量用简洁的中文分点说明，给出可执行的建议。若问题超出本平台范围，也可以进行一般性答疑。',
+    });
+    if (Array.isArray(history)) {
+      for (const m of history) {
+        if (!m || typeof m.role !== 'string' || typeof m.content !== 'string') continue;
+        const role = m.role === 'assistant' || m.role === 'system' ? m.role : 'user';
+        messages.push({ role, content: m.content });
+      }
+    }
+    messages.push({ role: 'user', content: text });
+
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error('[ai-chat] upstream error:', resp.status, errText.slice(0, 500));
+      return res.status(502).json({ error: '调用大模型失败，请稍后重试。' });
+    }
+
+    const data = await resp.json();
+    const content =
+      data?.choices?.[0]?.message?.content ||
+      data?.choices?.[0]?.delta?.content ||
+      '';
+    if (!content) {
+      return res.status(500).json({ error: '大模型返回为空，请稍后重试。' });
+    }
+    return res.json({
+      answer: content,
+    });
+  } catch (e) {
+    console.error('[ai-chat] error:', e?.message || e);
+    return res.status(500).json({ error: 'AI 对话服务异常，请稍后重试。' });
+  }
+});
+
 // 受保护的数据文件（从项目 public 目录读取）
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
 // 允许的子目录前缀
@@ -287,6 +361,7 @@ app.get('/api/data/:filename', verifyAuth, (req, res) => {
   // 根目录文件白名单
   const ALLOWED_ROOT_FILES = new Set([
     'competitor_data.db',
+    'sensortower_applist.db',
     'wechatdouyin.db',
     'videos.db',
     '周报谷歌表单.csv',

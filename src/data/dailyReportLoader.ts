@@ -42,11 +42,15 @@ export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<Monit
     if (getDataUrl) {
       return [getDataUrl(filename)];
     }
-    const baseUrlCandidate = baseUrl ? `${baseUrl}/${filename}` : filename;
-    const absoluteCandidate = `/${filename}`;
+    // 有 base 时先试「相对路径」和「根路径」，再试 base，避免 dev 下 public 在根路径而请求到 SPA 回退 HTML
     const rawCandidate = filename;
-    const urls = [baseUrlCandidate, absoluteCandidate, rawCandidate];
-    return Array.from(new Set(urls.flatMap((url) => [url, encodeURI(url)])));
+    const absoluteCandidate = `/${filename}`;
+    const baseUrlCandidate = baseUrl ? `${baseUrl.replace(/\/$/, '')}/${filename}` : filename;
+    const ordered = baseUrl
+      ? [rawCandidate, absoluteCandidate, baseUrlCandidate]
+      : [baseUrlCandidate, absoluteCandidate, rawCandidate];
+    const urls = ordered.flatMap((url) => [url, encodeURI(url)]);
+    return Array.from(new Set(urls));
   };
 
   const normalizeIndexEntry = (value: string) => {
@@ -115,8 +119,12 @@ export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<Monit
         }
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-          const text = await response.text();
-          console.warn(`Failed to parse ${jsonUrl}: expected JSON, got ${contentType || 'unknown'}`, text.slice(0, 120));
+          // 常见为 404 时服务器返回 index.html（SPA 回退），不读 body、不刷屏
+          if (contentType.includes('text/html')) {
+            // 静默跳过，避免 "expected JSON, got text/html" 和 HTML 片段刷屏
+            continue;
+          }
+          console.warn(`Failed to parse ${jsonUrl}: unexpected content-type ${contentType || 'unknown'}`);
           continue;
         }
         const data = await response.json();

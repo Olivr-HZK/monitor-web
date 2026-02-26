@@ -87,6 +87,10 @@ export interface SensorTowerTopItem {
   publisherName?: string;
   /** 来自 app_metadata：发行日期 */
   releaseDate?: string;
+  /** 下载量（apple_top100 / android_top100.downloads） */
+  downloads?: number;
+  /** 收入（apple_top100 / android_top100.revenue） */
+  revenue?: number;
 }
 
 /** SensorTower 异动榜单单条记录（rank_changes + 可选 app_metadata） */
@@ -115,6 +119,8 @@ export interface SensorTowerRankChangeItem {
   downloads?: number;
   /** 收入（rank_changes.revenue） */
   revenue?: number;
+  /** Top5 异动：上周第一本周掉出第一为「掉出第一」，上周非第一本周登顶为「登顶」 */
+  top5Movement?: '登顶' | '掉出第一';
 }
 
 /** iOS App Store 商店信息（appstoreinfo 表） */
@@ -228,7 +234,8 @@ export type ReportContentJson =
   | ReportContentDailyAi
   | ReportContentDailyAiOverview
   | ReportContentWeeklyReport
-  | ReportContentGameRanking;
+  | ReportContentGameRanking
+  | ReportContentAiCompetitorWeekly;
 
 /** 热点日报（热点趋势监测） */
 export interface ReportContentDailyHot {
@@ -285,13 +292,36 @@ export interface ReportContentGameRanking {
   items: GameRankingItem[];
 }
 
+/** AI 竞品周报（sensortower_applist 本周/上周下载与收益表格） */
+export interface AiCompetitorWeeklyItem {
+  appId: string;
+  platform: string;
+  productName: string;
+  publisherName: string;
+  /** 商店页 URL（来自 app_metadata.url） */
+  storeUrl?: string;
+  downloadsThisWeek: number;
+  downloadsLastWeek: number;
+  revenueThisWeek: number;
+  revenueLastWeek: number;
+}
+
+export interface ReportContentAiCompetitorWeekly {
+  kind: 'ai_competitor_weekly';
+  title: string;
+  weekThis: string;
+  weekLast: string;
+  items: AiCompetitorWeeklyItem[];
+}
+
 /** 监测内容 kind 枚举 */
 export type ReportContentKind =
   | 'daily_hot'
   | 'daily_ai'
   | 'daily_ai_overview'
   | 'weekly_report'
-  | 'game_ranking';
+  | 'game_ranking'
+  | 'ai_competitor_weekly';
 
 /** 监测内容 JSON 的版本与根字段（可选，用于扩展） */
 export interface ReportContentSchema {

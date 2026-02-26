@@ -3,9 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadGameplayByGameName } from '../data/reportsLoader';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-
-/** 后端 API 根地址。托管在 Google Pages 等静态站时，需单独部署后端并在此指定其地址（构建时 VITE_API_BASE） */
-const getApiBase = () => (typeof import.meta.env.VITE_API_BASE === 'string' ? import.meta.env.VITE_API_BASE.replace(/\/$/, '') : '');
+import { getApiUrl } from '../utils/api';
 
 const GameplayDetailPage = () => {
   const navigate = useNavigate();
@@ -48,11 +46,10 @@ const GameplayDetailPage = () => {
     setRequesting(true);
     setApiUnavailable(false);
     try {
-      const apiBase = getApiBase();
-      const res = await fetch(`${apiBase}/api/feedback/gameplay-request`, {
+      const res = await fetch(getApiUrl('/api/feedback/gameplay-request'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: apiBase ? 'omit' : 'include',
+        credentials: 'include',
         body: JSON.stringify({
           gameName,
           source: source || 'wechat_douyin',

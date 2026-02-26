@@ -13,7 +13,7 @@ const CasualHeader: FC<CasualHeaderProps> = ({ user, onLogout }) => {
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2">
               <span className="text-xl">🎮</span>
-              <span className="font-bold text-lg text-slate-900">休闲游戏检测</span>
+              <span className="font-bold text-lg text-slate-900">休闲游戏监测</span>
             </div>
           </div>
           <div className="flex items-center space-x-3">

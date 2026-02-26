@@ -5,6 +5,7 @@
 
 import type { SensorTowerRankChangeItem, SensorTowerStoreChangeItem } from '../types';
 import type { MonitorItem } from '../types';
+import { formatCountryToZh, buildSensorTowerOverviewUrl } from '../utils/rankingLabels';
 
 const DETAIL_LINK = 'https://sites.google.com/castbox.fm/overwatch2/home?authuser=1';
 
@@ -41,7 +42,7 @@ function groupByAppId(items: SensorTowerRankChangeItem[]): Map<string, SensorTow
   return map;
 }
 
-/** 从异动数据中按周生成周报 Markdown 内容（含新进 Top50、排名飙升 Top10 + 底部详情链接） */
+/** 从异动数据中按周生成周报 Markdown 内容（新进 Top50、排名飙升 Top10 + 底部详情链接） */
 function buildWeekReportMd(
   rankDateCurrent: string,
   rankDateLast: string,
@@ -49,39 +50,48 @@ function buildWeekReportMd(
   surgeTop10: SensorTowerRankChangeItem[]
 ): string {
   const lines: string[] = [
-    `**统计周期**：本周榜单日期 ${rankDateCurrent}，对比上周 ${rankDateLast}。`,
+    `**统计周期**：本周榜单日期 ${rankDateCurrent}，对比上周 ${rankDateLast}（本月内/最近四周）。`,
     '',
-    '---',
-    '',
+  ];
+  lines.push(
     '## 一、本周新进 Top50',
     '',
     '当周新进榜单且当前排名在 Top50 内的产品（按当前排名排序）：',
     '',
     '| 排名 | 产品名 | 开发者 | 国家/地区 | 平台 | 下载量 | 收入 |',
     '|------|--------|--------|-----------|------|--------|------|',
-  ];
+  );
   const top50Groups = groupByAppId(newTop50);
   for (const [, group] of top50Groups) {
     const base = group[0];
     const nameRaw = base.metadataAppName || base.appName || base.appId;
-    const name = formatNameWithLink(nameRaw, base.appUrl);
+    const stUrl = buildSensorTowerOverviewUrl(base.appId, base.country);
+    const storeUrl = base.appUrl;
+    let name = nameRaw;
+    if (storeUrl && stUrl) {
+      name = `${formatNameWithLink(nameRaw, storeUrl)} [📊 SensorTower](${stUrl})`;
+    } else if (stUrl) {
+      name = `[${nameRaw}](${stUrl})`;
+    } else if (storeUrl) {
+      name = formatNameWithLink(nameRaw, storeUrl);
+    }
     const publisher = base.publisherName || '—';
     if (group.length === 1) {
       lines.push(
-        `| ${base.currentRank} | ${name} | ${publisher} | ${base.country} | ${base.platform} | ${formatNum(base.downloads)} | ${formatRevenue(base.revenue)} |`
+        `| ${base.currentRank} | ${name} | ${publisher} | ${formatCountryToZh(base.country) || base.country} | ${base.platform} | ${formatNum(base.downloads)} | ${formatRevenue(base.revenue)} |`
       );
     } else {
       const regionRanks = group
-        .map((row) => `${row.country}：${row.currentRank}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${row.currentRank}`)
         .join('<br>');
       const regionCountries = group
-        .map((row) => `${row.country}`)
+        .map((row) => formatCountryToZh(row.country) || row.country)
         .join('<br>');
       const regionDownloads = group
-        .map((row) => `${row.country}：${formatNum(row.downloads)}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${formatNum(row.downloads)}`)
         .join('<br>');
       const regionRevenue = group
-        .map((row) => `${row.country}：${formatRevenue(row.revenue)}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${formatRevenue(row.revenue)}`)
         .join('<br>');
       lines.push(
         `| ${regionRanks} | ${name} | ${publisher} | ${regionCountries} | ${base.platform} | ${regionDownloads} | ${regionRevenue} |`
@@ -106,30 +116,39 @@ function buildWeekReportMd(
   for (const [, group] of surgeGroups) {
     const base = group[0];
     const nameRaw = base.metadataAppName || base.appName || base.appId;
-    const name = formatNameWithLink(nameRaw, base.appUrl);
+    const stUrl = buildSensorTowerOverviewUrl(base.appId, base.country);
+    const storeUrl = base.appUrl;
+    let name = nameRaw;
+    if (storeUrl && stUrl) {
+      name = `${formatNameWithLink(nameRaw, storeUrl)} [📊 SensorTower](${stUrl})`;
+    } else if (stUrl) {
+      name = `[${nameRaw}](${stUrl})`;
+    } else if (storeUrl) {
+      name = formatNameWithLink(nameRaw, storeUrl);
+    }
     const publisher = base.publisherName || '—';
     if (group.length === 1) {
       lines.push(
-        `| ${base.currentRank} | ${base.lastWeekRank} | ${base.change} | ${name} | ${publisher} | ${base.country} | ${base.platform} | ${formatNum(base.downloads)} | ${formatRevenue(base.revenue)} |`
+        `| ${base.currentRank} | ${base.lastWeekRank} | ${base.change} | ${name} | ${publisher} | ${formatCountryToZh(base.country) || base.country} | ${base.platform} | ${formatNum(base.downloads)} | ${formatRevenue(base.revenue)} |`
       );
     } else {
       const regionRanks = group
-        .map((row) => `${row.country}：${row.currentRank}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${row.currentRank}`)
         .join('<br>');
       const regionLastRanks = group
-        .map((row) => `${row.country}：${row.lastWeekRank || '—'}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${row.lastWeekRank || '—'}`)
         .join('<br>');
       const regionChanges = group
-        .map((row) => `${row.country}：${row.change || '—'}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${row.change || '—'}`)
         .join('<br>');
       const regionCountries = group
-        .map((row) => `${row.country}`)
+        .map((row) => formatCountryToZh(row.country) || row.country)
         .join('<br>');
       const regionDownloads = group
-        .map((row) => `${row.country}：${formatNum(row.downloads)}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${formatNum(row.downloads)}`)
         .join('<br>');
       const regionRevenue = group
-        .map((row) => `${row.country}：${formatRevenue(row.revenue)}`)
+        .map((row) => `${formatCountryToZh(row.country) || row.country}：${formatRevenue(row.revenue)}`)
         .join('<br>');
       lines.push(
         `| ${regionRanks} | ${regionLastRanks} | ${regionChanges} | ${name} | ${publisher} | ${regionCountries} | ${base.platform} | ${regionDownloads} | ${regionRevenue} |`

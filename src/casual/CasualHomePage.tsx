@@ -1,37 +1,38 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CasualHeader from './CasualHeader';
 import MonitorList from '../components/MonitorList';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import type {
-  MonitorItem,
-  CasualGameMainCategory,
-  CasualGameCompetitorSub,
-  GamePlatformKey,
-} from '../types';
+import type { MonitorItem, AiProductSubCategory } from '../types';
+import { useCasualView } from './CasualViewContext';
 
 const CasualHomePage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { dataLoading, monitorItems, weeklyReports, sensortowerStoreCardItems } = useData();
+  const { dataLoading, monitorItems, weeklyReports } = useData();
 
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [selectedCasualGameCategory, setSelectedCasualGameCategory] =
-    useState<CasualGameMainCategory | null>(null);
-  const [selectedGamePlatform, setSelectedGamePlatform] = useState<GamePlatformKey | null>(null);
-  const [selectedCasualGameCompetitorSub, setSelectedCasualGameCompetitorSub] =
-    useState<CasualGameCompetitorSub | null>(null);
-  const [selectedCasualSourceSection, setSelectedCasualSourceSection] =
-    useState<'wechat_douyin' | 'sensortower'>('wechat_douyin');
+  const {
+    selectedType,
+    setSelectedType,
+    selectedCompany,
+    setSelectedCompany,
+    selectedCasualGameCategory,
+    setSelectedCasualGameCategory,
+    selectedGamePlatform,
+    setSelectedGamePlatform,
+    selectedCasualGameCompetitorSub,
+    setSelectedCasualGameCompetitorSub,
+    selectedCasualSourceSection,
+    setSelectedCasualSourceSection,
+    selectedAiProductSub,
+    setSelectedAiProductSub,
+  } = useCasualView();
 
-  useEffect(() => {
-    if (selectedCasualGameCategory === null) {
-      setSelectedCasualGameCategory('周报简要');
-      setSelectedGamePlatform('微信');
-    }
-  }, [selectedCasualGameCategory]);
+  const handleAiProductSubSelect = (sub: AiProductSubCategory | null) => {
+    setSelectedAiProductSub(sub ?? 'UA素材');
+  };
 
   const companyOptions = useMemo(
     () =>
@@ -63,11 +64,12 @@ const CasualHomePage = () => {
   };
 
   const handleReportClick = (item: MonitorItem) => {
+    const state = { from: 'list' as const };
     if (item.reportContent && item.reportContent.trim().startsWith('{')) {
       try {
         const data = JSON.parse(item.reportContent) as { kind?: string; cardId?: string };
         if (data.kind === 'sensortower_store_card' && data.cardId) {
-          navigate(`/store/${encodeURIComponent(data.cardId)}`);
+          navigate(`/store/${encodeURIComponent(data.cardId)}`, { state });
           return;
         }
       } catch {
@@ -75,7 +77,7 @@ const CasualHomePage = () => {
       }
     }
     if (item.reportContent) {
-      navigate(`/report/${encodeURIComponent(item.id)}`);
+      navigate(`/report/${encodeURIComponent(item.id)}`, { state });
     }
   };
 
@@ -85,103 +87,113 @@ const CasualHomePage = () => {
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex gap-8">
           <div className="flex-1 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 mb-2">微信 / 抖音小游戏</h2>
-                  <p className="text-sm text-slate-600 mb-4">
-                    查看微信与抖音小游戏的最新排行榜，关注平台热门与新进榜小游戏表现。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/rankings/casual/wechat_douyin')}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                    />
-                  </svg>
-                  微信/抖音排行榜
-                </button>
-              </div>
+            {selectedType === '休闲游戏监测' ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2">微信 / 抖音小游戏</h2>
+                      <p className="text-sm text-slate-600 mb-4">
+                        查看微信与抖音小游戏的最新排行榜，关注平台热门与新进榜小游戏表现。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/rankings/casual/wechat_douyin')}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                        />
+                      </svg>
+                      微信/抖音排行榜
+                    </button>
+                  </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 mb-2">SensorTower 榜单</h2>
-                  <p className="text-sm text-slate-600 mb-4">
-                    查看 iOS Top100、Android Top100 及榜单异动，追踪全球重点休闲游戏表现。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/rankings/casual/sensortower')}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors border border-violet-200"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 3v18h18M7 15l4-8 4 6 3-5"
-                    />
-                  </svg>
-                  SensorTower 排行榜
-                </button>
-              </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2">SensorTower 榜单</h2>
+                      <p className="text-sm text-slate-600 mb-4">
+                        查看 iOS Top100、Android Top100 及榜单异动，追踪全球重点休闲游戏表现。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/rankings/casual/sensortower')}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors border border-violet-200"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 3v18h18M7 15l4-8 4 6 3-5"
+                        />
+                      </svg>
+                      SensorTower 排行榜
+                    </button>
+                  </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 mb-2">竞品监测</h2>
-                  <p className="text-sm text-slate-600 mb-4">
-                    快速进入休闲游戏竞品监控视图，查看社媒更新与 UA 素材等内容。
-                  </p>
+                  <div className="bg白 border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2">竞品监测</h2>
+                      <p className="text-sm text-slate-600 mb-4">
+                        快速进入休闲游戏竞品监控视图，查看社媒更新与 UA 素材等内容。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCasualGameCategory('竞品');
+                        setSelectedCasualGameCompetitorSub('社媒更新');
+                        setSelectedCompany(null);
+                      }}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors border border-emerald-200"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 17l-3-3m0 0l3-3m-3 3h8m4 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      打开竞品监测
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCasualGameCategory('竞品');
-                    setSelectedCasualGameCompetitorSub('社媒更新');
-                    setSelectedCompany(null);
-                  }}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors border border-emerald-200"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 17l-3-3m0 0l3-3m-3 3h8m4 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  打开竞品监测
-                </button>
-              </div>
-            </div>
 
-            <MonitorList
-              items={
-                selectedCasualSourceSection === 'sensortower' &&
-                selectedCasualGameCategory === '玩法拆解' &&
-                sensortowerStoreCardItems.length > 0
-                  ? [...sensortowerStoreCardItems, ...monitorItems]
-                  : monitorItems
-              }
-              selectedType="休闲游戏监测"
-              selectedCompanyName={selectedCompany}
-              companies={companyOptions}
-              onCompanySelect={setSelectedCompany}
-              selectedCasualGameCategory={selectedCasualGameCategory ?? undefined}
-              selectedGamePlatform={selectedGamePlatform ?? undefined}
-              selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
-              selectedCasualSourceSection={selectedCasualSourceSection}
-              pageTitle={getCasualGamePageTitle()}
-              onItemClick={handleReportClick}
-            />
+                <MonitorList
+                  items={monitorItems}
+                  selectedType="休闲游戏监测"
+                  selectedCompanyName={selectedCompany}
+                  companies={companyOptions}
+                  onCompanySelect={setSelectedCompany}
+                  selectedCasualGameCategory={selectedCasualGameCategory ?? undefined}
+                  selectedGamePlatform={selectedGamePlatform ?? undefined}
+                  selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
+                  selectedCasualSourceSection={selectedCasualSourceSection}
+                  pageTitle={getCasualGamePageTitle()}
+                  onItemClick={handleReportClick}
+                />
+              </>
+            ) : (
+              <MonitorList
+                items={monitorItems}
+                selectedType="AI产品监测"
+                selectedAiProductSub={selectedAiProductSub}
+                pageTitle={
+                  selectedAiProductSub === 'UA素材'
+                    ? 'AI 产品监测 - UA 素材'
+                    : 'AI 产品监测 - 竞品动态'
+                }
+                onItemClick={handleReportClick}
+              />
+            )}
 
             {dataLoading && (
               <div className="mt-8 text-center text-sm text-slate-500">
@@ -191,9 +203,11 @@ const CasualHomePage = () => {
           </div>
           <Sidebar
             sources={[]}
-            selectedType="休闲游戏监测"
-            onTypeSelect={() => {
-              // 子项目中只保留休闲游戏监测一个入口，忽略其它类型切换
+            selectedType={selectedType}
+            onTypeSelect={(type) => {
+              if (type === '休闲游戏监测' || type === 'AI产品监测') {
+                setSelectedType(type);
+              }
             }}
             companies={companyOptions}
             selectedCompany={selectedCompany}
@@ -219,7 +233,10 @@ const CasualHomePage = () => {
             onCasualGameCompetitorSubSelect={setSelectedCasualGameCompetitorSub}
             selectedCasualSourceSection={selectedCasualSourceSection}
             onCasualSourceSectionSelect={setSelectedCasualSourceSection}
-            visibleTypes={['休闲游戏监测']}
+            selectedAiProductSub={selectedAiProductSub}
+            onAiProductSubSelect={handleAiProductSubSelect}
+            visibleTypes={['休闲游戏监测', 'AI产品监测']}
+            aiProductVisibleSubs={['UA素材', '竞品动态']}
             showAllTypeButton={false}
           />
         </div>

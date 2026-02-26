@@ -16,10 +16,74 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
   const [activeTab, setActiveTab] = useState<GameRankingType>(
     rankings[0]?.type || '微信小游戏'
   );
+  const [platformFilter, setPlatformFilter] = useState<'all' | '微信小游戏' | '抖音小游戏'>('all');
+
+  const isWechatDouyin = rankings.some(
+    (r) => r.type === '微信小游戏' || r.type === '抖音小游戏'
+  );
 
   const activeRanking = selectedPlatform
     ? rankings.find(r => r.type === selectedPlatform)
     : rankings.find(r => r.type === activeTab);
+
+  const handleExportCsv = () => {
+    if (!activeRanking || !activeRanking.items.length) return;
+
+    const type = activeRanking.type;
+    const rows: string[] = [];
+
+    if (type === '微信小游戏' || type === '抖音小游戏') {
+      // 微信/抖音 Top20：排名, 游戏名称, 开发公司, 排名变化, 监控日期
+      rows.push(['排名', '游戏名称', '开发公司', '排名变化', '监控日期'].join(','));
+      activeRanking.items.forEach((item) => {
+        const cols = [
+          item.rank,
+          `"${(item.name ?? '').replace(/"/g, '""')}"`,
+          `"${(item.developer ?? '').replace(/"/g, '""')}"`,
+          `"${(item.change ?? '').replace(/"/g, '""')}"`,
+          `"${(item.updateDate ?? '').replace(/"/g, '""')}"`,
+        ];
+        rows.push(cols.join(','));
+      });
+    } else if (type === '榜单异动') {
+      // 榜单异动：当前排名, 游戏名, 平台, 开发公司, 排名变化, 异动类型, 监控日期, 周区间
+      rows.push(['当前排名', '游戏名', '平台', '开发公司', '排名变化', '异动类型', '监控日期', '周区间'].join(','));
+      activeRanking.items.forEach((item) => {
+        const cols = [
+          item.rank,
+          `"${(item.name ?? '').replace(/"/g, '""')}"`,
+          `"${(item.platformLabel ?? '').replace(/"/g, '""')}"`,
+          `"${(item.developer ?? '').replace(/"/g, '""')}"`,
+          `"${(item.change ?? '').replace(/"/g, '""')}"`,
+          `"${(item.changeType ?? '').replace(/"/g, '""')}"`,
+          `"${(item.updateDate ?? '').replace(/"/g, '""')}"`,
+          `"${(item.weekRange ?? '').replace(/"/g, '""')}"`,
+        ];
+        rows.push(cols.join(','));
+      });
+    } else {
+      // 其他类型暂不导出
+      return;
+    }
+
+    const csvContent = rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const datePart = (activeRanking.updateTime || '').split(' ')[0] || 'export';
+    const baseName =
+      type === '微信小游戏'
+        ? 'wechat_minigame_top20'
+        : type === '抖音小游戏'
+          ? 'douyin_minigame_top20'
+          : 'minigame_rank_changes';
+    a.href = url;
+    a.download = `${baseName}_${datePart}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const getTabIcon = (type: GameRankingType) => {
     switch (type) {
@@ -46,31 +110,51 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            {selectedPlatform ? activeRanking?.title ?? '休闲游戏周榜' : '休闲游戏排行榜'}
+            {selectedPlatform
+              ? activeRanking?.title ?? '休闲游戏周榜'
+              : isWechatDouyin
+                ? '微信抖音小游戏排行榜'
+                : '休闲游戏排行榜'}
           </h1>
           <p className="text-sm text-slate-600">
             {selectedPlatform
               ? '该平台小游戏周榜'
-              : 'US Top Charts & 榜单异动'}
+              : isWechatDouyin
+                ? '微信/抖音小游戏人气榜 Top20 & 榜单异动'
+                : 'US Top Charts & 榜单异动'}
           </p>
         </div>
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7 7-7M3 12h18" />
-            </svg>
-            返回
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7 7-7M3 12h18" />
+              </svg>
+              返回
+            </button>
+          )}
+          {!selectedPlatform && isWechatDouyin && activeRanking && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v12a2 2 0 002 2h3m5 0h4a2 2 0 002-2V4M8 4h8m-4 4v8m0 0l-3-3m3 3l3-3" />
+              </svg>
+              导出 CSV
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 仅当未指定平台时显示标签页切换 */}
       {!selectedPlatform && (
-        <div className="border-b border-slate-200 mb-6">
+        <div className="border-b border-slate-200 mb-4">
           <nav className="flex space-x-2" aria-label="Tabs">
             {rankings.map((ranking) => (
               <button
@@ -93,6 +177,27 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
               </button>
             ))}
           </nav>
+        </div>
+      )}
+
+      {/* 微信/抖音排行榜：平台筛选 */}
+      {!selectedPlatform && isWechatDouyin && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <label className="text-sm font-medium text-slate-600">平台：</label>
+          <select
+            value={platformFilter}
+            onChange={(e) => {
+              const v = e.target.value as 'all' | '微信小游戏' | '抖音小游戏';
+              setPlatformFilter(v);
+              if (v === '微信小游戏') setActiveTab('微信小游戏');
+              else if (v === '抖音小游戏') setActiveTab('抖音小游戏');
+            }}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">全部</option>
+            <option value="微信小游戏">微信小游戏</option>
+            <option value="抖音小游戏">抖音小游戏</option>
+          </select>
         </div>
       )}
 
@@ -128,6 +233,7 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
             <GameRankingTable
               items={activeRanking.items}
               rankingType={activeRanking.type}
+              platformFilter={isWechatDouyin ? platformFilter : undefined}
               onGameNameClick={
                 onGameNameClick && (activeRanking.type === '微信小游戏' || activeRanking.type === '抖音小游戏')
                   ? (item) => onGameNameClick(item.name)

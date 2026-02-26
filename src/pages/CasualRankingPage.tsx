@@ -7,7 +7,7 @@ import { useData } from '../context/DataContext';
 const CasualRankingPage = () => {
   const navigate = useNavigate();
   const { section } = useParams();
-  const { dataLoading, wechatDouyinRankings, sensorTowerTopItems, sensorTowerRankChangeItems, sensorTowerStoreChanges } = useData();
+  const { dataLoading, wechatDouyinRankings, sensorTowerTopItems, sensorTowerRankChangeItems } = useData();
 
   const normalized = section === 'wechat_douyin' || section === 'sensortower' ? section : null;
 
@@ -40,7 +40,6 @@ const CasualRankingPage = () => {
           <SensorTowerTopTable
             items={sensorTowerTopItems}
             rankChangeItems={sensorTowerRankChangeItems}
-            storeChanges={sensorTowerStoreChanges}
             onBack={() => navigate(-1)}
           />
         )}

@@ -144,15 +144,15 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
+      {/* Content：min-w-0 + overflow-hidden 防止长链接/长文案撑出卡片 */}
+      <div className="flex-1 min-w-0 overflow-hidden">
         {/* Title */}
-        <h3 className="text-lg font-bold text-slate-900 mb-2 line-clamp-2">
+        <h3 className="text-lg font-bold text-slate-900 mb-2 line-clamp-2 break-words">
           {item.title}
         </h3>
 
         {/* Source and Metadata */}
-        <div className="flex items-center gap-3 text-sm text-slate-600 mb-2 flex-wrap">
+        <div className="flex items-center gap-3 text-sm text-slate-600 mb-2 flex-wrap break-all min-w-0">
           <div className="flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -192,12 +192,12 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
         </div>
 
         {/* Description：AI 日报卡片仅展示摘要+分析，以及可点击的「原文链接」；其他类型展示 description */}
-        <div className="mb-3 space-y-1">
+        <div className="mb-3 space-y-1 overflow-hidden min-w-0">
           {isAiHotspot ? (
-            <div className="text-[13px] leading-snug text-slate-600 overflow-hidden max-h-40 [&_p]:mb-1 [&_p]:last:mb-0 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_strong]:text-slate-700">
+            <div className="text-[13px] leading-snug text-slate-600 overflow-hidden max-h-40 [&_p]:mb-1 [&_p]:last:mb-0 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_strong]:text-slate-700 break-all">
               <MarkdownRenderer content={cardContent || item.description || '暂无内容'} />
               {linkUrl && linkUrl !== '#' && (
-                <p className="mt-2 mb-0">
+                <p className="mt-2 mb-0 truncate" title={linkUrl}>
                   <a
                     href={linkUrl}
                     target="_blank"
@@ -211,14 +211,14 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-600 line-clamp-2">
+            <p className="text-sm text-slate-600 line-clamp-2 break-all overflow-hidden min-w-0" title={item.description}>
               {item.description}
             </p>
           )}
         </div>
 
         {/* Tags and Sentiment */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 overflow-hidden min-w-0">
           {!isAiHotspot && item.sentiment && (
             <span className={`px-2.5 py-1 text-xs rounded-full border ${getSentimentColor(item.sentiment)}`}>
               {item.sentiment === 'positive' && '正面'}

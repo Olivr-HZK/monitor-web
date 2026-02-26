@@ -9,6 +9,7 @@ import {
 } from '../data/sensortowerTopLoader';
 import { buildSensorTowerWeeklyItems } from '../data/sensortowerWeeklyReport';
 import { loadCompetitorReportMd, loadAiSalesRankingFromCsv, loadAiProductUADailyReport } from '../data/aiProductLoader';
+import { loadAiCompetitorWeeklyFromDb, buildAiCompetitorWeeklyMonitorItem } from '../data/sensortowerApplistLoader';
 import { loadReportsData } from '../data/reportsLoader';
 import { loadWeeklyReportsFromDatabase } from '../data/weeklyReportLoader';
 import { loadAllDailyReports } from '../data/dailyReportLoader';
@@ -62,6 +63,27 @@ const buildStoreChangeMonitorItems = (changes: SensorTowerStoreChangeItem[]) => 
   return sorted.map((change) => {
     const { date, time } = splitDateTime(change.changedAt || change.rankDate);
     const summariesText = change.summaries.length ? change.summaries.join('，') : '检测到商店页变化';
+    // 标题只显示「发生了哪些类型的变化」，不展开具体内容
+    const moduleSet = new Set<string>();
+    for (const s of change.summaries) {
+      if (s.includes('截图')) moduleSet.add('截图');
+      if (s.includes('图标')) moduleSet.add('图标');
+      if (s.includes('视频封面')) moduleSet.add('视频封面');
+      else if (s.includes('视频')) moduleSet.add('视频');
+      if (s.includes('语言')) moduleSet.add('语言');
+      if (s.includes('评分')) moduleSet.add('评分');
+      if (s.includes('商店链接')) moduleSet.add('商店链接');
+      if (s.includes('名称')) moduleSet.add('名称');
+      if (s.includes('开发者')) moduleSet.add('开发者');
+      if (s.includes('分类')) moduleSet.add('分类');
+      if (s.includes('价格')) moduleSet.add('价格');
+      if (s.includes('安装量')) moduleSet.add('安装量');
+      if (s.includes('内容评级')) moduleSet.add('内容评级');
+      if (s.includes('描述')) moduleSet.add('描述');
+    }
+    const modules = Array.from(moduleSet);
+    const modulesText = modules.join('、');
+    const fullTitle = modules.length > 0 ? `${change.appName}（${modulesText}变化）` : `${change.appName} 变化`;
     const contentLines = [
       `变动时间：${change.changedAt || change.rankDate}`,
       `平台：${change.platform}`,
@@ -71,23 +93,25 @@ const buildStoreChangeMonitorItems = (changes: SensorTowerStoreChangeItem[]) => 
       '变更项：',
       ...(change.summaries.length ? change.summaries.map((s) => `- ${s}`) : ['- （未解析到具体字段）']),
     ].filter(Boolean);
+    // 卡片描述不包含商店链接，避免长 URL 撑出卡片；详情页 content 中仍保留
+    const cardDescription = `变动时间：${change.changedAt || change.rankDate}；${summariesText}`;
     return {
       id: change.id,
       type: '休闲游戏监测' as MonitorType,
-      title: change.appName,
+      title: fullTitle,
       source: 'SensorTower',
       platform: change.platform,
       date,
       time,
       views: 0,
       engagement: 0,
-      description: `变动时间：${change.changedAt || change.rankDate}；${summariesText}`,
+      description: cardDescription,
       tags: ['商店页变化', 'SensorTower', change.platform, `优先级:${change.priorityLabel}`],
       language: 'zh',
       casualGameCategory: '商店页变化' as CasualGameMainCategory,
       casualGameSource: 'sensortower' as const,
       reportContent: JSON.stringify({
-        title: `商店页变化 - ${change.appName}`,
+        title: fullTitle,
         date,
         time,
         source: 'SensorTower',
@@ -171,6 +195,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           competitorReportItem,
           aiSalesRankings,
           aiProductUADailyReport,
+          aiCompetitorWeeklyPayload,
           sensorTowerTop,
           sensorTowerRankChanges,
           sensorTowerStoreCards,
@@ -202,6 +227,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
             return [];
           }),
           loadAiProductUADailyReport(getDataUrlFn).catch(() => null),
+          loadAiCompetitorWeeklyFromDb(getDataUrlFn).catch(() => null),
           loadSensorTowerTop100(getDataUrlFn).catch((error) => {
             console.error('Failed to load SensorTower top100 from DB:', error);
             return [];
@@ -261,9 +287,15 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         if (aiProductUADailyReport) {
           aiProductItems.push(aiProductUADailyReport);
         }
-        const aiProductWithReport = competitorReportItem
-          ? [competitorReportItem, ...aiProductItems.filter((i) => i.aiProductSub !== '竞品动态')]
-          : aiProductItems;
+        const aiCompetitorWeeklyItem = buildAiCompetitorWeeklyMonitorItem(aiCompetitorWeeklyPayload ?? null);
+        const competitorDynamicItems: MonitorItem[] = [
+          ...(competitorReportItem ? [competitorReportItem] : []),
+          ...(aiCompetitorWeeklyItem ? [aiCompetitorWeeklyItem] : []),
+        ];
+        const aiProductWithReport = [
+          ...competitorDynamicItems,
+          ...aiProductItems.filter((i) => i.aiProductSub !== '竞品动态'),
+        ];
 
         setMonitorItems([
           ...dailyReports,

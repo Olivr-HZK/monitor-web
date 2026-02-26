@@ -22,7 +22,6 @@ const MonitorTypePage = () => {
     dataLoading,
     monitorItems,
     weeklyReports,
-    sensortowerStoreCardItems,
   } = useData();
 
   const selectedType = parseMonitorType(monitorType);
@@ -209,13 +208,7 @@ const MonitorTypePage = () => {
                 </div>
 
                 <MonitorList
-                  items={
-                    selectedCasualSourceSection === 'sensortower' &&
-                    selectedCasualGameCategory === '玩法拆解' &&
-                    sensortowerStoreCardItems.length > 0
-                      ? [...sensortowerStoreCardItems, ...monitorItems]
-                      : monitorItems
-                  }
+                  items={monitorItems}
                   selectedType="休闲游戏监测"
                   selectedCompanyName={selectedCompany}
                   companies={companyOptions}

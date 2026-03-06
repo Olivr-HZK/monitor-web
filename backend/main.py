@@ -20,7 +20,7 @@ from passlib.hash import pbkdf2_sha256
 
 from config import (
     PORT,
-    CORS_ORIGIN,
+    CORS_ORIGINS,
     JWT_SECRET,
     LOGIN_USERNAME,
     LOGIN_PASSWORD_HASH,
@@ -40,11 +40,12 @@ from config import (
 from auth import create_token, get_current_user, get_token_from_request, require_user_for_ai
 
 app = FastAPI(title="监测汇总 API")
+CORS_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[CORS_ORIGIN] if CORS_ORIGIN != "*" else ["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
@@ -132,6 +133,14 @@ async def me(request: Request):
     if not username:
         raise HTTPException(status_code=401, detail="登录已过期")
     return {"user": username}
+
+
+@app.get("/api/debug/cors")
+async def debug_cors():
+    return {
+        "cors_origins": CORS_ORIGINS,
+        "allow_credentials": CORS_ALLOW_CREDENTIALS,
+    }
 
 
 @app.post("/api/logout")

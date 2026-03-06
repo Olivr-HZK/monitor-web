@@ -20,11 +20,19 @@ def _bool(v: str | None) -> bool:
     return (v or "").strip().lower() in ("1", "true", "yes")
 
 
+def _csv(v: str | None, default: list[str] | None = None) -> list[str]:
+    raw = (v or "").strip()
+    if not raw:
+        return default[:] if default else []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 PORT = _int(os.environ.get("PORT"), 3001)
 JWT_SECRET = _str(os.environ.get("JWT_SECRET"), "monitor-web-secret-change-in-production")
 LOGIN_USERNAME = _str(os.environ.get("LOGIN_USERNAME"), "admin")
 LOGIN_PASSWORD_HASH = _str(os.environ.get("LOGIN_PASSWORD_HASH"))
 CORS_ORIGIN = _str(os.environ.get("CORS_ORIGIN"), "*")
+CORS_ORIGINS = _csv(os.environ.get("CORS_ORIGIN"), ["*"])
 
 FEISHU_APP_ID = _str(os.environ.get("FEISHU_APP_ID") or os.environ.get("app_id"))
 FEISHU_APP_SECRET = _str(os.environ.get("FEISHU_APP_SECRET") or os.environ.get("app_secret"))
@@ -41,7 +49,7 @@ AI_CHAT_REQUIRE_AUTH = os.environ.get("NODE_ENV") == "production" and os.environ
 PUBLIC_DIR = Path(os.environ.get("PUBLIC_DIR", _PROJECT_ROOT / "public")).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", _PROJECT_ROOT / "data")).resolve()
 
-ALLOWED_PREFIXES = ("ai产品/", "ai热点/", "休闲游戏检测/")
+ALLOWED_PREFIXES = ("ai产品/", "ai热点/", "休闲游戏检测/", "热点/")
 ALLOWED_ROOT_FILES = {
     "competitor_data.db",
     "sensortower_applist.db",

@@ -10,11 +10,13 @@
     "dev:backend": "cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 3001",
     "dev:casual": "vite --open /casual.html",
     "build": "tsc -b && vite build",
+    "build:staging": "tsc -b && vite build --mode staging",
     "start": "npm run build && node server/server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "node scripts/strip-sensitive-from-dist.js && gh-pages -d dist"
+    "deploy": "node scripts/strip-sensitive-from-dist.js && gh-pages -d dist",
+    "deploy:staging": "npm run build:staging && node scripts/strip-sensitive-from-dist.js && gh-pages -d dist -b gh-pages-staging"
   },
   "dependencies": {
     "@types/papaparse": "^5.5.2",

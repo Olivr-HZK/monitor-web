@@ -181,9 +181,6 @@ const Sidebar = ({
                   >
                     <span className="text-lg">{getTypeIcon(type)}</span>
                     <span>{getTypeLabel(type)}</span>
-                    <span className="ml-auto text-xs text-slate-400">
-                      {groupSources.reduce((sum, s) => sum + s.count, 0)}
-                    </span>
                   </button>
 
                   {selectedType === type && (
@@ -267,12 +264,11 @@ const Sidebar = ({
               );
             }
 
-            // AI产品监测：排行榜 / 产品周报 / UA素材
+            // AI产品监测：产品周报 / UA素材 / 新产品速览
             if (type === 'AI产品监测') {
               const allAiSubs: { key: AiProductSubCategory; label: string; icon: string }[] = [
                 { key: '产品周报', label: '产品周报', icon: '📋' },
                 { key: 'UA素材', label: 'UA素材', icon: '🎬' },
-                { key: '竞品动态', label: '竞品动态', icon: '🏆' },
                 { key: '新产品速览', label: '新产品速览', icon: '🆕' },
               ];
               const aiSubItems = aiProductVisibleSubs
@@ -290,9 +286,6 @@ const Sidebar = ({
                   >
                     <span className="text-lg">{getTypeIcon(type)}</span>
                     <span>{getTypeLabel(type)}</span>
-                    <span className="ml-auto text-xs text-slate-400">
-                      {groupSources.reduce((sum, s) => sum + s.count, 0)}
-                    </span>
                   </button>
 
                   {selectedType === type && (
@@ -334,9 +327,6 @@ const Sidebar = ({
                 >
                   <span className="text-lg">{getTypeIcon(type)}</span>
                   <span>{getTypeLabel(type)}</span>
-                  <span className="ml-auto text-xs text-slate-400">
-                    {groupSources.reduce((sum, s) => sum + s.count, 0)}
-                  </span>
                 </button>
 
                 {selectedType === type && (

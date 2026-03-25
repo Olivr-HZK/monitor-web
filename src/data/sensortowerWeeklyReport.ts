@@ -3,7 +3,12 @@
  * 不生成 MD 文件，周报内容直接为 Markdown 字符串，底部带详情链接。
  */
 
-import type { SensorTowerRankChangeItem, SensorTowerStoreChangeItem } from '../types';
+import type {
+  SensorTowerRankChangeItem,
+  SensorTowerStoreChangeItem,
+  SensorTowerRemovedGameItem,
+  SensorTowerTop5OverviewItem,
+} from '../types';
 import type { MonitorItem } from '../types';
 import { formatCountryToZh, buildSensorTowerOverviewUrl } from '../utils/rankingLabels';
 
@@ -32,6 +37,13 @@ function formatNameWithLink(name: string, url?: string): string {
   return `[${name}](${url})`;
 }
 
+function formatChartTypeLabel(chartType: string): string {
+  const normalized = (chartType || '').trim().toLowerCase();
+  if (normalized.includes('free')) return '免费榜';
+  if (normalized.includes('grossing')) return '畅销榜';
+  return chartType || '—';
+}
+
 function groupByAppId(items: SensorTowerRankChangeItem[]): Map<string, SensorTowerRankChangeItem[]> {
   const map = new Map<string, SensorTowerRankChangeItem[]>();
   for (const item of items) {
@@ -47,12 +59,21 @@ function buildWeekReportMd(
   rankDateCurrent: string,
   rankDateLast: string,
   newTop50: SensorTowerRankChangeItem[],
-  surgeTop10: SensorTowerRankChangeItem[]
+  surgeTop10: SensorTowerRankChangeItem[],
+  removedGames: SensorTowerRemovedGameItem[],
+  top5Statement?: string
 ): string {
-  const lines: string[] = [
-    `**统计周期**：本周榜单日期 ${rankDateCurrent}，对比上周 ${rankDateLast}（本月内/最近四周）。`,
-    '',
-  ];
+  const lines: string[] = [];
+  if (top5Statement && top5Statement.trim()) {
+    lines.push('## Top5 异动');
+    lines.push('');
+    lines.push(top5Statement.trim());
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+  lines.push(`**统计周期**：本周榜单日期 ${rankDateCurrent}，对比上周 ${rankDateLast}（本月内/最近四周）。`);
+  lines.push('');
   lines.push(
     '## 一、本周新进 Top50',
     '',
@@ -162,6 +183,27 @@ function buildWeekReportMd(
     '',
     '---',
     '',
+    '## 三、上周榜单中疑似下线的产品',
+    '',
+    '以下产品在上周榜单对应商店页访问异常，点击产品名可直接打开商店页：',
+    '',
+    '| 产品名 | 国家/地区 | 榜单类型 | 平台 | 原因 |',
+    '|--------|-----------|----------|------|------|',
+  );
+  if (removedGames.length > 0) {
+    for (const row of removedGames) {
+      const name = formatNameWithLink(row.appName || row.appId, row.storeUrl);
+      lines.push(
+        `| ${name} | ${formatCountryToZh(row.country) || row.country} | ${formatChartTypeLabel(row.chartType)} | ${row.platform} | ${row.reason || '—'} |`
+      );
+    }
+  } else {
+    lines.push('| 本周无疑似下线产品 | — | — | — | — |');
+  }
+  lines.push(
+    '',
+    '---',
+    '',
     `详情请进入 [${DETAIL_LINK}](${DETAIL_LINK})`,
     '',
   );
@@ -173,7 +215,9 @@ function buildWeekReportMd(
  */
 export function buildSensorTowerWeeklyItems(
   rankChangeItems: SensorTowerRankChangeItem[],
-  storeChangeItems: SensorTowerStoreChangeItem[] = []
+  storeChangeItems: SensorTowerStoreChangeItem[] = [],
+  removedGameItems: SensorTowerRemovedGameItem[] = [],
+  top5OverviewItems: SensorTowerTop5OverviewItem[] = []
 ): MonitorItem[] {
   const byWeek = new Map<string, SensorTowerRankChangeItem[]>();
   for (const item of rankChangeItems) {
@@ -216,8 +260,19 @@ export function buildSensorTowerWeeklyItems(
     const surgeAll = items.filter((i) => i.changeType === '🚀 排名飙升');
     surgeAll.sort((a, b) => parseSurgeValue(b.change) - parseSurgeValue(a.change));
     const surgeTop10 = surgeAll.slice(0, 10);
+    // 疑似下线是在“下一周”才能检测到，因此挂到当前周报时应读取上周榜单日期的数据。
+    const removedGamesForWeek = removedGameItems.filter((item) => item.rankDate === rankDateLast);
+    const top5Statement =
+      top5OverviewItems.find((item) => item.rankDate === rankDateCurrent)?.statement?.trim() || '';
 
-    const content = buildWeekReportMd(rankDateCurrent, rankDateLast, newTop50, surgeTop10);
+    const content = buildWeekReportMd(
+      rankDateCurrent,
+      rankDateLast,
+      newTop50,
+      surgeTop10,
+      removedGamesForWeek,
+      top5Statement
+    );
     const storeChangesForWeek = storeChangeItems
       .filter((c) => c.rankDate === rankDateCurrent)
       .map((c) => ({
@@ -236,7 +291,7 @@ export function buildSensorTowerWeeklyItems(
       time: '',
       views: 0,
       engagement: 0,
-      description: `本周新进 Top50 ${newTop50.length} 条，排名飙升 Top10 ${surgeTop10.length} 条。`,
+      description: `本周新进 Top50 ${newTop50.length} 条，排名飙升 Top10 ${surgeTop10.length} 条，上周疑似下线 ${removedGamesForWeek.length} 条。`,
       tags: ['周报', 'SensorTower', '休闲游戏'],
       language: 'zh',
       casualGameCategory: '周报简要',
@@ -248,6 +303,7 @@ export function buildSensorTowerWeeklyItems(
         content,
         meta: {
           kind: 'sensortower_weekly',
+          top5Statement,
           storeChanges: storeChangesForWeek.map((c) => ({
             id: c.id,
             appName: c.appName,
@@ -255,6 +311,15 @@ export function buildSensorTowerWeeklyItems(
             changedAt: c.changedAt || c.rankDate,
             storeUrl: c.storeUrl,
             summaries: c.summaries,
+          })),
+          removedGames: removedGamesForWeek.map((g) => ({
+            id: g.id,
+            appName: g.appName,
+            platform: g.platform,
+            country: g.country,
+            chartType: formatChartTypeLabel(g.chartType),
+            storeUrl: g.storeUrl,
+            reason: g.reason,
           })),
         },
       }),

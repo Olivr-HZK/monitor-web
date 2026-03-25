@@ -6,16 +6,17 @@ import {
   loadSensorTowerRankChanges,
   loadSensorTowerNewTop3StoreCards,
   loadSensorTowerStoreChanges,
+  loadSensorTowerRemovedGames,
+  loadSensorTowerTop5Overview,
 } from '../data/sensortowerTopLoader';
 import { buildSensorTowerWeeklyItems } from '../data/sensortowerWeeklyReport';
 import {
-  loadCompetitorReportMd,
-  loadAiSalesRankingFromCsv,
+  loadAiCreativeLibraryFromDb,
+  buildAiProductWeeklyReportItem,
   loadAiProductUADailyReport,
-  loadAiProductUATopAdReport,
+  loadAiUaWeeklyReportFromDb,
   loadAiUaCreativeCardsFromDb,
 } from '../data/aiProductLoader';
-import { loadAiCompetitorWeeklyFromDb, buildAiCompetitorWeeklyMonitorItem } from '../data/sensortowerApplistLoader';
 import { loadReportsData } from '../data/reportsLoader';
 import { loadWeeklyReportsFromDatabase } from '../data/weeklyReportLoader';
 import { loadAllDailyReports } from '../data/dailyReportLoader';
@@ -30,6 +31,7 @@ import type {
   WechatDouyinRankingsByWeek,
   MonitorType,
   CasualGameMainCategory,
+  AiCreativeLibraryItem,
 } from '../types';
 
 interface DataContextValue {
@@ -37,6 +39,9 @@ interface DataContextValue {
   monitorItems: MonitorItem[];
   weeklyReports: MonitorItem[];
   aiProductRankings: GameRanking[];
+  aiCreativeLibraryNewItems: AiCreativeLibraryItem[];
+  aiCreativeLibraryHotItems: AiCreativeLibraryItem[];
+  aiCreativeLibrarySurgeItems: AiCreativeLibraryItem[];
   wechatDouyinRankings: GameRanking[];
   /** 按周聚合的微信/抖音三榜单，用于周选择器（多周时 length > 1） */
   wechatDouyinRankingsByWeek: WechatDouyinRankingsByWeek[];
@@ -159,6 +164,9 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [sensorTowerStoreCards, setSensorTowerStoreCards] = useState<SensorTowerStoreCard[]>([]);
   const [sensorTowerStoreChanges, setSensorTowerStoreChanges] = useState<SensorTowerStoreChangeItem[]>([]);
   const [aiProductRankings, setAiProductRankings] = useState<GameRanking[]>([]);
+  const [aiCreativeLibraryNewItems, setAiCreativeLibraryNewItems] = useState<AiCreativeLibraryItem[]>([]);
+  const [aiCreativeLibraryHotItems, setAiCreativeLibraryHotItems] = useState<AiCreativeLibraryItem[]>([]);
+  const [aiCreativeLibrarySurgeItems, setAiCreativeLibrarySurgeItems] = useState<AiCreativeLibraryItem[]>([]);
   const [monitorItems, setMonitorItems] = useState<MonitorItem[]>([]);
   const [weeklyReports, setWeeklyReports] = useState<MonitorItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -198,15 +206,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           weeklyReportsFromDb,
           dailyReports,
           reportDocuments,
-          competitorReportItem,
-          aiSalesRankings,
           aiProductUADailyReport,
+          aiUaWeeklyReport,
           aiUaCreativeCards,
-          aiCompetitorWeeklyPayload,
+          aiCreativeLibrary,
           sensorTowerTop,
           sensorTowerRankChanges,
           sensorTowerStoreCards,
           sensorTowerStoreChanges,
+          sensorTowerRemovedGames,
+          sensorTowerTop5Overview,
         ] = await Promise.all([
           loadUsGameRankingsFromCSVs(csvConfig).catch((error) => {
             console.error('Failed to load game rankings from CSVs:', error);
@@ -228,17 +237,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
             console.error('Failed to load report_documents.json:', error);
             return [];
           }),
-          loadCompetitorReportMd(getDataUrlFn).catch(() => null),
-          loadAiSalesRankingFromCsv(getDataUrlFn).catch((error) => {
-            console.error('Failed to load AI sales ranking:', error);
-            return [];
-          }),
           loadAiProductUADailyReport(getDataUrlFn).catch(() => null),
+          loadAiUaWeeklyReportFromDb(getDataUrlFn).catch(() => null),
           loadAiUaCreativeCardsFromDb(getDataUrlFn).catch((error) => {
             console.error('Failed to load AI UA creative cards from DB:', error);
             return [];
           }),
-          loadAiCompetitorWeeklyFromDb(getDataUrlFn).catch(() => null),
+          loadAiCreativeLibraryFromDb(getDataUrlFn).catch((error) => {
+            console.error('Failed to load AI creative library from DB:', error);
+            return { newItems: [], hotItems: [], surgeItems: [] };
+          }),
           loadSensorTowerTop100(getDataUrlFn).catch((error) => {
             console.error('Failed to load SensorTower top100 from DB:', error);
             return [];
@@ -253,6 +261,14 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           }),
           loadSensorTowerStoreChanges(getDataUrlFn).catch((error) => {
             console.error('Failed to load SensorTower store changes:', error);
+            return [];
+          }),
+          loadSensorTowerRemovedGames(getDataUrlFn).catch((error) => {
+            console.error('Failed to load SensorTower removed games:', error);
+            return [];
+          }),
+          loadSensorTowerTop5Overview(getDataUrlFn).catch((error) => {
+            console.error('Failed to load SensorTower top5 overview:', error);
             return [];
           }),
         ]);
@@ -273,15 +289,18 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         setSensorTowerRankChangeItems(sensorTowerRankChanges ?? []);
         setSensorTowerStoreCards(sensorTowerStoreCards ?? []);
         setSensorTowerStoreChanges(sensorTowerStoreChanges ?? []);
-        if (aiSalesRankings.length > 0) {
-          setAiProductRankings(aiSalesRankings);
-        }
+        setAiProductRankings([]);
+        setAiCreativeLibraryNewItems(aiCreativeLibrary.newItems ?? []);
+        setAiCreativeLibraryHotItems(aiCreativeLibrary.hotItems ?? []);
+        setAiCreativeLibrarySurgeItems(aiCreativeLibrary.surgeItems ?? []);
 
         setWeeklyReports(weeklyReportsFromDb);
 
         const sensorTowerWeeklyItems = buildSensorTowerWeeklyItems(
           sensorTowerRankChanges ?? [],
-          sensorTowerStoreChanges ?? []
+          sensorTowerStoreChanges ?? [],
+          sensorTowerRemovedGames ?? [],
+          sensorTowerTop5Overview ?? []
         );
         const sensorTowerStoreChangeItems = buildStoreChangeMonitorItems(sensorTowerStoreChanges ?? []);
         const casualGameItems = [
@@ -295,25 +314,19 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         const competitorSocialItems: MonitorItem[] = [];
 
         const aiProductItems: MonitorItem[] = [];
+        const aiWeeklyCard = buildAiProductWeeklyReportItem(aiCreativeLibrary);
+        if (aiWeeklyCard) {
+          aiProductItems.push(aiWeeklyCard);
+        }
         if (aiProductUADailyReport) {
           aiProductItems.push(aiProductUADailyReport);
         }
-        const aiProductUATopAdReport = await loadAiProductUATopAdReport(getDataUrlFn).catch(() => null);
-        if (aiProductUATopAdReport) {
-          aiProductItems.push(aiProductUATopAdReport);
+        if (aiUaWeeklyReport) {
+          aiProductItems.push(aiUaWeeklyReport);
         }
         if (aiUaCreativeCards && aiUaCreativeCards.length > 0) {
           aiProductItems.push(...aiUaCreativeCards);
         }
-        const aiCompetitorWeeklyItem = buildAiCompetitorWeeklyMonitorItem(aiCompetitorWeeklyPayload ?? null);
-        const competitorDynamicItems: MonitorItem[] = [
-          ...(competitorReportItem ? [competitorReportItem] : []),
-          ...(aiCompetitorWeeklyItem ? [aiCompetitorWeeklyItem] : []),
-        ];
-        const aiProductWithReport = [
-          ...competitorDynamicItems,
-          ...aiProductItems.filter((i) => i.aiProductSub !== '竞品动态'),
-        ];
 
         setMonitorItems([
           ...dailyReports,
@@ -321,7 +334,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           ...weeklyReportsFromDb,
           ...casualGameItems,
           ...competitorSocialItems,
-          ...aiProductWithReport,
+          ...aiProductItems,
         ]);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -384,6 +397,9 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
       monitorItems,
       weeklyReports,
       aiProductRankings,
+      aiCreativeLibraryNewItems,
+      aiCreativeLibraryHotItems,
+      aiCreativeLibrarySurgeItems,
       wechatDouyinRankings,
       wechatDouyinRankingsByWeek,
       sensorTowerTopItems,
@@ -401,6 +417,9 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
       monitorItems,
       weeklyReports,
       aiProductRankings,
+      aiCreativeLibraryNewItems,
+      aiCreativeLibraryHotItems,
+      aiCreativeLibrarySurgeItems,
       wechatDouyinRankings,
       wechatDouyinRankingsByWeek,
       sensorTowerTopItems,

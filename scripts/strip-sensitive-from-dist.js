@@ -9,12 +9,8 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, '..', 'dist');
 
-/** 相对于 dist 的敏感文件（与后端 /api/data 白名单对应，仅不应以静态资源暴露） */
+/** 相对于 dist 的敏感文件（与后端 /api/data 白名单对应，仅不应以静态资源暴露）。数据库已允许部署，不再从此列表 strip。 */
 const SENSITIVE_IN_DIST = [
-  'competitor_data.db',
-  'sensortower_applist.db',
-  'wechatdouyin.db',
-  'videos.db',
   '周报谷歌表单.csv',
   '热点日报.md',
   'report_documents.json',

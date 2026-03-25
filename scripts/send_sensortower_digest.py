@@ -360,7 +360,7 @@ def build_markdown(db_path: Path) -> str:
   # 底部：引导访问站点查看更多详情
   lines.append("---")
   lines.append("")
-  lines.append("更多榜单详情和玩法拆解，请访问：[游戏监测网站](https://sites.google.com/castbox.fm/overwatch2/home?authuser=1)")
+  lines.append("更多榜单详情和玩法拆解，请访问：[游戏监测网站](https://sites.google.com/castbox.fm/overwatch2/home?authuser=1)（密码：guru666）")
   lines.append("")
 
   return "\n".join(lines).strip()

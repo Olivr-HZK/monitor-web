@@ -10,7 +10,7 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,11 +36,21 @@ from config import (
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
     OPENAI_MODEL,
+    AI_PROVIDER,
+    CODEX_APP_SERVER_BIN,
+    CODEX_MODEL,
+    CODEX_WORKDIR,
+    CODEX_TURN_TIMEOUT_SEC,
+    CODEX_ENABLE_DB_TOOL,
+    CODEX_ENABLE_WEB_SEARCH_TOOL,
+    TAVILY_API_KEY,
 )
 from auth import create_token, get_current_user, get_token_from_request, require_user_for_ai
+from codex_app_server import CodexAppServerSession, CodexProtocolError
 
 app = FastAPI(title="监测汇总 API")
 CORS_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 app.add_middleware(
     CORSMiddleware,
@@ -290,45 +300,204 @@ class AIChatBody(BaseModel):
     history: list[dict] | None = None
 
 
-@app.post("/api/ai/chat")
-async def ai_chat(body: AIChatBody, request: Request):
-    await require_user_for_ai(request)  # 生产时要求登录，开发时可选
-    text = (body.message or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="缺少提问内容")
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
+def _classify_intent(text: str, history: list[dict] | None = None) -> dict[str, object]:
+    full = " ".join(
+        [text]
+        + [
+            str(item.get("content") or "")
+            for item in (history or [])
+            if isinstance(item, dict) and isinstance(item.get("content"), str)
+        ]
+    ).lower()
+    db_keywords = [
+        "数据库",
+        "sql",
+        "sqlite",
+        "表",
+        "字段",
+        "排行",
+        "rank",
+        "wechatdouyin",
+        "competitor_data",
+        "sensortower",
+    ]
+    web_keywords = [
+        "联网",
+        "搜索",
+        "最新",
+        "今天",
+        "新闻",
+        "官网",
+        "链接",
+        "来源",
+        "web",
+        "url",
+    ]
+    hybrid_hints = ["对比", "结合", "同时", "再", "之后", "并且"]
+
+    needs_db = any(k in full for k in db_keywords)
+    needs_web = any(k in full for k in web_keywords)
+    if any(k in full for k in hybrid_hints) and (needs_db or needs_web):
+        # If user asks to compare/combine, bias to hybrid planning.
+        needs_db = True if needs_db or "数据库" in full or "sql" in full else needs_db
+        needs_web = True if needs_web or "新闻" in full or "最新" in full else needs_web
+
+    if needs_db and needs_web:
+        mode = "hybrid"
+        steps = [
+            "先调用 query_sqlite 获取结构化事实。",
+            "再调用 web_search 获取最新外部信息。",
+            "最后对齐口径并给出结论与引用来源。",
+        ]
+    elif needs_db:
+        mode = "db_only"
+        steps = [
+            "仅调用 query_sqlite 获取数据。",
+            "如 SQL 失败，先用 PRAGMA table_info(表名) 确认字段后重试。",
+            "基于查询结果输出结论。",
+        ]
+    elif needs_web:
+        mode = "web_only"
+        steps = [
+            "仅调用 web_search 获取外部信息。",
+            "优先保留来源链接与发布时间。",
+            "基于搜索结果输出结论。",
+        ]
+    else:
+        mode = "chat_only"
+        steps = [
+            "无需调用工具，直接回答。",
+            "若缺少事实再建议用户补充问题。",
+        ]
+    return {"mode": mode, "needs_db": needs_db, "needs_web": needs_web, "steps": steps}
+
+
+def _attach_execution_plan(text: str, plan: dict[str, object]) -> str:
+    steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
+    plan_lines = "\n".join(f"- {str(s)}" for s in steps)
+    mode = str(plan.get("mode") or "chat_only")
+    return (
+        f"【执行模式】{mode}\n"
+        f"【执行步骤】\n{plan_lines}\n"
+        "【约束】仅在需要时调用工具；回答必须明确是否使用了工具与关键来源。\n\n"
+        f"【用户问题】{text}"
+    )
+
+
+def _build_openai_messages(text: str, history: list[dict] | None) -> list[dict[str, str]]:
     messages = [
         {
             "role": "system",
             "content": "你是「监测汇总」内部平台的智能助手，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。回答时尽量用简洁的中文分点说明，给出可执行的建议。若问题超出本平台范围，也可以进行一般性答疑。",
         }
     ]
-    for m in (body.history or []):
-        if not m or not isinstance(m.get("role"), str) or not isinstance(m.get("content"), str):
+    for item in history or []:
+        if not item or not isinstance(item.get("role"), str) or not isinstance(item.get("content"), str):
             continue
-        role = m["role"] if m["role"] in ("assistant", "system") else "user"
-        messages.append({"role": role, "content": m["content"]})
+        role = item["role"] if item["role"] in ("assistant", "system") else "user"
+        messages.append({"role": role, "content": item["content"]})
     messages.append({"role": "user", "content": text})
+    return messages
+
+
+def _build_codex_subprocess_env() -> dict[str, str]:
+    env = {
+        "OPENAI_API_KEY": OPENAI_API_KEY,
+        "OPENAI_BASE_URL": OPENAI_BASE_URL,
+    }
+    for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy"):
+        value = os.environ.get(key)
+        if value:
+            env[key] = value
+    return env
+
+
+async def _chat_via_openai(text: str, history: list[dict] | None) -> str:
+    messages = _build_openai_messages(text, history)
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        r = await client.post(
+            f"{OPENAI_BASE_URL}/chat/completions",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"},
+            json={"model": OPENAI_MODEL, "messages": messages},
+        )
+    if r.status_code != 200:
+        print("[ai-chat] upstream", r.status_code, r.text[:500])
+        raise HTTPException(status_code=502, detail="调用大模型失败，请稍后重试。")
+    data = r.json()
+    content = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+    if not content and data.get("choices"):
+        content = (data["choices"][0].get("delta") or {}).get("content") or ""
+    if not content:
+        raise HTTPException(status_code=500, detail="大模型返回为空，请稍后重试。")
+    return content
+
+
+async def _chat_via_codex(text: str, history: list[dict] | None) -> str:
+    workdir = Path(CODEX_WORKDIR).expanduser() if CODEX_WORKDIR else PROJECT_ROOT
+    print(
+        "[ai-codex-config]",
+        {
+            "AI_PROVIDER": AI_PROVIDER,
+            "CODEX_MODEL": CODEX_MODEL,
+            "OPENAI_BASE_URL": OPENAI_BASE_URL,
+            "OPENAI_API_KEY_prefix": f"{OPENAI_API_KEY[:10]}..." if OPENAI_API_KEY else "",
+            "CODEX_APP_SERVER_BIN": CODEX_APP_SERVER_BIN,
+            "CODEX_WORKDIR": str(workdir),
+        },
+    )
+    print("[ai-step1-codex] start", f"model={CODEX_MODEL}", f"workdir={workdir}")
+    print(
+        "[codex-subprocess-env]",
+        {
+            "OPENAI_BASE_URL": OPENAI_BASE_URL,
+            "OPENAI_API_KEY_prefix": f"{OPENAI_API_KEY[:10]}..." if OPENAI_API_KEY else "",
+            "MODEL": CODEX_MODEL,
+            "CWD": str(workdir),
+            "HTTP_PROXY": bool(os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")),
+            "HTTPS_PROXY": bool(os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")),
+            "ALL_PROXY": bool(os.environ.get("ALL_PROXY") or os.environ.get("all_proxy")),
+        },
+    )
+    async with CodexAppServerSession(
+        bin_name=CODEX_APP_SERVER_BIN,
+        model=CODEX_MODEL,
+        project_root=PROJECT_ROOT,
+        public_dir=PUBLIC_DIR,
+        workdir=workdir,
+        turn_timeout_sec=CODEX_TURN_TIMEOUT_SEC,
+        enable_db_tool=CODEX_ENABLE_DB_TOOL,
+        enable_web_search_tool=CODEX_ENABLE_WEB_SEARCH_TOOL,
+        tavily_api_key=TAVILY_API_KEY,
+        subprocess_env=_build_codex_subprocess_env(),
+    ) as session:
+        return await session.run_chat(text, history)
+
+
+@app.post("/api/ai/chat")
+async def ai_chat(body: AIChatBody, request: Request):
+    await require_user_for_ai(request)  # 生产时要求登录，开发时可选
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="缺少提问内容")
+    plan = _classify_intent(text, body.history)
+    planned_text = _attach_execution_plan(text, plan)
+    print("[ai-intent]", plan)
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            r = await client.post(
-                f"{OPENAI_BASE_URL}/chat/completions",
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"},
-                json={"model": OPENAI_MODEL, "messages": messages},
-            )
-        if r.status_code != 200:
-            print("[ai-chat] upstream", r.status_code, r.text[:500])
-            raise HTTPException(status_code=502, detail="调用大模型失败，请稍后重试。")
-        data = r.json()
-        content = (
-            (data.get("choices") or [{}])[0].get("message") or {}
-        ).get("content") or ""
-        if not content and data.get("choices"):
-            content = (data["choices"][0].get("delta") or {}).get("content") or ""
-        if not content:
-            raise HTTPException(status_code=500, detail="大模型返回为空，请稍后重试。")
-        return {"answer": content}
+        if AI_PROVIDER == "codex":
+            try:
+                answer = await _chat_via_codex(planned_text, body.history)
+                print("[ai-step1-codex] success", f"chars={len(answer)}")
+                return {"answer": answer}
+            except CodexProtocolError as e:
+                print("[ai-step1-codex] failed", e)
+                raise HTTPException(status_code=502, detail=f"Codex 协议错误: {e}")
+
+        print("[ai-step2-responses] start", f"model={OPENAI_MODEL}")
+        answer = await _chat_via_openai(planned_text, body.history)
+        print("[ai-step2-responses] success", f"chars={len(answer)}")
+        return {"answer": answer}
     except HTTPException:
         raise
     except Exception as e:

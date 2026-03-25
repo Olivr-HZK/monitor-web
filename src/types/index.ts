@@ -1,7 +1,7 @@
 export type MonitorType = 'ai热点监测' | '热点趋势监测' | '竞品社媒监控' | '休闲游戏监测' | 'AI产品监测';
 
 /** AI产品检测下的子类（排行榜通过右上角按钮进入，不在此列） */
-export type AiProductSubCategory = '产品周报' | 'UA素材' | '竞品动态' | '新产品速览';
+export type AiProductSubCategory = '产品周报' | 'UA素材' | '竞品动态' | '新产品速览' | '素材库';
 
 export type GameRankingType = '微信小游戏' | '抖音小游戏' | '安卓游戏' | 'iOS游戏' | '榜单异动' | '竞品动态';
 
@@ -198,6 +198,64 @@ export interface SensorTowerStoreChangeItem {
   priorityLabel: '最高' | '高' | '普通';
 }
 
+/** SensorTower 周报中的疑似下线/下架产品（weekly_removed_games） */
+export interface SensorTowerRemovedGameItem {
+  id: string;
+  rankDate: string;
+  platform: 'iOS' | 'Android';
+  country: string;
+  chartType: string;
+  appId: string;
+  appName: string;
+  storeUrl?: string;
+  reason?: string;
+}
+
+/** Top5 异动综述（weekly_top5_overview） */
+export interface SensorTowerTop5OverviewItem {
+  rankDate: string;
+  statement: string;
+  trendJson?: string;
+  modelUsed?: string;
+  createdAt?: string;
+}
+
+export type AiCreativeLibraryKind = 'new' | 'hot' | 'surge';
+
+export interface AiCreativeLibraryItem {
+  id: string;
+  kind: AiCreativeLibraryKind;
+  rank: number;
+  exposureTopWeek?: string;
+  category: string;
+  adKey: string;
+  advertiserName: string;
+  appDeveloper?: string;
+  platform?: string;
+  heat?: number;
+  allExposureValue?: number;
+  newWeekExposureValue?: number;
+  exposureDiff?: number;
+  exposureGrowth?: number;
+  daysCount?: number;
+  title?: string;
+  message?: string;
+  callToAction?: string;
+  logoUrl?: string;
+  previewImgUrl?: string;
+  videoUrl?: string;
+  countries: string[];
+  createdAt?: string;
+  firstSeen?: string;
+  lastSeen?: string;
+}
+
+export interface AiCreativeLibraryPayload {
+  newItems: AiCreativeLibraryItem[];
+  hotItems: AiCreativeLibraryItem[];
+  surgeItems: AiCreativeLibraryItem[];
+}
+
 /**
  * 统一日报文档格式
  * 用同一套字段描述所有日报（热点日报、AI日报、竞品周报等），便于列表展示与详情渲染
@@ -311,6 +369,8 @@ export interface ReportContentAiCompetitorWeekly {
   title: string;
   weekThis: string;
   weekLast: string;
+  /** 本周竞品变化摘要（Markdown，来自 applist_ai_summary 聚合） */
+  summaryMd?: string;
   items: AiCompetitorWeeklyItem[];
 }
 

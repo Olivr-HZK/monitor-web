@@ -105,8 +105,20 @@ def _load_env(repo_root: Path) -> None:
 
 
 def _parse_content_option(content: str) -> set[str]:
-    """解析 --content：game,hot,ai -> {'game','hot','ai'}。"""
-    alias = {"游戏检测": "game", "热点日报": "hot", "ai日报": "ai"}
+    """解析 --content：
+    - game：游戏检测（微信/抖音 + SensorTower）
+    - game_st：仅 SensorTower 榜单周报
+    - game_wd：仅 微信/抖音 榜单周报
+    - hot：热点日报
+    - ai：AI 日报
+    """
+    alias = {
+        "游戏检测": "game",
+        "热点日报": "hot",
+        "ai日报": "ai",
+        "sensortower": "game_st",
+        "小游戏": "game_wd",
+    }
     out = set()
     for part in content.replace("，", ",").split(","):
         key = (part or "").strip().lower()
@@ -223,7 +235,7 @@ def build_hot_trend_daily_md(
         + "\n"
     )
     title = f"热点日报每日汇总 {date_str}"
-    summary_md = f"# {title}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看。"
+    summary_md = f"# {title}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
     return summary_md, summary_md
 
 
@@ -280,7 +292,7 @@ def build_ai_daily_from_json(json_path: Path) -> tuple[str, str] | None:
         topic_list += "\n……"
     content = f"## 摘要\n{overview_summary}\n\n## 本日话题\n{topic_list}\n"
     title_str = f"AI热点日报（{date_full or short_date}）"
-    body = f"# {title_str}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看。"
+    body = f"# {title_str}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
     return title_str, body
 
 
@@ -391,6 +403,118 @@ def _store_change_brief(summaries: list[str]) -> str:
         return ""
     # 组装成「截图、图标有更新」这类短语
     return "、".join(uniq) + "有更新"
+
+
+def _chart_type_label(chart_type: str) -> str:
+    """榜单类型转中文，与前端 formatChartTypeLabel 一致。"""
+    s = (chart_type or "").strip().lower()
+    if "free" in s:
+        return "免费榜"
+    if "grossing" in s:
+        return "畅销榜"
+    return chart_type or "—"
+
+
+def _parse_weekly_metadata_changed_fields(changed_fields_raw: str) -> list[str]:
+    """解析 weekly_metadata_changes.changed_fields（JSON 数组或逗号分隔），返回中文摘要列表，与前端一致。"""
+    summaries: list[str] = []
+    s = (changed_fields_raw or "").strip()
+    if not s:
+        return summaries
+    # 支持 ["screenshot_urls","name"] 或 screenshot_urls,name
+    if s.startswith("["):
+        try:
+            arr = json.loads(s)
+            fields = [str(x).strip() for x in arr if x]
+        except json.JSONDecodeError:
+            fields = [f.strip() for f in re.split(r"[,;\s]+", s) if f.strip()]
+    else:
+        fields = [f.strip() for f in re.split(r"[,;\s]+", s) if f.strip()]
+    for f in fields:
+        key = f.lower()
+        if "screenshot" in key:
+            summaries.append("截图已更新")
+        elif key in ("name", "app_name", "title"):
+            summaries.append("名称已更新")
+        elif "description" in key or "short_description" in key:
+            summaries.append("描述已更新")
+    # 去重并保留顺序
+    seen: set[str] = set()
+    out: list[str] = []
+    for x in summaries:
+        if x and x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def _get_store_changes_from_weekly_metadata(
+    conn: sqlite3.Connection,
+    rank_date: str,
+    limit: int = 5,
+) -> list[dict]:
+    """从 weekly_metadata_changes 取指定 rank_date 的商店页变化，最多 limit 条。与前端 loadSensorTowerStoreChanges 一致。"""
+    if not rank_date or not rank_date.strip():
+        return []
+    result: list[dict] = []
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT rank_date, app_id, os, app_name, changed_fields, detected_at
+            FROM weekly_metadata_changes
+            WHERE rank_date = ?
+            ORDER BY detected_at DESC, id DESC
+            LIMIT ?
+            """,
+            (rank_date.strip(), limit),
+        )
+        rows = cur.fetchall()
+    except sqlite3.OperationalError:
+        return []
+    for r in rows:
+        app_id = str(r[1] or "").strip()
+        os_val = str(r[2] or "").strip().lower()
+        app_name = str(r[3] or "").strip() or app_id
+        changed_fields = str(r[4] or "")
+        info_table = "appstoreinfo" if os_val == "ios" else "gamestoreinfo"
+        name_col = "app_name" if info_table == "appstoreinfo" else "title"
+        store_url = ""
+        try:
+            cur.execute(
+                f"SELECT {name_col}, store_url FROM {info_table} WHERE app_id = ? LIMIT 1",
+                (app_id,),
+            )
+            row_info = cur.fetchone()
+            if row_info:
+                if (row_info[0] or "").strip():
+                    app_name = str(row_info[0]).strip()
+                store_url = str(row_info[1] or "").strip() if len(row_info) > 1 else ""
+        except sqlite3.OperationalError:
+            pass
+        # 若 appstoreinfo/gamestoreinfo 无 store_url，用 app_metadata.url 兜底（与前端下线游戏一致）
+        if not store_url:
+            try:
+                cur.execute(
+                    "SELECT name, url FROM app_metadata WHERE app_id = ? AND LOWER(os) = ? LIMIT 1",
+                    (app_id, os_val),
+                )
+                row_meta = cur.fetchone()
+                if row_meta and len(row_meta) > 1 and (row_meta[1] or "").strip():
+                    store_url = str(row_meta[1]).strip()
+                    if (row_meta[0] or "").strip() and not app_name:
+                        app_name = str(row_meta[0]).strip()
+            except sqlite3.OperationalError:
+                pass
+        summaries = _parse_weekly_metadata_changed_fields(changed_fields)
+        if not summaries:
+            continue
+        result.append({
+            "name": app_name or app_id,
+            "store_url": store_url,
+            "summaries": summaries,
+        })
+    return result
 
 
 def _get_store_changes(
@@ -636,7 +760,7 @@ def _build_wechat_douyin_push(
 
     lines.append("---")
     lines.append("")
-    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})")
+    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（密码：guru666）")
     return "\n".join(lines), week_range
 
 
@@ -852,37 +976,32 @@ def _build_sensortower_only_push(
         except sqlite3.OperationalError:
             pass
 
-    # 异动简述（来自 top5_异动陈述_YYYY-MM-DD.json，若有）
-    _repo_root = Path(__file__).resolve().parents[1]
-    _insight_dir = _repo_root / "public/休闲游戏检测/sensortower_周报"
-    _insight_file = _insight_dir / f"top5_异动陈述_{st_date}.json"
-    if _insight_file.exists():
-        try:
-            _payload = json.loads(_insight_file.read_text(encoding="utf-8"))
-            _stmt = (_payload.get("statement") or "").strip()
-            if _stmt:
-                lines.append("## 异动简述")
-                lines.append("")
-                lines.append(_stmt)
-                lines.append("")
-        except (json.JSONDecodeError, OSError):
-            pass
+    # 异动简述（直接来自 weekly_top5_overview.statement）
+    try:
+        cur = st_conn.cursor()
+        cur.execute(
+            "SELECT statement FROM weekly_top5_overview WHERE rank_date = ? LIMIT 1",
+            (st_date,),
+        )
+        row = cur.fetchone()
+        _stmt = str(row[0] or "").strip() if row and len(row) > 0 else ""
+        if _stmt:
+            lines.append("## 异动简述")
+            lines.append("")
+            lines.append(_stmt)
+            lines.append("")
+    except sqlite3.OperationalError:
+        pass
 
-    # 三、商店页的更新（指定周时只取该周 rank_date 的变更）
+    # 三、商店页的更新（从 weekly_metadata_changes 读取当周 rank_date，取 5 条）
     lines.append("## 三、商店页的更新")
     lines.append("")
-    store_items: list[dict] = []
-    store_rank_filter = st_date if target_rank_date else None
-    for table in ("appstoreinfo_changes", "gamestoreinfo_changes"):
-        _rank_date, store_rows = _get_store_changes(st_conn, table, limit=10, rank_date_filter=store_rank_filter)
-        for r in store_rows:
-            r["rank_date"] = _rank_date
-            store_items.append(r)
+    store_items = _get_store_changes_from_weekly_metadata(st_conn, st_date, limit=5)
     if store_items:
-        for item in store_items[:max_items_per_section]:
+        for item in store_items:
             name = item.get("name") or "—"
             store_url = item.get("store_url") or ""
-            brief = _store_change_brief(item.get("summaries") or [])
+            brief = "、".join(item.get("summaries") or [])
             if store_url:
                 line = f"- [{name}]({store_url})"
             else:
@@ -890,16 +1009,65 @@ def _build_sensortower_only_push(
             if brief:
                 line += f"（{brief}）"
             lines.append(line)
-        if len(store_items) > max_items_per_section:
-            lines.append(f"- …… 共 {len(store_items)} 款有更新，详见平台")
     else:
         lines.append("本周期暂无商店页变化。")
+    lines.append("")
+
+    # 四、上周榜单中疑似下线的产品（与前端 sensortowerWeeklyReport 一致：用 rank_date_last）
+    lines.append("## 四、上周榜单中疑似下线的产品")
+    lines.append("")
+    removed_items: list[dict] = []
+    if rank_date_last:
+        try:
+            cur = st_conn.cursor()
+            cur.execute(
+                """
+                SELECT rank_date, os, country, chart_type, app_id, app_name, store_url, reason
+                FROM weekly_removed_games
+                WHERE removed = 1 AND rank_date = ?
+                ORDER BY os, country, chart_type, app_name
+                """,
+                (rank_date_last,),
+            )
+            for r in cur.fetchall():
+                removed_items.append({
+                    "rank_date": str(r[0] or ""),
+                    "platform": "Android" if str(r[1] or "").lower() == "android" else "iOS",
+                    "country": str(r[2] or ""),
+                    "chart_type": str(r[3] or ""),
+                    "app_id": str(r[4] or ""),
+                    "app_name": str(r[5] or "").strip() or str(r[4] or ""),
+                    "store_url": str(r[6] or "").strip() or "",
+                    "reason": str(r[7] or "").strip() or "",
+                })
+        except sqlite3.OperationalError:
+            pass
+    if removed_items:
+        for item in removed_items[:max_items_per_section]:
+            name = item.get("app_name") or item.get("app_id") or "—"
+            store_url = item.get("store_url") or ""
+            country = item.get("country") or "—"
+            chart_label = _chart_type_label(item.get("chart_type") or "")
+            platform = item.get("platform") or "—"
+            reason = item.get("reason") or "—"
+            if store_url:
+                line = f"- [{name}]({store_url})（{country} | {chart_label} | {platform}"
+            else:
+                line = f"- {name}（{country} | {chart_label} | {platform}"
+            if reason:
+                line += f"；{reason}"
+            line += "）"
+            lines.append(line)
+        if len(removed_items) > max_items_per_section:
+            lines.append(f"- …… 共 {len(removed_items)} 款，详见平台")
+    else:
+        lines.append("上周无疑似下线产品。")
     lines.append("")
 
     lines.append("---")
     lines.append("")
     weekly_url = _weekly_report_url(st_date)
-    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({weekly_url})")
+    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({weekly_url})（密码：guru666）")
     return "\n".join(lines), st_date
 
 
@@ -971,7 +1139,7 @@ def _truncate_for_wecom(md: str, max_bytes: int = WECOM_MARKDOWN_MAX_BYTES) -> s
     data = md.encode("utf-8")
     if len(data) <= max_bytes:
         return md
-    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK}) 查看。"
+    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
     suffix_bytes = suffix.encode("utf-8")
     keep = max_bytes - len(suffix_bytes)
     if keep <= 0:
@@ -997,24 +1165,40 @@ def send_wecom_markdown(webhook: str, md_content: str) -> None:
 
 
 def _split_sensortower_for_wecom(md: str) -> list[str]:
-    """SensorTower 周报拆成两条发企业微信：第一条一+二节，第二条三节+底部，避免 4096 截断把商店页变化截掉。每段末尾都带链接。"""
-    sep = "## 三、商店页的更新"
-    if sep not in md:
+    """SensorTower 周报拆成多条发企业微信（单条 4096 字节上限）：一+二、三、四 各成一段，避免截断把商店页变化或下线游戏的链接截掉。每段末尾带链接。"""
+    sep3 = "## 三、商店页的更新"
+    sep4 = "## 四、上周榜单中疑似下线的产品"
+    if sep3 not in md:
         return [md]
-    before, after = md.split(sep, 1)
-    part2 = sep + after  # part2 已含文末 --- 与链接
+    before, after3 = md.split(sep3, 1)
     part1 = before.rstrip()
-    if not part1:
-        return [md]
-    footer = f"\n\n---\n\n> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})"
+    footer = f"\n\n---\n\n> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（密码：guru666）"
     part1 = part1 + footer
     out = []
-    for block in (part1, part2):
+    for block in (part1,):
         block_utf8 = block.encode("utf-8")
         if len(block_utf8) <= WECOM_MARKDOWN_MAX_BYTES:
             out.append(block)
         else:
             out.append(_truncate_for_wecom(block))
+    # 三、商店页的更新：单独一条，避免和「四」合在一起超长被截断导致最后几条没链接
+    block3 = sep3 + after3
+    if sep4 in block3:
+        part3_content, part4_content = block3.split(sep4, 1)
+        part3_content = part3_content.rstrip() + footer
+        part4_content = sep4 + part4_content  # 已含文末 --- 与链接
+        for block in (part3_content, part4_content):
+            block_utf8 = block.encode("utf-8")
+            if len(block_utf8) <= WECOM_MARKDOWN_MAX_BYTES:
+                out.append(block)
+            else:
+                out.append(_truncate_for_wecom(block))
+    else:
+        block_utf8 = block3.encode("utf-8")
+        if len(block_utf8) <= WECOM_MARKDOWN_MAX_BYTES:
+            out.append(block3)
+        else:
+            out.append(_truncate_for_wecom(block3))
     return out
 
 
@@ -1114,7 +1298,7 @@ def main() -> int:
     messages: list[tuple[str, str, str | None]] = []
 
     # 微信/抖音小游戏周报（wechatdouyin.db：top20_ranking + rank_changes）
-    if "game" in content_set and wechatdouyin_db.exists():
+    if ("game" in content_set or "game_wd" in content_set) and wechatdouyin_db.exists():
         try:
             conn_wd = sqlite3.connect(str(wechatdouyin_db))
             try:
@@ -1145,14 +1329,14 @@ def main() -> int:
                         json_path.write_text(json.dumps(weekly_doc, ensure_ascii=False, indent=2), encoding="utf-8")
                     except Exception as e:  # noqa: BLE001
                         print(f"[警告] 写入小游戏周报 JSON 失败：{e}", file=sys.stderr)
-                elif "game" in content_set and not wd_md:
+                elif ("game" in content_set or "game_wd" in content_set) and not wd_md:
                     print("[跳过] 微信/抖音小游戏：wechatdouyin.db 中无 top20_ranking/rank_changes 数据或无匹配周", file=sys.stderr)
             finally:
                 conn_wd.close()
         except Exception as e:
             print(f"[跳过] 微信/抖音小游戏：读取 wechatdouyin.db 失败：{e}", file=sys.stderr)
 
-    if "game" in content_set and st_db.exists():
+    if ("game" in content_set or "game_st" in content_set) and st_db.exists():
         conn_st = sqlite3.connect(str(st_db))
         try:
             target_rank_date = report_date_iso if args.date else None
@@ -1165,7 +1349,7 @@ def main() -> int:
                 print(f"[跳过] 游戏检测：未找到 {report_date_iso} 对应周报数据（rank_changes 中无该 rank_date_current）", file=sys.stderr)
         finally:
             conn_st.close()
-    elif "game" in content_set:
+    elif "game" in content_set or "game_st" in content_set:
         print(f"[跳过] 游戏检测：sensortower_top100.db 不存在 {st_db}", file=sys.stderr)
 
     if "hot" in content_set:

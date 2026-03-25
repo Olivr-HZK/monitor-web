@@ -31,7 +31,7 @@ const CasualHomePage = () => {
   } = useCasualView();
 
   const handleAiProductSubSelect = (sub: AiProductSubCategory | null) => {
-    setSelectedAiProductSub(sub ?? 'UA素材');
+    setSelectedAiProductSub(sub ?? '产品周报');
   };
 
   const companyOptions = useMemo(
@@ -186,11 +186,7 @@ const CasualHomePage = () => {
                 items={monitorItems}
                 selectedType="AI产品监测"
                 selectedAiProductSub={selectedAiProductSub}
-                pageTitle={
-                  selectedAiProductSub === 'UA素材'
-                    ? 'AI 产品监测 - UA 素材'
-                    : 'AI 产品监测 - 竞品动态'
-                }
+                pageTitle={`AI 产品监测 - ${selectedAiProductSub}`}
                 onItemClick={handleReportClick}
               />
             )}
@@ -236,7 +232,7 @@ const CasualHomePage = () => {
             selectedAiProductSub={selectedAiProductSub}
             onAiProductSubSelect={handleAiProductSubSelect}
             visibleTypes={['休闲游戏监测', 'AI产品监测']}
-            aiProductVisibleSubs={['UA素材', '竞品动态']}
+            aiProductVisibleSubs={['产品周报', 'UA素材']}
             showAllTypeButton={false}
           />
         </div>

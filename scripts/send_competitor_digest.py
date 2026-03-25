@@ -266,7 +266,7 @@ def build_digest_md(items: list[dict], week_label: str = "") -> str:
         else:
             lines.append(f"{i}. **{company}** {period} {score_str}")
     lines.append("")
-    lines.append(f"> 👉 查看竞品周报详情：[监测汇总平台]({PLATFORM_LINK})")
+    lines.append(f"> 👉 查看竞品周报详情：[监测汇总平台]({PLATFORM_LINK})（密码：guru666）")
     return "\n".join(lines)
 
 
@@ -295,7 +295,7 @@ def send_wecom(webhook: str, md: str, max_bytes: int = 4096) -> None:
     """企业微信 Markdown，超长截断。"""
     data = md.encode("utf-8")
     if len(data) > max_bytes:
-        suffix = f"\n\n> 内容过长，详见 [监测汇总平台]({PLATFORM_LINK}) 查看。"
+        suffix = f"\n\n> 内容过长，详见 [监测汇总平台]({PLATFORM_LINK}) 查看（密码：guru666）。"
         keep = max_bytes - len(suffix.encode("utf-8"))
         if keep > 0:
             chunk = data[:keep]

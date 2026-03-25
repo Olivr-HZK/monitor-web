@@ -26,6 +26,71 @@ export interface WeeklyReportContent {
   card: any;
 }
 
+interface WeeklyRemoveItem {
+  gameName: string;
+  platform?: string;
+  note?: string;
+}
+
+function findColumnIndex(columns: string[], candidates: string[]): number {
+  const lower = columns.map((c) => c.toLowerCase());
+  for (const name of candidates) {
+    const idx = lower.indexOf(name.toLowerCase());
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function buildWeeklyKey(company: string, start: string, end: string): string {
+  return `${company.trim()}||${start.trim()}||${end.trim()}`;
+}
+
+function injectWeeklyRemoveSection(
+  content: WeeklyReportContent,
+  removed: WeeklyRemoveItem[]
+): WeeklyReportContent {
+  if (!removed.length) return content;
+
+  const card = content.card ?? {};
+  const elements = Array.isArray(card.elements) ? [...card.elements] : [];
+
+  const lines: string[] = [];
+  lines.push('**上周榜单中疑似下架的游戏**');
+  lines.push('');
+  removed.forEach((item, idx) => {
+    const parts: string[] = [];
+    parts.push(`${idx + 1}. ${item.gameName || '（未命名游戏）'}`);
+    const meta: string[] = [];
+    if (item.platform) meta.push(`平台：${item.platform}`);
+    if (item.note) meta.push(item.note);
+    if (meta.length) {
+      parts.push(`（${meta.join('，')}）`);
+    }
+    lines.push(parts.join(' '));
+  });
+
+  const sectionText = lines.join('\n');
+
+  if (elements.length > 0) {
+    elements.push({ tag: 'hr' });
+  }
+  elements.push({
+    tag: 'div',
+    text: {
+      tag: 'lark_md',
+      content: sectionText,
+    },
+  });
+
+  return {
+    ...content,
+    card: {
+      ...card,
+      elements,
+    },
+  };
+}
+
 /**
  * 从数据库加载周报数据并转换为 MonitorItem
  * 每个公司每周一份周报（一个卡片）
@@ -54,6 +119,50 @@ export async function loadWeeklyReportsFromDatabase(dbUrl: string = 'competitor_
     }
     const buffer = await response.arrayBuffer();
     const db = new SQL.Database(new Uint8Array(buffer));
+
+    const removedByKey = new Map<string, WeeklyRemoveItem[]>();
+
+    // 尝试读取 weekly_remove 表（若不存在则忽略）
+    try {
+      const check = db.exec(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_remove'`
+      );
+      if (check.length > 0 && check[0].values.length > 0) {
+        const res = db.exec(`SELECT * FROM weekly_remove`);
+        if (res.length > 0 && res[0].values.length > 0) {
+          const columns = res[0].columns;
+          const rows = res[0].values;
+          const idxCompany = findColumnIndex(columns, ['company_name', 'company']);
+          const idxStart = findColumnIndex(columns, ['start_date', 'week_start', 'start']);
+          const idxEnd = findColumnIndex(columns, ['end_date', 'week_end', 'end']);
+          const idxGame = findColumnIndex(columns, ['game_name', 'app_name', 'title', 'product_name']);
+          const idxPlatform = findColumnIndex(columns, ['platform', 'platform_name', 'channel']);
+          const idxNote = findColumnIndex(columns, ['note', 'remark', 'reason', 'desc', 'description']);
+
+          if (idxCompany !== -1 && idxStart !== -1 && idxEnd !== -1 && idxGame !== -1) {
+            rows.forEach((row: any[]) => {
+              const company = String(row[idxCompany] ?? '').trim();
+              const start = String(row[idxStart] ?? '').trim();
+              const end = String(row[idxEnd] ?? '').trim();
+              const gameName = String(row[idxGame] ?? '').trim();
+              if (!company || !start || !end || !gameName) return;
+              const platform =
+                idxPlatform !== -1 ? String(row[idxPlatform] ?? '').trim() || undefined : undefined;
+              const note =
+                idxNote !== -1 ? String(row[idxNote] ?? '').trim() || undefined : undefined;
+              const key = buildWeeklyKey(company, start, end);
+              const list = removedByKey.get(key) ?? [];
+              list.push({ gameName, platform, note });
+              removedByKey.set(key, list);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('weekly_remove 表查询失败，忽略该部分：', e);
+      }
+    }
 
     // 查询周报数据
     const result = db.exec(`
@@ -98,10 +207,16 @@ export async function loadWeeklyReportsFromDatabase(dbUrl: string = 'competitor_
           period: {
             start_date: report.start_date,
             end_date: report.end_date,
-            days: 7
+            days: 7,
           },
-          card: {}
+          card: {},
         };
+      }
+
+      const key = buildWeeklyKey(report.company_name, report.start_date, report.end_date);
+      const removedItems = removedByKey.get(key) ?? [];
+      if (removedItems.length > 0) {
+        reportContent = injectWeeklyRemoveSection(reportContent, removedItems);
       }
 
       // 提取评分
@@ -149,7 +264,7 @@ export async function loadWeeklyReportsFromDatabase(dbUrl: string = 'competitor_
         sentiment: 'neutral',
         url: '#',
         score, // 评分
-        reportContent: report.report_content // 保存原始 JSON 内容
+        reportContent: JSON.stringify(reportContent), // 保存（可能包含疑似下架部分的）JSON 内容
       };
     });
 

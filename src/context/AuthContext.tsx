@@ -179,6 +179,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getDataUrl,
   };
 
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

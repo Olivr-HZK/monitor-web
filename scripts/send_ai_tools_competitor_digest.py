@@ -230,7 +230,7 @@ def build_digest_md(date_str: str, items: list[dict], top_n: int = 10) -> str:
         )
 
     lines.append("")
-    lines.append("> 以上为 AI 工具竞品当日表现摘要，完整明细与历史趋势请在监测汇总平台查看。")
+    lines.append("> 以上为 AI 工具竞品当日表现摘要，完整明细与历史趋势请在监测汇总平台查看（密码：guru666）。")
     return "\n".join(lines)
 
 

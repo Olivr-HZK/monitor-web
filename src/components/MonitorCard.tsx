@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { MonitorItem } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -42,7 +42,9 @@ function buildAiCardContent(content: string): string {
 }
 
 const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
+  const [coverFailed, setCoverFailed] = useState(false);
   const isAiHotspot = item.type === 'ai热点监测';
+  const showCover = item.coverImage && !coverFailed;
   const { cardContent, linkUrl } = useMemo(() => {
     if (!isAiHotspot) return { cardContent: '', linkUrl: '' };
     const { content, linkUrl: url } = getContentFromReportContent(item.reportContent);
@@ -108,12 +110,14 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
     >
       {/* Cover/Type Indicator */}
       <div className="flex-shrink-0 relative">
-        {item.coverImage ? (
+        {showCover ? (
           <div className="w-32 h-32 rounded-xl overflow-hidden relative border border-slate-200">
-            <img 
-              src={item.coverImage} 
+            <img
+              src={item.coverImage}
               alt={item.title}
               className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={() => setCoverFailed(true)}
             />
             <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2`}>
               <div className="text-xs font-bold text-white">{item.type}</div>

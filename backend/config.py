@@ -43,6 +43,14 @@ WECOM_WEBHOOK_URL = _str(os.environ.get("WECOM_WEBHOOK_URL_REAL") or os.environ.
 OPENAI_API_KEY = _str(os.environ.get("OPENAI_API_KEY"))
 OPENAI_BASE_URL = (_str(os.environ.get("OPENAI_BASE_URL")) or "https://api.openai.com/v1").rstrip("/")
 OPENAI_MODEL = _str(os.environ.get("OPENAI_MODEL"), "gpt-4.1-mini")
+AI_PROVIDER = _str(os.environ.get("AI_PROVIDER"), "openai").lower()
+CODEX_APP_SERVER_BIN = _str(os.environ.get("CODEX_APP_SERVER_BIN"), "codex")
+CODEX_MODEL = _str(os.environ.get("CODEX_MODEL"), "gpt-5.1-codex")
+CODEX_WORKDIR = _str(os.environ.get("CODEX_WORKDIR"))
+CODEX_TURN_TIMEOUT_SEC = _int(os.environ.get("CODEX_TURN_TIMEOUT_SEC"), 180)
+CODEX_ENABLE_DB_TOOL = _bool(os.environ.get("CODEX_ENABLE_DB_TOOL") or "1")
+CODEX_ENABLE_WEB_SEARCH_TOOL = _bool(os.environ.get("CODEX_ENABLE_WEB_SEARCH_TOOL") or "1")
+TAVILY_API_KEY = _str(os.environ.get("TAVILY_API_KEY"))
 # 生产且未显式关闭时，AI 对话需要登录
 AI_CHAT_REQUIRE_AUTH = os.environ.get("NODE_ENV") == "production" and os.environ.get("AI_CHAT_REQUIRE_AUTH", "true").lower() not in ("0", "false")
 

@@ -3,7 +3,7 @@
  * 统一使用 ReportDocument 格式：标题、标签、时间、来源、摘要来自文档，正文仅渲染 content
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 /** 将 URL 中的百分号编码解码为可读字符再用于展示，避免显示 %E4%B8%AD 等“异常字母” */
 function urlForDisplay(url: string): string {
@@ -21,12 +21,12 @@ import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/api';
 
 /** 竞品周报默认摘要（仅展示下载/收益变化明显的产品，大模型未返回时使用） */
-const DEFAULT_AI_COMPETITOR_WEEKLY_SUMMARY = `- **ChatGPT（Android）**：收入较上周明显增加（约 +2,500 万级），下载小幅上升，付费转化在提升。
-- **Google Gemini（iOS）**：收入环比约 **+27%**（约 3,650 万 → 4,650 万），下载略降，单用户变现增强。
-- **ChatOn（Android）**：下载较上周减少约 **2.5 万**（约 -60%），收入略降，买量或热度有所回落。
-- **UpFoto（Android）**：下载减少约 **2.5 万**，收入同步下滑，本周表现偏弱。
-- **PhotoBoost（Android）**：下载 +1.2 万、收入 +约 28 万，在修图类里本周增长较突出。
-- **AI Chatbot - Nova（Android）**：收入较上周增加约 **80 万级**，增幅明显大于下载，订阅或高价包可能有优化。
+const DEFAULT_AI_COMPETITOR_WEEKLY_SUMMARY = `- **[ChatGPT（Android）](https://play.google.com/store/apps/details?id=com.openai.chatgpt)**：收入较上周明显增加（约 +2,500 万级），下载小幅上升，付费转化在提升。
+- **[Google Gemini（iOS）](https://apps.apple.com/app/id6477489729)**：收入环比约 **+27%**（约 3,650 万 → 4,650 万），下载略降，单用户变现增强。
+- **[ChatOn（Android）](https://play.google.com/store/apps/details?id=ai.chat.gpt.bot)**：下载较上周减少约 **2.5 万**（约 -60%），收入略降，买量或热度有所回落。
+- **[UpFoto（Android）](https://play.google.com/store/apps/details?id=ai.photo.enhancer.photoclear)**：下载减少约 **2.5 万**，收入同步下滑，本周表现偏弱。
+- **[PhotoBoost（Android）](https://play.google.com/store/apps/details?id=tap.photo.boost.restoration)**：下载 +1.2 万、收入 +约 28 万，在修图类里本周增长较突出。
+- **[AI Chatbot - Nova（Android）](https://play.google.com/store/apps/details?id=com.scaleup.chatai)**：收入较上周增加约 **80 万级**，增幅明显大于下载，订阅或高价包可能有优化。
 
 其余产品本周下载与收益波动不大，未单独列出。`;
 
@@ -206,6 +206,15 @@ const WeeklyReportDetail = ({ item, onBack, storeChangeItemMap, onOpenStoreChang
             storeUrl?: string;
             summaries?: string[];
           }>;
+          removedGames?: Array<{
+            id: string;
+            appName: string;
+            platform?: string;
+            country?: string;
+            chartType?: string;
+            storeUrl?: string;
+            reason?: string;
+          }>;
         })
       : null;
 
@@ -220,95 +229,6 @@ const WeeklyReportDetail = ({ item, onBack, storeChangeItemMap, onOpenStoreChang
       return null;
     }
   }, [item.reportContent]);
-
-  const [aiWeeklySummary, setAiWeeklySummary] = useState<string>('');
-  const [aiWeeklySummaryLoading, setAiWeeklySummaryLoading] = useState(false);
-
-  useEffect(() => {
-    if (!aiCompetitorWeeklyPayload) {
-      setAiWeeklySummary('');
-      setAiWeeklySummaryLoading(false);
-      return;
-    }
-    // 若已生成过摘要则不重复调用
-    if (aiWeeklySummary) return;
-
-    const controller = new AbortController();
-    const run = async () => {
-      try {
-        setAiWeeklySummaryLoading(true);
-        const weekThis = aiCompetitorWeeklyPayload.weekThis;
-        // 优先尝试读取后端/脚本生成的摘要 JSON（public/ai产品/ai_竞品周报摘要_YYYY-MM-DD.json）
-        const filename = `ai产品/ai_竞品周报摘要_${weekThis}.json`;
-        const url = getDataUrl ? getDataUrl(filename) : filename;
-        try {
-          const resp = await fetch(url, { signal: controller.signal, credentials: 'include' });
-          if (resp.ok) {
-            const data = (await resp.json()) as { summary?: string };
-            if (data.summary && typeof data.summary === 'string' && data.summary.trim()) {
-              setAiWeeklySummary(data.summary.trim());
-              return;
-            }
-          }
-        } catch {
-          // 若 JSON 不存在或读取失败，则退回到在线生成
-        }
-
-        const significantItems = aiCompetitorWeeklyPayload.items.map((it) => ({
-          appId: it.appId,
-          name: it.productName,
-          publisher: it.publisherName,
-          platform: it.platform,
-          downloadsThisWeek: it.downloadsThisWeek,
-          downloadsLastWeek: it.downloadsLastWeek,
-          revenueThisWeek: it.revenueThisWeek,
-          revenueLastWeek: it.revenueLastWeek,
-        }));
-        const payload = {
-          weekThis: aiCompetitorWeeklyPayload.weekThis,
-          weekLast: aiCompetitorWeeklyPayload.weekLast,
-          items: significantItems,
-        };
-        const prompt = [
-          '下面是一份 AI 产品竞品周报的源数据，字段包括每款产品本周/上周的下载量和收入：',
-          JSON.stringify(payload),
-          '',
-          '请用简洁的中文总结本周变化**明显**的产品（例如下载量或收入环比变化 ≥20% 或绝对变化特别大）。',
-          '- 只说变化比较大的产品，没有明显变化的可以忽略；',
-          '- 以要点列表形式输出，每条形如「产品A：下载量较上周 +35%，收入基本持平，主要亮点是……」；',
-          '- 优先关注下载和收入同时大幅上升/下降的产品，其次是某一项大幅变化的产品；',
-          '- 不需要重复列出原始数字，只需给出大致变化方向和量级（如「+30% 左右」「翻倍」「腰斩」等）。',
-        ].join('\n');
-
-        const resp = await fetch(getApiUrl('/api/ai/chat'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ message: prompt }),
-          signal: controller.signal,
-        });
-        if (!resp.ok) {
-          setAiWeeklySummary('');
-          return;
-        }
-        const data = (await resp.json()) as { answer?: string };
-        if (data.answer && typeof data.answer === 'string') {
-          setAiWeeklySummary(data.answer.trim());
-        }
-      } catch {
-        // 忽略错误，仅不展示摘要
-      } finally {
-        if (!controller.signal.aborted) {
-          setAiWeeklySummaryLoading(false);
-        }
-      }
-    };
-    void run();
-
-    return () => {
-      controller.abort();
-    };
-  }, [aiCompetitorWeeklyPayload, aiWeeklySummary, getDataUrl]);
 
   const parseHotTrendSections = (content: string) => {
     const sections: Record<string, string> = {};
@@ -418,7 +338,12 @@ const WeeklyReportDetail = ({ item, onBack, storeChangeItemMap, onOpenStoreChang
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {doc.coverImage && (
           <div className="mb-6 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-            <img src={doc.coverImage} alt={doc.title} className="w-full max-h-80 object-cover" />
+            <img
+              src={doc.coverImage}
+              alt={doc.title}
+              className="w-full max-h-80 object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
         )}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
@@ -426,13 +351,15 @@ const WeeklyReportDetail = ({ item, onBack, storeChangeItemMap, onOpenStoreChang
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900 mb-2">本周竞品变化摘要</h2>
-                {aiWeeklySummaryLoading ? (
-                  <p className="text-sm text-slate-500">摘要生成中...</p>
-                ) : (
-                  <div className="prose prose-sm max-w-none text-slate-700">
-                    <MarkdownRenderer content={aiWeeklySummary || DEFAULT_AI_COMPETITOR_WEEKLY_SUMMARY} />
-                  </div>
-                )}
+                <div className="prose prose-sm max-w-none text-slate-700">
+                  <MarkdownRenderer
+                    content={
+                      aiCompetitorWeeklyPayload.summaryMd && aiCompetitorWeeklyPayload.summaryMd.trim()
+                        ? aiCompetitorWeeklyPayload.summaryMd
+                        : '暂无摘要内容。'
+                    }
+                  />
+                </div>
               </div>
               <AiCompetitorWeeklyTable payload={aiCompetitorWeeklyPayload} />
             </div>

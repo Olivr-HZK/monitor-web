@@ -37,7 +37,7 @@ export const CasualViewProvider = ({ children }: { children: React.ReactNode }) 
   const [selectedCasualSourceSection, setSelectedCasualSourceSection] =
     useState<'wechat_douyin' | 'sensortower'>('wechat_douyin');
   const [selectedAiProductSub, setSelectedAiProductSub] =
-    useState<AiProductSubCategory>('UA素材');
+    useState<AiProductSubCategory>('产品周报');
 
   return (
     <CasualViewContext.Provider

@@ -61,7 +61,7 @@ def collect_top5_trends(conn: sqlite3.Connection) -> list[dict]:
     """
     对 apple_top100 / android_top100 每个表，取最近四周的 rank_date；
     对每个 (country, chart_type) 取「当前周」排名 1～5 的 app_id，再取这些 app 在四周内的 (rank_date, rank)。
-    返回结构：[ { "platform": "iOS", "country": "...", "chart_type": "...", "top5": [ {"app_id", "name", "trend": [{"rank_date","rank"}] }, ... ] }, ... ]
+    返回结构：[ { "platform", "country", "chart_type", "top5": [ {"app_id", "name", "current_rank"(1～5), "trend": [{"rank_date","rank"}] }, ... ] }, ... ]
     """
     cur = conn.cursor()
     meta = load_app_metadata(cur)
@@ -98,7 +98,8 @@ def collect_top5_trends(conn: sqlite3.Connection) -> list[dict]:
         for country, chart_type, rank, app_id in rows:
             group[(country, chart_type)].append((rank, app_id))
         for (country, chart_type), apps in group.items():
-            app_ids = [a[1] for a in sorted(apps, key=lambda x: x[0])]
+            sorted_apps = sorted(apps, key=lambda x: x[0])  # (rank, app_id)，rank 1～5
+            app_ids = [a[1] for a in sorted_apps]
             # 取这些 app 在 dates 内所有 (rank_date, rank)
             cur.execute(
                 f"""
@@ -115,11 +116,16 @@ def collect_top5_trends(conn: sqlite3.Connection) -> list[dict]:
             for app_id, rank_date, rank in raw_trends:
                 by_app[app_id].append({"rank_date": rank_date, "rank": rank})
             top5_list = []
-            for app_id in app_ids:
+            for current_rank, app_id in sorted_apps:
                 name = meta.get((app_id, os_key), "") or app_id
                 trend = by_app.get(app_id, [])
                 trend.sort(key=lambda x: x["rank_date"], reverse=True)
-                top5_list.append({"app_id": app_id, "name": name, "trend": trend})
+                top5_list.append({
+                    "app_id": app_id,
+                    "name": name,
+                    "current_rank": current_rank,
+                    "trend": trend,
+                })
             result.append({
                 "platform": platform,
                 "country": country,
@@ -156,12 +162,17 @@ def build_prompt(data: list[dict]) -> str:
             link_entries.append({"name": name, "url": url})
 
     lines = [
-        "以下为 SensorTower 休闲游戏 Top100 榜单中，各榜单（平台/国家/类型）当前排名前五的游戏，以及其最近四周的排名趋势（rank_date 与 rank）。",
-        "请根据这些数据，用 2～4 句中文写一段「Top5 异动简述」，概括：本周是否有登顶、是否有掉出第一、以及整体趋势（如谁在上升、谁在下降、是否稳定）。",
-        "不要列举具体数字，只要概括性陈述。",
+        "以下为 SensorTower 休闲游戏 Top100 榜单中，各榜单（平台/国家/类型）当前排名前五的游戏，以及其最近四周的排名趋势。",
+        "每个游戏带有 current_rank（当前周排名，1=榜首 2=第二 … 5=第五），trend 为按时间从新到旧的 (rank_date, rank) 列表，第一条即「当前周」数据。",
         "",
-        "当你在陈述中提到具体游戏时，请使用 Markdown 链接格式书写游戏名，例如 `[游戏名](链接)`。",
-        "下面是可用的游戏名及其链接，请在需要时引用（不必全部用上）：",
+        "请严格根据数据写一段「Top5 异动简述」（2～4 句中文）：",
+        "1. 「登顶」仅指：当前周 current_rank 为 1，且 trend 中前一周或更早曾出现过 rank 非 1（即本周新上第一）。若某游戏 current_rank 不是 1，切勿说其登顶。",
+        "2. 「掉出第一」仅指：当前周 current_rank 非 1，且 trend 中前一周 rank 为 1（即本周从第一滑落）。",
+        "3. 可概括整体趋势（谁在上升、谁在下降、是否稳定），不要列举具体数字。",
+        "4. 避免编造「转而在某市场登顶」「从 A 市场转战 B 市场」等故事性叙述，除非数据非常明确；更倾向使用「在 X 市场持续领跑 / 表现强势 / 保持领先」等中性表述。",
+        "5. 若同时涉及「免费榜」（chart_type = free）与「畅销榜」（chart_type = grossing），请尽量分开描述：免费榜一行、畅销榜一行，例如：第一行以「免费榜方面，……」开头，换行后第二行以「畅销榜方面，……」开头，使逻辑更清晰。若只涉及其中一种榜单，则只写对应的一行即可。",
+        "",
+        "陈述中提到具体游戏时，请使用 Markdown 链接格式 `[游戏名](链接)`。下面为可用游戏名及链接（不必全用）：",
     ]
     for entry in link_entries:
         lines.append(f"- {entry['name']}：{entry['url']}")

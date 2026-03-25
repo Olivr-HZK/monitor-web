@@ -27,3 +27,9 @@ public/*.db
 *.njsproj
 *.sln
 *.sw?
+
+# Python cache / virtualenv (避免打包到别的电脑也带缓存产物)
+__pycache__/
+*.pyc
+.venv/
+backend/.venv/

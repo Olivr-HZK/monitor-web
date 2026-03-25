@@ -7,6 +7,11 @@ interface ChatMessage {
   content: string;
 }
 
+type StreamEvent = {
+  event: string;
+  data: Record<string, unknown> | null;
+};
+
 const AiChatWidget = () => {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -41,7 +46,85 @@ const AiChatWidget = () => {
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
     setLoading(true);
-    try {
+    const assistantId = `${Date.now()}-assistant`;
+    setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+
+    const updateAssistant = (appendText: string) => {
+      if (!appendText) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}${appendText}` } : m))
+      );
+    };
+
+    const streamChat = async (): Promise<string> => {
+      const resp = await fetch(getApiUrl('/api/ai/chat/stream'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          message: text,
+          history: nextMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      if (resp.status === 401) throw new Error('UNAUTHORIZED');
+      if (!resp.ok || !resp.body) throw new Error('STREAM_HTTP_ERROR');
+
+      const decoder = new TextDecoder();
+      const reader = resp.body.getReader();
+      let buffer = '';
+      let answer = '';
+
+      const parseSse = (block: string): StreamEvent | null => {
+        const lines = block.split('\n');
+        let event = 'message';
+        let dataRaw = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          if (line.startsWith('data:')) dataRaw += line.slice(5).trim();
+        }
+        if (!dataRaw) return null;
+        try {
+          return { event, data: JSON.parse(dataRaw) as Record<string, unknown> };
+        } catch {
+          return null;
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop() || '';
+        for (const block of blocks) {
+          const evt = parseSse(block);
+          if (!evt) continue;
+          if (evt.event === 'delta') {
+            const delta = typeof evt.data?.delta === 'string' ? evt.data.delta : '';
+            if (delta) {
+              answer += delta;
+              updateAssistant(delta);
+            }
+          } else if (evt.event === 'done') {
+            const finalAnswer = typeof evt.data?.answer === 'string' ? evt.data.answer : '';
+            if (finalAnswer && !answer) {
+              answer = finalAnswer;
+              updateAssistant(finalAnswer);
+            }
+            return answer || finalAnswer;
+          } else if (evt.event === 'error') {
+            const msg = typeof evt.data?.error === 'string' ? evt.data.error : 'AI 流式接口异常';
+            throw new Error(msg || 'AI 流式接口异常');
+          }
+        }
+      }
+      if (!answer.trim()) throw new Error('EMPTY_STREAM_ANSWER');
+      return answer;
+    };
+
+    const fallbackChat = async (): Promise<string> => {
       const resp = await fetch(getApiUrl('/api/ai/chat'), {
         method: 'POST',
         headers: {
@@ -53,32 +136,37 @@ const AiChatWidget = () => {
           history: nextMessages.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
-      if (resp.status === 401) {
-        setError('请先登录后再使用 AI 助手。');
-        setLoading(false);
-        return;
-      }
+      if (resp.status === 401) throw new Error('UNAUTHORIZED');
       if (!resp.ok) {
         const data = await resp.json().catch(() => null);
-        setError(data?.error || '调用 AI 接口失败，请稍后重试。');
-        setLoading(false);
-        return;
+        throw new Error(data?.error || '调用 AI 接口失败，请稍后重试。');
       }
       const data = await resp.json();
       const answer = typeof data?.answer === 'string' ? data.answer.trim() : '';
-      if (!answer) {
-        setError('AI 返回内容为空，请稍后重试。');
-        setLoading(false);
-        return;
+      if (!answer) throw new Error('AI 返回内容为空，请稍后重试。');
+      return answer;
+    };
+
+    try {
+      let answer = '';
+      try {
+        answer = await streamChat();
+      } catch {
+        answer = await fallbackChat();
       }
-      const assistantMsg: ChatMessage = {
-        id: `${Date.now()}-assistant`,
-        role: 'assistant',
-        content: answer,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, content: answer } : m))
+      );
     } catch (e) {
-      setError('网络异常，暂时无法连接 AI。');
+      const msg = e instanceof Error ? e.message : '';
+      setMessages((prev) => prev.filter((m) => m.id !== assistantId || (m.content || '').trim() !== ''));
+      if (msg === 'UNAUTHORIZED') {
+        setError('请先登录后再使用 AI 助手。');
+      } else if (msg && !['STREAM_HTTP_ERROR', 'EMPTY_STREAM_ANSWER'].includes(msg)) {
+        setError(msg);
+      } else {
+        setError('网络异常，暂时无法连接 AI。');
+      }
     } finally {
       setLoading(false);
     }
@@ -202,4 +290,3 @@ const AiChatWidget = () => {
 };
 
 export default AiChatWidget;
-

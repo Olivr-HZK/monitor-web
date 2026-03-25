@@ -8,7 +8,13 @@ import type { MonitorType } from '../types';
 const HomePage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { monitorItems, weeklyReports, aiProductRankings } = useData();
+  const {
+    monitorItems,
+    weeklyReports,
+    aiCreativeLibraryNewItems,
+    aiCreativeLibraryHotItems,
+    aiCreativeLibrarySurgeItems,
+  } = useData();
 
   const homeStats = useMemo(() => {
     const byType = {
@@ -25,10 +31,13 @@ const HomePage = () => {
     return {
       totalItems: monitorItems.length,
       weeklyReports: weeklyReports.length,
-      aiProductRankings: aiProductRankings.length,
+      aiProductRankings:
+        aiCreativeLibraryNewItems.length +
+        aiCreativeLibraryHotItems.length +
+        aiCreativeLibrarySurgeItems.length,
       byType,
     };
-  }, [monitorItems, weeklyReports, aiProductRankings]);
+  }, [monitorItems, weeklyReports, aiCreativeLibraryNewItems, aiCreativeLibraryHotItems, aiCreativeLibrarySurgeItems]);
 
   const handleTypeSelect = (type: MonitorType | '全部') => {
     if (type === '全部') {
@@ -74,7 +83,7 @@ const HomePage = () => {
                   </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs uppercase text-slate-400">AI 榜单</div>
+                  <div className="text-xs uppercase text-slate-400">AI 素材榜</div>
                   <div className="mt-2 text-2xl font-semibold text-amber-600">
                     {homeStats.aiProductRankings.toLocaleString()}
                   </div>
@@ -115,7 +124,7 @@ const HomePage = () => {
               {
                 type: 'AI产品监测' as const,
                 title: 'AI 产品',
-                description: '汇总产品周报、UA 素材与竞品动态。',
+                description: '汇总产品周报、UA 素材与素材库榜单。',
                 accent: 'from-amber-500/10 via-orange-400/5 to-transparent',
                 glow: 'shadow-sm',
                 value: homeStats.byType.AI产品监测,

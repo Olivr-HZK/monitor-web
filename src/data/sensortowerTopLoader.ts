@@ -5,6 +5,8 @@ import type {
   AppStoreInfo,
   GameStoreInfo,
   SensorTowerStoreChangeItem,
+  SensorTowerRemovedGameItem,
+  SensorTowerTop5OverviewItem,
 } from '../types';
 
 type GetDataUrl = (filename: string) => string;
@@ -97,6 +99,78 @@ function parseScreenshotUrls(raw?: string): string[] {
     .map((item) => item.trim())
     .filter((item) => item);
   return candidates;
+}
+
+function stripLooseQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function splitTopLevel(input: string): string[] {
+  const result: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i];
+    if (ch === '{' || ch === '[') depth += 1;
+    if (ch === '}' || ch === ']') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) {
+      result.push(input.slice(start, i));
+      start = i + 1;
+    }
+  }
+  result.push(input.slice(start));
+  return result.map((s) => s.trim()).filter(Boolean);
+}
+
+function parseLooseMap(raw: string): Record<string, string> {
+  let s = (raw || '').trim();
+  if (!s) return {};
+  if (s.startsWith('{') && s.endsWith('}')) {
+    s = s.slice(1, -1);
+  }
+  const result: Record<string, string> = {};
+  let i = 0;
+  while (i < s.length) {
+    while (i < s.length && (s[i] === ' ' || s[i] === ',')) i += 1;
+    if (i >= s.length) break;
+    const keyStart = i;
+    while (i < s.length && s[i] !== ':') i += 1;
+    if (i >= s.length) break;
+    const key = stripLooseQuotes(s.slice(keyStart, i).trim());
+    i += 1;
+    let depth = 0;
+    const valStart = i;
+    while (i < s.length) {
+      const ch = s[i];
+      if (ch === '{' || ch === '[') depth += 1;
+      if (ch === '}' || ch === ']') depth = Math.max(0, depth - 1);
+      if (ch === ',' && depth === 0) break;
+      i += 1;
+    }
+    const value = s.slice(valStart, i).trim();
+    if (key) result[key] = value;
+    if (i < s.length && s[i] === ',') i += 1;
+  }
+  return result;
+}
+
+function parseChangedFields(raw?: string): string[] {
+  const text = (raw || '').trim();
+  if (!text) return [];
+  let s = text;
+  if (s.startsWith('[') && s.endsWith(']')) {
+    s = s.slice(1, -1);
+  }
+  return splitTopLevel(s)
+    .map((item) => stripLooseQuotes(item).trim())
+    .filter(Boolean);
 }
 
 function parseChangesJson(
@@ -701,83 +775,191 @@ export async function loadSensorTowerStoreChanges(
   if (!db) return [];
 
   const results: SensorTowerStoreChangeItem[] = [];
-  const tables: Array<{ name: string; platform: 'iOS' | 'Android' }> = [
-    { name: 'appstoreinfo_changes', platform: 'iOS' },
-    { name: 'gamestoreinfo_changes', platform: 'Android' },
-  ];
+  const iosInfoMap = loadStoreInfoMap(db, 'iOS');
+  const androidInfoMap = loadStoreInfoMap(db, 'Android');
 
-  for (const { name, platform } of tables) {
-    try {
-      const infoMap = loadStoreInfoMap(db, platform);
-      // 读取最近若干个 rank_date（放宽到最近 30 天），而不是只取最新一天
-      const dateStmt = db.prepare(`SELECT DISTINCT rank_date FROM ${name} ORDER BY rank_date DESC LIMIT 30`);
-      const rankDates: string[] = [];
-      while (dateStmt.step()) {
-        const row = dateStmt.getAsObject() as any;
-        const d = String(row.rank_date ?? '');
-        if (d) rankDates.push(d);
-      }
-      dateStmt.free();
-      if (rankDates.length === 0) continue;
-
-      let index = 0;
-      for (const rankDate of rankDates) {
-        const stmt = db.prepare(
-          `SELECT app_id, rank_date, changed_at, changes_json
-           FROM ${name}
-           WHERE rank_date = ?
-           ORDER BY changed_at DESC, id DESC`
-        );
-        stmt.bind([rankDate]);
-        while (stmt.step()) {
-          const row = stmt.getAsObject() as any;
-          const appId = String(row.app_id ?? '');
-          const info = infoMap.get(appId);
-          const appName = info?.name || appId;
-          const developer = info?.developer;
-          const storeUrl = info?.storeUrl;
-          const changedAt = String(row.changed_at ?? '');
-          const {
-            summaries,
-            screenshotUrls,
-            screenshotBefore,
-            screenshotAfter,
-            iconBefore,
-            iconAfter,
-            videoImagesBefore,
-            videoImagesAfter,
-            priority,
-            priorityLabel,
-            hasMeaningfulChange,
-          } = parseChangesJson(String(row.changes_json ?? ''));
-          if (!hasMeaningfulChange && summaries.length === 0) continue;
-          results.push({
-            id: `st-store-change-${platform}-${rankDate}-${appId}-${index++}`,
-            appId,
-            platform,
-            rankDate,
-            changedAt,
-            appName,
-            developer,
-            summaries,
-            storeUrl,
-            screenshotUrls,
-            screenshotBefore,
-            screenshotAfter,
-            iconBefore,
-            iconAfter,
-            videoImagesBefore,
-            videoImagesAfter,
-            priority,
-            priorityLabel,
-          });
-        }
-        stmt.free();
-      }
-    } catch (e) {
-      console.error(`Error reading ${name} from sensortower_top100.db:`, e);
+  try {
+    const dateStmt = db.prepare(
+      `SELECT DISTINCT rank_date FROM weekly_metadata_changes ORDER BY rank_date DESC LIMIT 30`
+    );
+    const rankDates: string[] = [];
+    while (dateStmt.step()) {
+      const row = dateStmt.getAsObject() as any;
+      const d = String(row.rank_date ?? '');
+      if (d) rankDates.push(d);
     }
+    dateStmt.free();
+    if (rankDates.length === 0) return results;
+
+    const snapshotMap = new Map<string, string[]>();
+    try {
+      const snapshotStmt = db.prepare(
+        `SELECT rank_date, app_id, os, screenshot_urls FROM weekly_metadata_snapshot
+         WHERE rank_date IN (${rankDates.map(() => '?').join(',')})`
+      );
+      snapshotStmt.bind(rankDates);
+      while (snapshotStmt.step()) {
+        const row = snapshotStmt.getAsObject() as any;
+        const key = `${String(row.rank_date ?? '')}|${String(row.app_id ?? '')}|${String(row.os ?? '').toLowerCase()}`;
+        snapshotMap.set(key, parseScreenshotUrls(String(row.screenshot_urls ?? '')));
+      }
+      snapshotStmt.free();
+    } catch (e) {
+      console.warn('Error reading weekly_metadata_snapshot from sensortower_top100.db:', e);
+    }
+
+    let index = 0;
+    const stmt = db.prepare(
+      `SELECT rank_date, app_id, os, app_name, changed_fields, old_values, new_values, detected_at
+       FROM weekly_metadata_changes
+       WHERE rank_date IN (${rankDates.map(() => '?').join(',')})
+       ORDER BY rank_date DESC, detected_at DESC, id DESC`
+    );
+    stmt.bind(rankDates);
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as any;
+      const appId = String(row.app_id ?? '');
+      const os = String(row.os ?? '').toLowerCase();
+      const platform: 'iOS' | 'Android' = os === 'android' ? 'Android' : 'iOS';
+      const infoMap = platform === 'Android' ? androidInfoMap : iosInfoMap;
+      const info = infoMap.get(appId);
+      const changedFields = parseChangedFields(String(row.changed_fields ?? ''));
+      const oldMap = parseLooseMap(String(row.old_values ?? ''));
+      const newMap = parseLooseMap(String(row.new_values ?? ''));
+
+      const summaries: string[] = [];
+      let screenshotBefore = parseScreenshotUrls(oldMap.screenshot_urls);
+      let screenshotAfter = parseScreenshotUrls(newMap.screenshot_urls);
+      const snapshotKey = `${String(row.rank_date ?? '')}|${appId}|${os}`;
+      if (screenshotAfter.length === 0 && snapshotMap.has(snapshotKey)) {
+        screenshotAfter = snapshotMap.get(snapshotKey) ?? [];
+      }
+      const screenshotChanged = changedFields.includes('screenshot_urls');
+      const nameChanged = changedFields.includes('name');
+      const descriptionChanged =
+        changedFields.includes('description') || changedFields.includes('short_description');
+
+      if (screenshotChanged) summaries.push('截图已更新');
+      if (nameChanged) summaries.push('名称已更新');
+      if (descriptionChanged) summaries.push('描述已更新');
+
+      if (summaries.length === 0) continue;
+
+      results.push({
+        id: `st-store-change-${platform}-${row.rank_date}-${appId}-${index++}`,
+        appId,
+        platform,
+        rankDate: String(row.rank_date ?? ''),
+        changedAt: String(row.detected_at ?? row.rank_date ?? ''),
+        appName: String(row.app_name ?? '') || info?.name || appId,
+        developer: info?.developer,
+        summaries,
+        storeUrl: info?.storeUrl,
+        screenshotUrls: screenshotAfter.length > 0 ? screenshotAfter.slice(0, 6) : undefined,
+        screenshotBefore: screenshotBefore.length > 0 ? screenshotBefore.slice(0, 6) : undefined,
+        screenshotAfter: screenshotAfter.length > 0 ? screenshotAfter.slice(0, 6) : undefined,
+        iconBefore: undefined,
+        iconAfter: undefined,
+        videoImagesBefore: undefined,
+        videoImagesAfter: undefined,
+        priority: screenshotChanged ? 2 : 0,
+        priorityLabel: screenshotChanged ? '最高' : '普通',
+      });
+    }
+    stmt.free();
+  } catch (e) {
+    console.error('Error reading weekly_metadata_changes from sensortower_top100.db:', e);
   }
 
   return results;
+}
+
+export async function loadSensorTowerRemovedGames(
+  getDataUrl?: GetDataUrl
+): Promise<SensorTowerRemovedGameItem[]> {
+  const db = await getSensorTowerDatabase(getDataUrl);
+  if (!db) return [];
+
+  const result: SensorTowerRemovedGameItem[] = [];
+  const metaMap = loadAppMetadataMap(db);
+  try {
+    const dateStmt = db.prepare(
+      `SELECT DISTINCT rank_date FROM weekly_removed_games WHERE removed = 1 ORDER BY rank_date DESC LIMIT ${RANK_WEEKS_LIMIT}`
+    );
+    const rankDates: string[] = [];
+    while (dateStmt.step()) {
+      const row = dateStmt.getAsObject() as any;
+      const d = String(row.rank_date ?? '');
+      if (d) rankDates.push(d);
+    }
+    dateStmt.free();
+    if (rankDates.length === 0) return result;
+
+    const stmt = db.prepare(
+      `SELECT rank_date, os, country, chart_type, app_id, app_name, store_url, reason
+       FROM weekly_removed_games
+       WHERE removed = 1 AND rank_date IN (${rankDates.map(() => '?').join(',')})
+       ORDER BY rank_date DESC, os, country, chart_type, app_name`
+    );
+    stmt.bind(rankDates);
+    let index = 0;
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as any;
+      const os = String(row.os ?? '').toLowerCase();
+      const platform: 'iOS' | 'Android' = os === 'android' ? 'Android' : 'iOS';
+      const appId = String(row.app_id ?? '');
+      const meta = metaMap.get(metadataKey(appId, platform));
+      result.push({
+        id: `st-removed-${String(row.rank_date ?? '')}-${platform}-${appId}-${index++}`,
+        rankDate: String(row.rank_date ?? ''),
+        platform,
+        country: String(row.country ?? ''),
+        chartType: String(row.chart_type ?? ''),
+        appId,
+        appName: String(row.app_name ?? '') || meta?.name || appId,
+        storeUrl: String(row.store_url ?? '') || meta?.url || undefined,
+        reason: String(row.reason ?? '').trim() || undefined,
+      });
+    }
+    stmt.free();
+  } catch (e) {
+    console.error('Error reading weekly_removed_games from sensortower_top100.db:', e);
+  }
+
+  return result;
+}
+
+export async function loadSensorTowerTop5Overview(
+  getDataUrl?: GetDataUrl
+): Promise<SensorTowerTop5OverviewItem[]> {
+  const db = await getSensorTowerDatabase(getDataUrl);
+  if (!db) return [];
+
+  const result: SensorTowerTop5OverviewItem[] = [];
+  try {
+    const stmt = db.prepare(
+      `SELECT rank_date, statement, trend_json, model_used, created_at
+       FROM weekly_top5_overview
+       ORDER BY rank_date DESC
+       LIMIT ${RANK_WEEKS_LIMIT}`
+    );
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as any;
+      const statement = String(row.statement ?? '').trim();
+      const rankDate = String(row.rank_date ?? '').trim();
+      if (!rankDate || !statement) continue;
+      result.push({
+        rankDate,
+        statement,
+        trendJson: row.trend_json != null ? String(row.trend_json) : undefined,
+        modelUsed: row.model_used != null ? String(row.model_used) : undefined,
+        createdAt: row.created_at != null ? String(row.created_at) : undefined,
+      });
+    }
+    stmt.free();
+  } catch (e) {
+    console.error('Error reading weekly_top5_overview from sensortower_top100.db:', e);
+  }
+
+  return result;
 }

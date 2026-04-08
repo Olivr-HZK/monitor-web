@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAiPageContext } from '../context/AiPageContext';
 import { getApiUrl, parseApiErrorBody } from '../utils/api';
+import { ChatMarkdown } from './ChatMarkdown';
 
 const STORAGE_KEY_V3 = 'ai-chat-sessions-v3';
 const STORAGE_KEY_V2 = 'ai-chat-sessions-v2';
@@ -597,19 +598,31 @@ const AiChatWidget = () => {
                   </div>
                 </div>
               )}
-              {messages.map((m) => (
+              {messages.map((m, idx) => {
+                const streamPlain = Boolean(
+                  loading && m.role === 'assistant' && idx === messages.length - 1
+                );
+                return (
                 <div
                   key={m.id}
                   className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[88%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${
+                    className={`max-w-[88%] min-w-0 rounded-2xl px-3 py-2 break-words ${
+                      streamPlain ? 'whitespace-pre-wrap' : ''
+                    } ${
                       m.role === 'user'
                         ? 'bg-blue-600 text-white rounded-br-sm'
                         : 'bg-white text-slate-900 border border-slate-200 rounded-bl-sm'
                     }`}
                   >
-                    {m.content}
+                    {streamPlain ? (
+                      <span className="text-[13px] leading-relaxed">{m.content}</span>
+                    ) : m.role === 'user' ? (
+                      <ChatMarkdown content={m.content} variant="user" />
+                    ) : (
+                      <ChatMarkdown content={m.content} variant="assistant" />
+                    )}
                     {m.role === 'assistant' && m.intentMeta && (
                       <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 leading-snug space-y-0.5">
                         <div className="font-medium text-slate-600">本次规划（意图识别）</div>
@@ -630,7 +643,8 @@ const AiChatWidget = () => {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {loading && (
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span className="h-2 w-2 rounded-full bg-slate-300 animate-pulse" />

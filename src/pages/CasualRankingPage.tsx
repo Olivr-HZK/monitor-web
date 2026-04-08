@@ -1,11 +1,16 @@
 import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import GameRankingView from '../components/GameRankingView';
 import SensorTowerTopTable from '../components/SensorTowerTopTable';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useData } from '../context/DataContext';
+import { stateWithReturnTo, useNavigateBack } from '../utils/navigation';
 
 const CasualRankingPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const goBack = useNavigateBack('/type/休闲游戏监测');
+  const { setPageMeta } = useAiPageContext();
   const { section } = useParams();
   const { dataLoading, wechatDouyinRankings, sensorTowerTopItems, sensorTowerRankChangeItems } = useData();
 
@@ -16,6 +21,16 @@ const CasualRankingPage = () => {
       navigate('/type/休闲游戏监测', { replace: true });
     }
   }, [normalized, navigate]);
+
+  useEffect(() => {
+    if (!normalized) return;
+    setPageMeta({
+      pageKind: 'casual_rankings',
+      monitorType: '休闲游戏监测',
+      pageTitle: normalized === 'wechat_douyin' ? '微信/抖音小游戏排行榜' : 'SensorTower Top100 榜单',
+      rankingSection: normalized,
+    });
+  }, [normalized, setPageMeta]);
 
   if (!normalized) return null;
 
@@ -33,14 +48,18 @@ const CasualRankingPage = () => {
         {normalized === 'wechat_douyin' ? (
           <GameRankingView
             rankings={wechatDouyinRankings}
-            onBack={() => navigate(-1)}
-            onGameNameClick={(name) => navigate(`/gameplay/wechat_douyin/${encodeURIComponent(name)}`)}
+            onBack={goBack}
+            onGameNameClick={(name) =>
+              navigate(`/gameplay/wechat_douyin/${encodeURIComponent(name)}`, {
+                state: stateWithReturnTo(location),
+              })
+            }
           />
         ) : (
           <SensorTowerTopTable
             items={sensorTowerTopItems}
             rankChangeItems={sensorTowerRankChangeItems}
-            onBack={() => navigate(-1)}
+            onBack={goBack}
           />
         )}
       </div>

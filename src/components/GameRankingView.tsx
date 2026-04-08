@@ -8,7 +8,7 @@ interface GameRankingViewProps {
   selectedPlatform?: GameRankingType | null;
   /** 从休闲游戏监测跳转时传入，显示返回按钮 */
   onBack?: () => void;
-  /** 点击游戏名时跳转（仅微信/抖音小游戏时使用，如跳转玩法解析页） */
+  /** 点击游戏名时跳转（仅微信/抖音小游戏 Top20，如跳转玩法解析页） */
   onGameNameClick?: (gameName: string) => void;
 }
 

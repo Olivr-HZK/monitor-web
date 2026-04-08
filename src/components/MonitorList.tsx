@@ -3,6 +3,44 @@ import type { MonitorItem, MonitorType } from '../types';
 import type { GamePlatformKey, CasualGameMainCategory, CasualGameCompetitorSub, AiProductSubCategory } from '../types';
 import MonitorCard from './MonitorCard';
 
+/** 与侧栏结构对齐：监测类型 → 数据块（微信/抖音 或 SensorTower，或竞品）→ 子项 */
+function getCasualGameHeading(
+  selectedCasualSourceSection: 'wechat_douyin' | 'sensortower' | undefined,
+  selectedCasualGameCategory: CasualGameMainCategory | null | undefined,
+  selectedGamePlatform: GamePlatformKey | null | undefined,
+  selectedCasualGameCompetitorSub: CasualGameCompetitorSub | null | undefined
+): { crumbs: string[]; headline: string } {
+  const root = '休闲游戏监测';
+  if (selectedCasualGameCategory === '竞品') {
+    const sub =
+      selectedCasualGameCompetitorSub === '社媒更新'
+        ? '社媒监控'
+        : selectedCasualGameCompetitorSub === 'UA素材'
+          ? 'UA素材'
+          : '竞品动态';
+    return {
+      crumbs: [root, '竞品监测', sub],
+      /** 与周报简要等一致：主标题只保留叶子，避免与面包屑重复「竞品监测」 */
+      headline: sub,
+    };
+  }
+  const section =
+    selectedCasualSourceSection === 'sensortower'
+      ? 'SensorTower 榜单'
+      : '微信 / 抖音小游戏';
+  const cat = selectedCasualGameCategory ?? '周报简要';
+  if (cat === '新游戏' && selectedGamePlatform) {
+    return {
+      crumbs: [root, section, '新游戏', selectedGamePlatform],
+      headline: `新游戏 · ${selectedGamePlatform}`,
+    };
+  }
+  return {
+    crumbs: [root, section, cat],
+    headline: cat,
+  };
+}
+
 interface MonitorListProps {
   items: MonitorItem[];
   selectedType?: MonitorType | '全部';
@@ -257,13 +295,55 @@ const MonitorList = ({
     storeChangeSearch,
   ]);
 
+  const casualHeading =
+    selectedType === '休闲游戏监测'
+      ? getCasualGameHeading(
+          selectedCasualSourceSection,
+          selectedCasualGameCategory,
+          selectedGamePlatform,
+          selectedCasualGameCompetitorSub
+        )
+      : null;
+
   return (
     <div className="flex-1">
       {/* Title + optional action */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-slate-900">
-          {pageTitle ?? '监测汇总'}
-        </h1>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="min-w-0 flex-1">
+          {casualHeading ? (
+            <div className="space-y-2">
+              <nav className="text-xs sm:text-sm text-slate-500" aria-label="当前位置">
+                <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {casualHeading.crumbs.map((part, i) => (
+                    <li key={`${i}-${part}`} className="flex items-center gap-1.5">
+                      {i > 0 && (
+                        <span className="text-slate-300 select-none" aria-hidden>
+                          /
+                        </span>
+                      )}
+                      <span
+                        className={
+                          i === 0
+                            ? 'text-slate-400'
+                            : i === casualHeading.crumbs.length - 1
+                              ? 'font-medium text-slate-600'
+                              : 'text-slate-500'
+                        }
+                      >
+                        {part}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                {casualHeading.headline}
+              </h1>
+            </div>
+          ) : (
+            <h1 className="text-3xl font-bold text-slate-900">{pageTitle ?? '监测汇总'}</h1>
+          )}
+        </div>
         {headerAction}
       </div>
 

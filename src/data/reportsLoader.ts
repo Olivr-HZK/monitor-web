@@ -7,6 +7,10 @@
 
 import Papa from 'papaparse';
 import type { GameRanking, GameRankingItem, GameRankingType, WechatDouyinRankingsByWeek } from '../types';
+import {
+  isNewEntrantToTop10,
+  parseMinigameSurgeDelta,
+} from '../utils/minigameRankChange';
 import type { MonitorItem, ReportDocument, CasualGameMainCategory } from '../types';
 import type { GamePlatformKey } from '../types';
 
@@ -850,121 +854,48 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
 
   const items: MonitorItem[] = [];
 
-  // 辅助函数：按周读取微信 / 抖音 Top20，用于「一、本周微信抖音 Top20」部分
-  const loadTop20ForWeek = (weekRange: string) => {
-    const wx: { rank: string; game_name: string; company: string; rank_change: string }[] = [];
-    const dy: { rank: string; game_name: string; company: string; rank_change: string }[] = [];
-    try {
-      const wxStmt = db.prepare(
-        `SELECT rank, game_name, company, rank_change 
-         FROM top20_ranking 
-         WHERE platform_key = 'wx' AND week_range = ? 
-         ORDER BY CAST(rank AS INTEGER) ASC`
-      );
-      wxStmt.bind([weekRange]);
-      while (wxStmt.step()) {
-        const row: any = wxStmt.getAsObject();
-        const rc = row.rank_change ?? row.RANK_CHANGE;
-        wx.push({
-          rank: String(row.rank ?? ''),
-          game_name: String(row.game_name ?? ''),
-          company: String(row.company ?? ''),
-          rank_change: rc != null && String(rc).trim() !== '' ? String(rc).trim() : '',
-        });
-      }
-      wxStmt.free();
-    } catch {
-      // ignore wx error, fallback to仅榜单异动
-    }
-
-    try {
-      const dyStmt = db.prepare(
-        `SELECT rank, game_name, company, rank_change 
-         FROM top20_ranking 
-         WHERE platform_key = 'dy' AND week_range = ? 
-         ORDER BY CAST(rank AS INTEGER) ASC`
-      );
-      dyStmt.bind([weekRange]);
-      while (dyStmt.step()) {
-        const row: any = dyStmt.getAsObject();
-        const rc = row.rank_change ?? row.RANK_CHANGE;
-        dy.push({
-          rank: String(row.rank ?? ''),
-          game_name: String(row.game_name ?? ''),
-          company: String(row.company ?? ''),
-          rank_change: rc != null && String(rc).trim() !== '' ? String(rc).trim() : '',
-        });
-      }
-      dyStmt.free();
-    } catch {
-      // ignore dy error
-    }
-
-    return { wx, dy };
-  };
-
   for (const [weekRange, weekRows] of byWeek) {
     const lines: string[] = [];
     lines.push(`**监控时间**：${weekRange}`);
     lines.push('');
 
-    const { wx, dy } = loadTop20ForWeek(weekRange);
+    const parseRankNum = (s: string): number | null => {
+      const n = parseInt(String(s || '').trim(), 10);
+      return Number.isNaN(n) ? null : n;
+    };
 
-    // 一、本周微信小游戏 Top20
-    lines.push('## 一、本周微信小游戏 Top20');
+    const newTop10Rows = weekRows.filter((r) => {
+      const rk = parseRankNum(r.rank);
+      if (rk === null) return false;
+      return isNewEntrantToTop10(rk, r.rank_change);
+    });
+    const sortedNewTop10 = [...newTop10Rows].sort((a, b) => {
+      const pa = a.platform_key === 'wx' ? 0 : 1;
+      const pb = b.platform_key === 'wx' ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (parseRankNum(a.rank) ?? 0) - (parseRankNum(b.rank) ?? 0);
+    });
+
+    const newTopKeysBrief = new Set(
+      sortedNewTop10.map((r) => `${r.platform_key}\t${(r.game_name || '').trim()}`)
+    );
+    const surgeRows = [...weekRows]
+      .map((r) => ({ r, delta: parseMinigameSurgeDelta(r.rank_change) }))
+      .filter((x) => x.delta > 0)
+      .filter((x) => !newTopKeysBrief.has(`${x.r.platform_key}\t${(x.r.game_name || '').trim()}`))
+      .sort((a, b) => {
+        if (b.delta !== a.delta) return b.delta - a.delta;
+        return (parseRankNum(a.r.rank) ?? 999) - (parseRankNum(b.r.rank) ?? 999);
+      })
+      .slice(0, 10)
+      .map((x) => x.r);
+
+    lines.push('## 一、新进 Top10（本周进入 Top10，上周不在 Top10）');
     lines.push('');
-    if (wx.length > 0) {
-      lines.push('| 排名 | 游戏名 | 开发公司 | 排名变化 |');
-      lines.push('|------|--------|----------|----------|');
-      wx.forEach((r) => {
-        const rank = r.rank || '—';
-        const name = r.game_name || '—';
-        const company = r.company || '—';
-        const change = r.rank_change || '—';
-        lines.push(`| ${rank} | ${name} | ${company} | ${change} |`);
-      });
-      lines.push('');
-    } else {
-      lines.push('本周未读取到微信小游戏 Top20 榜单数据。');
-      lines.push('');
-    }
-
-    // 二、本周抖音小游戏 Top20
-    lines.push('## 二、本周抖音小游戏 Top20');
-    lines.push('');
-    if (dy.length > 0) {
-      lines.push('| 排名 | 游戏名 | 开发公司 | 排名变化 |');
-      lines.push('|------|--------|----------|----------|');
-      dy.forEach((r) => {
-        const rank = r.rank || '—';
-        const name = r.game_name || '—';
-        const company = r.company || '—';
-        const change = r.rank_change || '—';
-        lines.push(`| ${rank} | ${name} | ${company} | ${change} |`);
-      });
-      lines.push('');
-    } else {
-      lines.push('本周未读取到抖音小游戏 Top20 榜单数据。');
-      lines.push('');
-    }
-
-    // 三、本周榜单异动：展示微信 + 抖音全部异动数据
-    lines.push('## 三、本周榜单异动');
-    lines.push('');
-
-    if (weekRows.length > 0) {
-      const sortedChanges = [...weekRows].sort((a, b) => {
-        const pa = a.platform_key === 'wx' ? 0 : 1;
-        const pb = b.platform_key === 'wx' ? 0 : 1;
-        if (pa !== pb) return pa - pb;
-        const ra = parseInt((a.rank || '').trim() || '0', 10);
-        const rb = parseInt((b.rank || '').trim() || '0', 10);
-        return ra - rb;
-      });
-
+    if (sortedNewTop10.length > 0) {
       lines.push('| 排名 | 游戏名 | 平台 | 开发公司 | 排名变化 | 异动类型 |');
       lines.push('|------|--------|------|----------|----------|----------|');
-      sortedChanges.forEach((r) => {
+      sortedNewTop10.forEach((r) => {
         const rank = (r.rank || '').trim() || '—';
         const platformLabel = WEEKLY_BRIEF_PLATFORM_LABEL[r.platform_key] || r.platform_key;
         const name = (r.game_name || '').trim() || '—';
@@ -975,7 +906,27 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
       });
       lines.push('');
     } else {
-      lines.push('该周暂无榜单异动记录。');
+      lines.push('本周暂无「本周进入 Top10、上周不在 Top10」的记录。');
+      lines.push('');
+    }
+
+    lines.push('## 二、本周排名飙升 Top10');
+    lines.push('');
+    if (surgeRows.length > 0) {
+      lines.push('| 当前排名 | 游戏名 | 平台 | 开发公司 | 排名变化 | 异动类型 |');
+      lines.push('|----------|--------|------|----------|----------|----------|');
+      surgeRows.forEach((r) => {
+        const rank = (r.rank || '').trim() || '—';
+        const platformLabel = WEEKLY_BRIEF_PLATFORM_LABEL[r.platform_key] || r.platform_key;
+        const name = (r.game_name || '').trim() || '—';
+        const company = (r.company || '').trim() || '—';
+        const change = (r.rank_change || '').trim() || '—';
+        const changeType = getChangeTypeFromRankChange(r.rank_change || '');
+        lines.push(`| ${rank} | ${name} | ${platformLabel} | ${company} | ${change} | ${changeType} |`);
+      });
+      lines.push('');
+    } else {
+      lines.push('本周暂无排名飙升（↑）记录。');
       lines.push('');
     }
 
@@ -989,7 +940,7 @@ export async function loadWeeklyBriefFromDb(getDataUrl?: GetDataUrl): Promise<Mo
       tags: ['周报简要', '休闲游戏', '微信小游戏', '抖音小游戏'],
       date: weekRange.split('~')[0]?.replace(/-/g, '-') ?? weekRange,
       source: '引力引擎',
-      summary: `监控时间 ${weekRange}，异动 ${weekRows.length} 款。详细玩法请登录游戏监测网站查看。`,
+      summary: `监控时间 ${weekRange}，新进 Top10 ${sortedNewTop10.length} 款，飙升 Top10 ${surgeRows.length} 款。详细玩法请登录游戏监测网站查看。`,
       content,
     };
     const dateStr = doc.date ?? '';
@@ -1076,7 +1027,11 @@ function mergeWechatDouyinRankingsAllWeeks(byWeek: WechatDouyinRankingsByWeek[])
   }
   const result: GameRanking[] = [];
   const order: GameRankingType[] = ['微信小游戏', '抖音小游戏', '榜单异动'];
-  const titles: Record<string, string> = { '微信小游戏': '微信小游戏 Top20', '抖音小游戏': '抖音小游戏 Top20', '榜单异动': '榜单异动' };
+  const titles: Record<string, string> = {
+    微信小游戏: '微信小游戏 Top20',
+    抖音小游戏: '抖音小游戏 Top20',
+    榜单异动: '榜单异动',
+  };
   const latestWeekRange = byWeek[0]?.weekRange ?? '';
   const updateTimeEnd = parseWeekRangeEnd(latestWeekRange);
   const updateTime = updateTimeEnd ? `${updateTimeEnd} 12:00` : '';

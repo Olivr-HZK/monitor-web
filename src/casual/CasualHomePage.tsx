@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import CasualHeader from './CasualHeader';
 import MonitorList from '../components/MonitorList';
 import Sidebar from '../components/Sidebar';
@@ -7,9 +7,11 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import type { MonitorItem, AiProductSubCategory } from '../types';
 import { useCasualView } from './CasualViewContext';
+import { stateWithReturnTo } from '../utils/navigation';
 
 const CasualHomePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const { dataLoading, monitorItems, weeklyReports } = useData();
 
@@ -29,6 +31,14 @@ const CasualHomePage = () => {
     selectedAiProductSub,
     setSelectedAiProductSub,
   } = useCasualView();
+
+  useEffect(() => {
+    const s = (location.state as { restoreCasualSourceSection?: 'wechat_douyin' | 'sensortower' } | null)
+      ?.restoreCasualSourceSection;
+    if (s === 'sensortower' || s === 'wechat_douyin') {
+      setSelectedCasualSourceSection(s);
+    }
+  }, [location.key, location.state, setSelectedCasualSourceSection]);
 
   const handleAiProductSubSelect = (sub: AiProductSubCategory | null) => {
     setSelectedAiProductSub(sub ?? '产品周报');
@@ -64,7 +74,11 @@ const CasualHomePage = () => {
   };
 
   const handleReportClick = (item: MonitorItem) => {
-    const state = { from: 'list' as const };
+    const state = {
+      from: 'list' as const,
+      returnTo: '/' as const,
+      casualSourceSection: selectedCasualSourceSection,
+    };
     if (item.reportContent && item.reportContent.trim().startsWith('{')) {
       try {
         const data = JSON.parse(item.reportContent) as { kind?: string; cardId?: string };
@@ -86,7 +100,7 @@ const CasualHomePage = () => {
       <CasualHeader user={user} onLogout={logout} />
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex gap-8">
-          <div className="flex-1 space-y-8">
+          <div className="flex-1 min-w-0 space-y-8">
             {selectedType === '休闲游戏监测' ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -99,7 +113,9 @@ const CasualHomePage = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => navigate('/rankings/casual/wechat_douyin')}
+                      onClick={() =>
+                        navigate('/rankings/casual/wechat_douyin', { state: stateWithReturnTo(location) })
+                      }
                       className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,7 +139,9 @@ const CasualHomePage = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => navigate('/rankings/casual/sensortower')}
+                      onClick={() =>
+                        navigate('/rankings/casual/sensortower', { state: stateWithReturnTo(location) })
+                      }
                       className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors border border-violet-200"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,7 +156,7 @@ const CasualHomePage = () => {
                     </button>
                   </div>
 
-                  <div className="bg白 border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900 mb-2">竞品监测</h2>
                       <p className="text-sm text-slate-600 mb-4">

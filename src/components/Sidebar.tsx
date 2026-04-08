@@ -104,7 +104,7 @@ const Sidebar = ({
 
   return (
     <aside className="w-64 flex-shrink-0">
-      <div className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-y-contain rounded-2xl border border-slate-200 bg-white p-4 [scrollbar-gutter:stable]">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">监测源</h2>
 
         {/* All option */}
@@ -256,6 +256,22 @@ const Sidebar = ({
                               </button>
                             );
                           })}
+                        </div>
+                      </div>
+
+                      {/* 我方产品检测（占位，后续接入内容） */}
+                      <div
+                        id="sidebar-casual-own-product"
+                        className="space-y-1 pt-2 border-t border-slate-200 mt-1"
+                      >
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                            🏠
+                          </span>
+                          <span className="font-semibold">我方产品检测</span>
+                        </div>
+                        <div className="ml-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 text-xs text-slate-400">
+                          内容待接入
                         </div>
                       </div>
                     </div>

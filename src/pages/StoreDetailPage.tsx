@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import StoreInfoDetail from '../components/StoreInfoDetail';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useData } from '../context/DataContext';
+import { useSmartBack } from '../utils/navigation';
 
 interface StoreDetailPageProps {
   /** 子项目内使用时传入：从列表点进时返回该路径，从其他详情内链点进仍用 history 后退 */
@@ -9,25 +11,41 @@ interface StoreDetailPageProps {
 }
 
 const StoreDetailPage = ({ backTo }: StoreDetailPageProps) => {
-  const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
   const { dataLoading, sensorTowerStoreCards } = useData();
+  const { setPageMeta } = useAiPageContext();
 
   const fromList = (location.state as { from?: string } | null)?.from === 'list';
-  const handleBack = () => {
-    if (backTo !== undefined && fromList) {
-      navigate(backTo);
-    } else {
-      navigate(-1);
-    }
-  };
+  const handleBack = useSmartBack({
+    fallback: '/type/休闲游戏监测',
+    backTo,
+    fromList,
+  });
 
   const card = useMemo(() => {
     if (!id) return undefined;
     const decoded = decodeURIComponent(id);
     return sensorTowerStoreCards.find((entry) => entry.id === decoded);
   }, [id, sensorTowerStoreCards]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (!card) {
+      setPageMeta({
+        pageKind: 'store_detail',
+        storeId: decodeURIComponent(id),
+        pageTitle: '商店页变化详情',
+      });
+      return;
+    }
+    setPageMeta({
+      pageKind: 'store_detail',
+      storeId: card.id,
+      pageTitle: card.gameName,
+      monitorType: '休闲游戏监测',
+    });
+  }, [id, card, setPageMeta]);
 
   if (dataLoading && !card) {
     return (

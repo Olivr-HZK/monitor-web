@@ -1,15 +1,26 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import AiCreativeLibraryTable from '../components/AiCreativeLibraryTable';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useData } from '../context/DataContext';
+import { useNavigateBack } from '../utils/navigation';
 
 const AiRankingPage = () => {
-  const navigate = useNavigate();
+  const goBack = useNavigateBack('/type/AI产品监测');
+  const { setPageMeta } = useAiPageContext();
   const {
     dataLoading,
     aiCreativeLibraryNewItems,
     aiCreativeLibraryHotItems,
     aiCreativeLibrarySurgeItems,
   } = useData();
+
+  useEffect(() => {
+    setPageMeta({
+      pageKind: 'ai_material_rankings',
+      monitorType: 'AI产品监测',
+      pageTitle: 'AI 产品素材库（新/热/飙升榜）',
+    });
+  }, [setPageMeta]);
 
   if (dataLoading) {
     return (
@@ -31,7 +42,7 @@ const AiRankingPage = () => {
           </div>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

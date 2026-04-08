@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import WeeklyReportDetail from '../components/WeeklyReportDetail';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useData } from '../context/DataContext';
+import { buildForwardNavigationState, useSmartBack } from '../utils/navigation';
 
 interface ReportDetailPageProps {
   /** 子项目内使用时传入：从列表点进时返回该路径，从周报内链点进仍用 history 后退 */
@@ -13,21 +15,34 @@ const ReportDetailPage = ({ backTo }: ReportDetailPageProps) => {
   const location = useLocation();
   const { id } = useParams();
   const { dataLoading, monitorItems, storeChangeItemMap } = useData();
+  const { setPageMeta } = useAiPageContext();
 
   const fromList = (location.state as { from?: string } | null)?.from === 'list';
-  const handleBack = () => {
-    if (backTo !== undefined && fromList) {
-      navigate(backTo);
-    } else {
-      navigate(-1);
-    }
-  };
+  const handleBack = useSmartBack({ fallback: '/', backTo, fromList });
 
   const item = useMemo(() => {
     if (!id) return undefined;
     const decoded = decodeURIComponent(id);
     return monitorItems.find((entry) => entry.id === decoded);
   }, [id, monitorItems]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (!item) {
+      setPageMeta({
+        pageKind: 'report_detail',
+        reportId: decodeURIComponent(id),
+        pageTitle: '监测报告详情',
+      });
+      return;
+    }
+    setPageMeta({
+      pageKind: 'report_detail',
+      reportId: item.id,
+      pageTitle: item.title,
+      monitorType: item.type,
+    });
+  }, [id, item, setPageMeta]);
 
   if (dataLoading && !item) {
     return (
@@ -57,8 +72,16 @@ const ReportDetailPage = ({ backTo }: ReportDetailPageProps) => {
       item={item}
       onBack={handleBack}
       storeChangeItemMap={storeChangeItemMap}
-      onOpenStoreChange={(changeItem) => navigate(`/report/${encodeURIComponent(changeItem.id)}`)}
-      onNavigateToEntry={(entryId) => navigate(`/report/${encodeURIComponent(entryId)}`)}
+      onOpenStoreChange={(changeItem) =>
+        navigate(`/report/${encodeURIComponent(changeItem.id)}`, {
+          state: buildForwardNavigationState(location),
+        })
+      }
+      onNavigateToEntry={(entryId) =>
+        navigate(`/report/${encodeURIComponent(entryId)}`, {
+          state: buildForwardNavigationState(location),
+        })
+      }
     />
   );
 };

@@ -2,7 +2,7 @@
 """
 构建日报/周报内容，并发送到飞书和企业微信：
   1. 热点趋势日报（来自 public/热点/：优先 final_json_from_csv_YYYYMMDD.json，否则 final_json_from_csv.json；摘要 + 本日热点列表）
-  2. 微信/抖音小游戏排行榜（数据来自 public/wechatdouyin.db 的 top20_ranking、rank_changes 两表：微信 Top20、抖音 Top20、异动榜单）
+  2. 微信/抖音小游戏周报（public/wechatdouyin.db 的 rank_changes：新进 Top10、本周排名飙升 Top10，不含 Top20 正文）
   3. SensorTower 周报（来自 public/sensortower_top100.db 的 rank_changes）
 
 飞书：发互动卡片（内容经 _adapt_md_for_feishu 适配）。
@@ -642,13 +642,54 @@ def _pick_wechatdouyin_week_for_report_date(
     return candidates[0][1]
 
 
+def _minigame_last_week_rank(current: int, change: str) -> int | None:
+    raw = (change or "").strip()
+    if "新进榜" in raw:
+        return None
+    is_down = "↓" in raw
+    m = re.search(r"\d+", raw)
+    if not m:
+        return None
+    n = int(m.group())
+    if n <= 0:
+        return None
+    return current - n if is_down else current + n
+
+
+def _minigame_is_new_to_top10(current: int, change: str) -> bool:
+    if current < 1 or current > 10:
+        return False
+    raw = (change or "").strip()
+    if "新进榜" in raw:
+        return True
+    last = _minigame_last_week_rank(current, change)
+    if last is None:
+        return False
+    return last > 10
+
+
+def _minigame_surge_delta(change: str) -> int:
+    raw = (change or "").strip()
+    if "新进榜" in raw:
+        return -1
+    if "↑" not in raw:
+        return -1
+    m = re.search(r"\d+", raw)
+    if not m:
+        return -1
+    n = int(m.group())
+    return n if n > 0 else -1
+
+
 def _build_wechat_douyin_push(
     conn: sqlite3.Connection,
     target_week_range: str | None = None,
     max_top20: int = 5,
     max_changes: int = 5,
 ) -> tuple[str, str]:
-    """从 wechatdouyin.db 的 top20_ranking、rank_changes 构建微信/抖音小游戏周报 Markdown。
+    """从 wechatdouyin.db 的 rank_changes 构建微信/抖音小游戏周报 Markdown（不再包含 Top20 榜单正文）。
+    一、新进 Top10：本周名次在 1–10 且上周不在 Top10（由「新进榜」或 ↑/↓ 推算上周名次）。
+    二、本周排名飙升 Top10：按「↑」幅度取前 10（不含新进榜）。
     返回 (markdown, week_range)；无数据时返回 ('', '')。
     target_week_range：若指定则只生成该周；否则取最新一周（按 week_range 排序取最大）。"""
     lines: list[str] = []
@@ -678,80 +719,91 @@ def _build_wechat_douyin_push(
     lines.append(f"# 微信/抖音小游戏周报-{week_range}")
     lines.append("")
 
-    # 一、微信小游戏 Top20（真实总数 + 前 max_top20 条示例，仅展示排名与名称）
-    try:
-        cur = conn.execute(
-            "SELECT rank, game_name, company, rank_change FROM top20_ranking "
-            "WHERE platform_key = 'wx' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC",
-            (week_range,),
-        )
-        rows = cur.fetchall()
-        if rows:
-            lines.append("## 一、微信小游戏 Top20")
-            lines.append("")
-            total = len(rows)
-            lines.append(f"共 {total} 款，示例 {min(total, max_top20)} 款：")
-            lines.append("")
-            for r in rows[: max_top20]:
-                rank = r[0] if r[0] is not None else "—"
-                name = (r[1] or "—").strip()
-                lines.append(f"- 排名 {rank}：{name}")
-            if total > max_top20:
-                lines.append("- ……")
-            lines.append("")
-    except sqlite3.OperationalError:
-        pass
+    platform_label = {"wx": "微信小游戏", "dy": "抖音小游戏"}
 
-    # 二、抖音小游戏 Top20（真实总数 + 前 max_top20 条示例，仅展示排名与名称）
-    try:
-        cur = conn.execute(
-            "SELECT rank, game_name, company, rank_change FROM top20_ranking "
-            "WHERE platform_key = 'dy' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC",
-            (week_range,),
-        )
-        rows = cur.fetchall()
-        if rows:
-            lines.append("## 二、抖音小游戏 Top20")
-            lines.append("")
-            total = len(rows)
-            lines.append(f"共 {total} 款，示例 {min(total, max_top20)} 款：")
-            lines.append("")
-            for r in rows[: max_top20]:
-                rank = r[0] if r[0] is not None else "—"
-                name = (r[1] or "—").strip()
-                lines.append(f"- 排名 {rank}：{name}")
-            if total > max_top20:
-                lines.append("- ……")
-            lines.append("")
-    except sqlite3.OperationalError:
-        pass
+    def _parse_rank_int(rank_raw) -> int | None:
+        if rank_raw is None:
+            return None
+        try:
+            return int(str(rank_raw).strip())
+        except (TypeError, ValueError):
+            return None
 
-    # 三、榜单异动（真实总数 + 前 max_changes 条示例）
+    def _format_change_row(r: tuple) -> str:
+        rank = r[0] if r[0] is not None else "—"
+        name = (r[1] or "—").strip()
+        company = (r[2] or "—").strip()
+        change = (r[3] or "—").strip()
+        pk = (r[4] or "").strip().lower() if len(r) > 4 else ""
+        plat = platform_label.get(pk, pk or "—")
+        return f"- 排名 {rank}：{name}（{plat}，{company}，变化 {change}）"
+
+    def _append_change_section(
+        heading: str,
+        section_rows: list,
+        *,
+        empty_hint: str,
+    ) -> None:
+        lines.append(heading)
+        lines.append("")
+        total = len(section_rows)
+        if total == 0:
+            lines.append(empty_hint)
+            lines.append("")
+            return
+        lines.append(f"共 {total} 条记录，示例 {min(total, max_changes)} 条：")
+        lines.append("")
+        for r in section_rows[:max_changes]:
+            lines.append(_format_change_row(r))
+        if total > max_changes:
+            lines.append("- ……")
+        lines.append("")
+
     try:
         cur = conn.execute(
             "SELECT rank, game_name, company, rank_change, platform_key FROM rank_changes "
             "WHERE week_range = ? ORDER BY platform_key, CAST(rank AS INTEGER) ASC",
             (week_range,),
         )
-        rows = cur.fetchall()
-        if rows:
-            lines.append("## 三、榜单异动")
-            lines.append("")
-            platform_label = {"wx": "微信小游戏", "dy": "抖音小游戏"}
-            total = len(rows)
-            lines.append(f"共 {total} 条记录，示例 {min(total, max_changes)} 条：")
-            lines.append("")
-            for r in rows[:max_changes]:
-                rank = r[0] if r[0] is not None else "—"
-                name = (r[1] or "—").strip()
-                company = (r[2] or "—").strip()
-                change = (r[3] or "—").strip()
-                pk = (r[4] or "").strip().lower() if len(r) > 4 else ""
-                plat = platform_label.get(pk, pk or "—")
-                lines.append(f"- 排名 {rank}：{name}（{plat}，{company}，变化 {change}）")
-            if total > max_changes:
-                lines.append("- ……")
-            lines.append("")
+        rows = list(cur.fetchall())
+        new_top10: list = []
+        for r in rows:
+            ch = (r[3] or "").strip() if len(r) > 3 else ""
+            rk = _parse_rank_int(r[0])
+            if rk is not None and _minigame_is_new_to_top10(rk, ch):
+                new_top10.append(r)
+
+        new_keys = set()
+        for r in new_top10:
+            pk = (r[4] or "").strip().lower() if len(r) > 4 else ""
+            nm = (r[1] or "").strip()
+            new_keys.add((pk, nm))
+
+        surge_scored: list[tuple[tuple, int]] = []
+        for r in rows:
+            ch = (r[3] or "").strip() if len(r) > 3 else ""
+            d = _minigame_surge_delta(ch)
+            if d <= 0:
+                continue
+            pk = (r[4] or "").strip().lower() if len(r) > 4 else ""
+            nm = (r[1] or "").strip()
+            if (pk, nm) in new_keys:
+                continue
+            surge_scored.append((r, d))
+        surge_scored.sort(key=lambda x: (-x[1], _parse_rank_int(x[0][0]) or 999))
+        surge_list = [t[0] for t in surge_scored[:10]]
+
+        if new_top10 or surge_list:
+            _append_change_section(
+                "## 一、新进 Top10（本周进入 Top10，上周不在 Top10）",
+                new_top10,
+                empty_hint="本周暂无符合条件的记录。",
+            )
+            _append_change_section(
+                "## 二、本周排名飙升 Top10",
+                surge_list,
+                empty_hint="本周暂无排名飙升（↑）记录。",
+            )
     except sqlite3.OperationalError:
         pass
 

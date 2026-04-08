@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useAuth } from '../context/AuthContext';
 import { loadGameplayByGameName } from '../data/reportsLoader';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { getApiUrl } from '../utils/api';
+import { useNavigateBack } from '../utils/navigation';
 
 const GameplayDetailPage = () => {
-  const navigate = useNavigate();
+  const { setPageMeta } = useAiPageContext();
   const { source, gameName: encodedName } = useParams<{ source: string; gameName: string }>();
+  const goBack = useNavigateBack(
+    source === 'sensortower' ? '/rankings/casual/sensortower' : '/rankings/casual/wechat_douyin'
+  );
   const { authMode, user, getDataUrl } = useAuth();
   const gameName = encodedName ? decodeURIComponent(encodedName) : '';
 
@@ -20,6 +25,15 @@ const GameplayDetailPage = () => {
 
   const useFullDataUrls = authMode === 'static' || (authMode === 'backend' && user);
   const getDataUrlFn = useFullDataUrls ? getDataUrl : undefined;
+
+  useEffect(() => {
+    setPageMeta({
+      pageKind: 'gameplay',
+      gameplaySource: source || '',
+      gameplayGameName: gameName,
+      pageTitle: gameName ? `玩法解析 · ${gameName}` : '玩法解析',
+    });
+  }, [source, gameName, setPageMeta]);
 
   useEffect(() => {
     if (!gameName) {
@@ -87,7 +101,7 @@ const GameplayDetailPage = () => {
         <div className="text-slate-600">缺少游戏名称</div>
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={goBack}
           className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100"
         >
           返回
@@ -113,7 +127,7 @@ const GameplayDetailPage = () => {
           <h1 className="text-2xl font-bold text-slate-900">{gameName} · 玩法解析</h1>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="inline-flex items-center px-3 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-100"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

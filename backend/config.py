@@ -43,7 +43,10 @@ WECOM_WEBHOOK_URL = _str(os.environ.get("WECOM_WEBHOOK_URL_REAL") or os.environ.
 OPENAI_API_KEY = _str(os.environ.get("OPENAI_API_KEY"))
 OPENAI_BASE_URL = (_str(os.environ.get("OPENAI_BASE_URL")) or "https://api.openai.com/v1").rstrip("/")
 OPENAI_MODEL = _str(os.environ.get("OPENAI_MODEL"), "gpt-4.1-mini")
+# openai=仅对话 | codex=Codex app-server+工具 | openrouter=OpenRouter+多轮 function calling+工具
 AI_PROVIDER = _str(os.environ.get("AI_PROVIDER"), "openai").lower()
+# OpenRouter 可选：部分场景建议设置站点 Referer（见 https://openrouter.ai/docs）
+OPENROUTER_HTTP_REFERER = _str(os.environ.get("OPENROUTER_HTTP_REFERER"))
 CODEX_APP_SERVER_BIN = _str(os.environ.get("CODEX_APP_SERVER_BIN"), "codex")
 CODEX_MODEL = _str(os.environ.get("CODEX_MODEL"), "gpt-5.1-codex")
 CODEX_WORKDIR = _str(os.environ.get("CODEX_WORKDIR"))

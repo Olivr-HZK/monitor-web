@@ -6,6 +6,8 @@ from pathlib import Path
 import json
 import os
 import urllib.parse
+from typing import Any
+
 import httpx
 from dotenv import load_dotenv
 
@@ -14,7 +16,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from passlib.hash import pbkdf2_sha256
 
@@ -44,13 +46,45 @@ from config import (
     CODEX_ENABLE_DB_TOOL,
     CODEX_ENABLE_WEB_SEARCH_TOOL,
     TAVILY_API_KEY,
+    OPENROUTER_HTTP_REFERER,
 )
 from auth import create_token, get_current_user, get_token_from_request, require_user_for_ai
+from ai_tools import AgentToolDispatcher
 from codex_app_server import CodexAppServerSession, CodexProtocolError
+from knowledge_loader import load_agent_knowledge_text
+from openrouter_agent import run_openrouter_agent_chat
 
 app = FastAPI(title="监测汇总 API")
 CORS_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+_agent_knowledge_cache: str | None = None
+
+
+def _get_agent_knowledge() -> str:
+    global _agent_knowledge_cache
+    if _agent_knowledge_cache is None:
+        _agent_knowledge_cache = load_agent_knowledge_text()
+    return _agent_knowledge_cache
+
+
+def _format_page_context(ctx: dict[str, Any] | None) -> str:
+    if not ctx or not isinstance(ctx, dict):
+        return ""
+    lines: list[str] = []
+    for key in sorted(ctx.keys()):
+        val = ctx[key]
+        if val is None or val == "":
+            continue
+        lines.append(f"- {key}: {val}")
+    if not lines:
+        return ""
+    return "【页面上下文】\n" + "\n".join(lines)
+
+
+def _sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -298,106 +332,47 @@ async def feishu_media(request: Request, url: str = ""):
 class AIChatBody(BaseModel):
     message: str = ""
     history: list[dict] | None = None
+    pageContext: dict[str, Any] | None = None
 
 
-def _classify_intent(text: str, history: list[dict] | None = None) -> dict[str, object]:
-    full = " ".join(
-        [text]
-        + [
-            str(item.get("content") or "")
-            for item in (history or [])
-            if isinstance(item, dict) and isinstance(item.get("content"), str)
-        ]
-    ).lower()
-    db_keywords = [
-        "数据库",
-        "sql",
-        "sqlite",
-        "表",
-        "字段",
-        "排行",
-        "rank",
-        "wechatdouyin",
-        "competitor_data",
-        "sensortower",
-    ]
-    web_keywords = [
-        "联网",
-        "搜索",
-        "最新",
-        "今天",
-        "新闻",
-        "官网",
-        "链接",
-        "来源",
-        "web",
-        "url",
-    ]
-    hybrid_hints = ["对比", "结合", "同时", "再", "之后", "并且"]
-
-    needs_db = any(k in full for k in db_keywords)
-    needs_web = any(k in full for k in web_keywords)
-    if any(k in full for k in hybrid_hints) and (needs_db or needs_web):
-        # If user asks to compare/combine, bias to hybrid planning.
-        needs_db = True if needs_db or "数据库" in full or "sql" in full else needs_db
-        needs_web = True if needs_web or "新闻" in full or "最新" in full else needs_web
-
-    if needs_db and needs_web:
-        mode = "hybrid"
-        steps = [
-            "先调用 query_sqlite 获取结构化事实。",
-            "再调用 web_search 获取最新外部信息。",
-            "最后对齐口径并给出结论与引用来源。",
-        ]
-    elif needs_db:
-        mode = "db_only"
-        steps = [
-            "仅调用 query_sqlite 获取数据。",
-            "如 SQL 失败，先用 PRAGMA table_info(表名) 确认字段后重试。",
-            "基于查询结果输出结论。",
-        ]
-    elif needs_web:
-        mode = "web_only"
-        steps = [
-            "仅调用 web_search 获取外部信息。",
-            "优先保留来源链接与发布时间。",
-            "基于搜索结果输出结论。",
-        ]
-    else:
-        mode = "chat_only"
-        steps = [
-            "无需调用工具，直接回答。",
-            "若缺少事实再建议用户补充问题。",
-        ]
-    return {"mode": mode, "needs_db": needs_db, "needs_web": needs_web, "steps": steps}
-
-
-def _attach_execution_plan(text: str, plan: dict[str, object]) -> str:
-    steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
-    plan_lines = "\n".join(f"- {str(s)}" for s in steps)
-    mode = str(plan.get("mode") or "chat_only")
-    return (
-        f"【执行模式】{mode}\n"
-        f"【执行步骤】\n{plan_lines}\n"
-        "【约束】仅在需要时调用工具；回答必须明确是否使用了工具与关键来源。\n\n"
-        f"【用户问题】{text}"
+def _build_system_content() -> str:
+    base = (
+        "你是「监测汇总」内部平台的智能助手，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。"
+        "用简洁中文回答；若问题超出本平台范围，也可做一般性说明。"
     )
+    knowledge = _get_agent_knowledge()
+    if knowledge:
+        base += "\n\n【平台知识库（供回答时参考）】\n" + knowledge
+    return base
 
 
-def _build_openai_messages(text: str, history: list[dict] | None) -> list[dict[str, str]]:
-    messages = [
-        {
-            "role": "system",
-            "content": "你是「监测汇总」内部平台的智能助手，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。回答时尽量用简洁的中文分点说明，给出可执行的建议。若问题超出本平台范围，也可以进行一般性答疑。",
-        }
-    ]
+def _build_openai_messages_for_request(
+    user_text: str,
+    history: list[dict] | None,
+    page_context: dict[str, Any] | None,
+) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = [{"role": "system", "content": _build_system_content()}]
     for item in history or []:
         if not item or not isinstance(item.get("role"), str) or not isinstance(item.get("content"), str):
             continue
         role = item["role"] if item["role"] in ("assistant", "system") else "user"
         messages.append({"role": role, "content": item["content"]})
-    messages.append({"role": "user", "content": text})
+    page_block = _format_page_context(page_context)
+    user_content = f"{page_block}\n\n{user_text}" if page_block else user_text
+    messages.append({"role": "user", "content": user_content})
     return messages
+
+
+def _compose_codex_user_message(user_text: str, page_context: dict[str, Any] | None) -> str:
+    knowledge = _get_agent_knowledge()
+    parts: list[str] = []
+    if knowledge:
+        parts.append("【平台知识库（供回答时参考）】\n" + knowledge)
+    page_block = _format_page_context(page_context)
+    if page_block:
+        parts.append(page_block)
+    parts.append(user_text)
+    return "\n\n".join(parts)
 
 
 def _build_codex_subprocess_env() -> dict[str, str]:
@@ -412,8 +387,45 @@ def _build_codex_subprocess_env() -> dict[str, str]:
     return env
 
 
-async def _chat_via_openai(text: str, history: list[dict] | None) -> str:
-    messages = _build_openai_messages(text, history)
+def _openrouter_extra_headers() -> dict[str, str]:
+    h: dict[str, str] = {}
+    if OPENROUTER_HTTP_REFERER.strip():
+        h["HTTP-Referer"] = OPENROUTER_HTTP_REFERER.strip()
+    return h
+
+
+async def _chat_via_openrouter(
+    user_text: str,
+    history: list[dict] | None,
+    page_context: dict[str, Any] | None,
+) -> str:
+    messages: list[dict[str, Any]] = [dict(m) for m in _build_openai_messages_for_request(user_text, history, page_context)]
+    dispatcher = AgentToolDispatcher(
+        PUBLIC_DIR,
+        TAVILY_API_KEY,
+        CODEX_ENABLE_DB_TOOL,
+        CODEX_ENABLE_WEB_SEARCH_TOOL,
+    )
+    try:
+        return await run_openrouter_agent_chat(
+            messages,
+            model=OPENAI_MODEL,
+            base_url=OPENAI_BASE_URL,
+            api_key=OPENAI_API_KEY,
+            dispatcher=dispatcher,
+            extra_headers=_openrouter_extra_headers() or None,
+        )
+    except ValueError as e:
+        print("[ai-openrouter]", e)
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+
+
+async def _chat_via_openai(
+    user_text: str,
+    history: list[dict] | None,
+    page_context: dict[str, Any] | None,
+) -> str:
+    messages = _build_openai_messages_for_request(user_text, history, page_context)
     async with httpx.AsyncClient(timeout=60.0) as client:
         r = await client.post(
             f"{OPENAI_BASE_URL}/chat/completions",
@@ -432,7 +444,11 @@ async def _chat_via_openai(text: str, history: list[dict] | None) -> str:
     return content
 
 
-async def _chat_via_codex(text: str, history: list[dict] | None) -> str:
+async def _chat_via_codex(
+    user_text: str,
+    history: list[dict] | None,
+    page_context: dict[str, Any] | None,
+) -> str:
     workdir = Path(CODEX_WORKDIR).expanduser() if CODEX_WORKDIR else PROJECT_ROOT
     print(
         "[ai-codex-config]",
@@ -470,7 +486,104 @@ async def _chat_via_codex(text: str, history: list[dict] | None) -> str:
         tavily_api_key=TAVILY_API_KEY,
         subprocess_env=_build_codex_subprocess_env(),
     ) as session:
-        return await session.run_chat(text, history)
+        combined = _compose_codex_user_message(user_text, page_context)
+        return await session.run_chat(combined, history)
+
+
+async def _stream_openai_text_chunks(messages: list[dict[str, str]]):
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        async with client.stream(
+            "POST",
+            f"{OPENAI_BASE_URL}/chat/completions",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"},
+            json={"model": OPENAI_MODEL, "messages": messages, "stream": True},
+        ) as r:
+            if r.status_code != 200:
+                body = await r.aread()
+                err_text = body.decode("utf-8", errors="replace")[:2000]
+                raise ValueError(f"调用大模型失败（{r.status_code}），请稍后重试。{err_text[:500]}")
+            async for line in r.aiter_lines():
+                if not line:
+                    continue
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    data = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                choices = data.get("choices") or []
+                if not choices:
+                    continue
+                delta = (choices[0].get("delta") or {}).get("content")
+                if isinstance(delta, str) and delta:
+                    yield delta
+
+
+@app.post("/api/ai/chat/stream")
+async def ai_chat_stream(body: AIChatBody, request: Request):
+    await require_user_for_ai(request)
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="缺少提问内容")
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
+
+    print("[ai-chat-stream] chars=", len(text))
+
+    async def event_generator():
+        try:
+            if AI_PROVIDER == "codex":
+                answer = await _chat_via_codex(text, body.history, body.pageContext)
+                step = 256
+                for i in range(0, len(answer), step):
+                    yield _sse_event("delta", {"delta": answer[i : i + step]})
+                if not answer.strip():
+                    yield _sse_event("error", {"error": "大模型返回为空，请稍后重试。"})
+                    return
+                yield _sse_event("done", {"answer": answer})
+                return
+
+            if AI_PROVIDER == "openrouter":
+                answer = await _chat_via_openrouter(text, body.history, body.pageContext)
+                step = 256
+                for i in range(0, len(answer), step):
+                    yield _sse_event("delta", {"delta": answer[i : i + step]})
+                if not answer.strip():
+                    yield _sse_event("error", {"error": "大模型返回为空，请稍后重试。"})
+                    return
+                yield _sse_event("done", {"answer": answer})
+                return
+
+            messages = _build_openai_messages_for_request(text, body.history, body.pageContext)
+            full = ""
+            async for chunk in _stream_openai_text_chunks(messages):
+                full += chunk
+                yield _sse_event("delta", {"delta": chunk})
+            if not full.strip():
+                yield _sse_event("error", {"error": "大模型返回为空，请稍后重试。"})
+                return
+            yield _sse_event("done", {"answer": full})
+        except CodexProtocolError as e:
+            print("[ai-chat-stream-codex]", e)
+            yield _sse_event("error", {"error": f"Codex 协议错误: {e}"})
+        except HTTPException as e:
+            detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+            yield _sse_event("error", {"error": detail or "请求失败"})
+        except ValueError as e:
+            print("[ai-chat-stream-upstream]", e)
+            yield _sse_event("error", {"error": str(e)[:800]})
+        except Exception as e:
+            print("[ai-chat-stream]", e)
+            yield _sse_event("error", {"error": "AI 流式对话异常，请稍后重试。"})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream; charset=utf-8",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/ai/chat")
@@ -479,23 +592,27 @@ async def ai_chat(body: AIChatBody, request: Request):
     text = (body.message or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="缺少提问内容")
-    plan = _classify_intent(text, body.history)
-    planned_text = _attach_execution_plan(text, plan)
-    print("[ai-intent]", plan)
+    print("[ai-chat]", f"chars={len(text)}", f"provider={AI_PROVIDER}")
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
     try:
         if AI_PROVIDER == "codex":
             try:
-                answer = await _chat_via_codex(planned_text, body.history)
+                answer = await _chat_via_codex(text, body.history, body.pageContext)
                 print("[ai-step1-codex] success", f"chars={len(answer)}")
                 return {"answer": answer}
             except CodexProtocolError as e:
                 print("[ai-step1-codex] failed", e)
                 raise HTTPException(status_code=502, detail=f"Codex 协议错误: {e}")
 
+        if AI_PROVIDER == "openrouter":
+            print("[ai-openrouter] start", f"model={OPENAI_MODEL}", f"base={OPENAI_BASE_URL}")
+            answer = await _chat_via_openrouter(text, body.history, body.pageContext)
+            print("[ai-openrouter] success", f"chars={len(answer)}")
+            return {"answer": answer}
+
         print("[ai-step2-responses] start", f"model={OPENAI_MODEL}")
-        answer = await _chat_via_openai(planned_text, body.history)
+        answer = await _chat_via_openai(text, body.history, body.pageContext)
         print("[ai-step2-responses] success", f"chars={len(answer)}")
         return {"answer": answer}
     except HTTPException:

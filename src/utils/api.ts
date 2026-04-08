@@ -15,3 +15,25 @@ export function getApiUrl(path: string): string {
   const base = getApiBase();
   return base ? `${base}${p}` : p;
 }
+
+/**
+ * 解析后端 JSON 错误体（FastAPI 常用 `detail`，部分接口用 `error`）。
+ */
+export function parseApiErrorBody(data: unknown): string {
+  if (!data || typeof data !== 'object') return '';
+  const o = data as Record<string, unknown>;
+  if (typeof o.error === 'string' && o.error.trim()) return o.error.trim();
+  if (typeof o.detail === 'string' && o.detail.trim()) return o.detail.trim();
+  if (Array.isArray(o.detail)) {
+    return o.detail
+      .map((item) => {
+        if (item && typeof item === 'object' && 'msg' in item) {
+          return String((item as { msg?: unknown }).msg ?? '');
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join('；');
+  }
+  return '';
+}

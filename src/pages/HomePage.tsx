@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import type { MonitorType } from '../types';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { setPageMeta } = useAiPageContext();
   const { user, logout } = useAuth();
   const {
     monitorItems,
@@ -15,6 +17,10 @@ const HomePage = () => {
     aiCreativeLibraryHotItems,
     aiCreativeLibrarySurgeItems,
   } = useData();
+
+  useEffect(() => {
+    setPageMeta({ pageKind: 'home', pageTitle: '监测汇总首页' });
+  }, [setPageMeta]);
 
   const homeStats = useMemo(() => {
     const byType = {

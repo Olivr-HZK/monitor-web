@@ -5,12 +5,12 @@ import asyncio
 import inspect
 import json
 import os
-import re
-import sqlite3
 from pathlib import Path
 from typing import Any
 
 import httpx
+
+from ai_tools import AgentToolDispatcher
 
 
 class CodexProtocolError(RuntimeError):
@@ -84,6 +84,12 @@ class CodexAppServerSession:
         self.enable_web_search_tool = enable_web_search_tool
         self.tavily_api_key = tavily_api_key
         self.subprocess_env = subprocess_env or {}
+        self._tools = AgentToolDispatcher(
+            public_dir,
+            tavily_api_key,
+            enable_db_tool,
+            enable_web_search_tool,
+        )
 
         self._process: asyncio.subprocess.Process | None = None
         self._reader_task: asyncio.Task | None = None
@@ -101,7 +107,10 @@ class CodexAppServerSession:
         env.update({k: v for k, v in self.subprocess_env.items() if isinstance(v, str) and v})
         base_url = (env.get("OPENAI_BASE_URL") or "").lower()
         if "openrouter.ai" in base_url:
-            raise CodexProtocolError("codex app-server 当前不支持 OpenRouter /responses websocket。请将 OPENAI_BASE_URL 改为 https://api.openai.com/v1，或把 AI_PROVIDER 改回 openai。")
+            raise CodexProtocolError(
+                "Codex app-server 与 OpenRouter 不兼容。请设置 AI_PROVIDER=openrouter（OpenRouter + query_sqlite/web_search），"
+                "或将 OPENAI_BASE_URL 改为 OpenAI 官方地址后再使用 AI_PROVIDER=codex。"
+            )
         if not self.workdir.exists():
             raise CodexProtocolError(f"CODEX_WORKDIR 不存在: {self.workdir}")
         if not self.workdir.is_dir():
@@ -167,11 +176,9 @@ class CodexAppServerSession:
     def _build_prompt(self, message: str, history: list[dict[str, Any]] | None) -> str:
         lines = [
             "你是监测汇总平台的后端智能助手。",
-            "可按需调用工具：",
-            "1) query_sqlite：查询业务数据库（只读，SQL）。",
-            "2) web_search：联网搜索最新信息。",
-            "SQL 提示：wechatdouyin.db 常用列是 rank、game_name、platform、monitor_date，不是 ranking/date。",
-            "回答使用简洁中文，优先基于工具结果给结论并标注关键数据来源。",
+            "可用工具：query_sqlite（只读 SQL）、web_search（联网搜索）；是否调用由你根据问题自行决定。",
+            "技术提示：wechatdouyin.db 常用列含 rank、game_name、platform、monitor_date（列名以 PRAGMA 为准）。",
+            "回答使用简洁中文。",
             "",
         ]
         for item in history or []:
@@ -375,144 +382,12 @@ class CodexAppServerSession:
     async def _dispatch_dynamic_tool(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
         print(f"[codex-tool] start tool={tool_name} args={_json_text(args)[:300]}")
         try:
-            if tool_name == "query_sqlite" and self.enable_db_tool:
-                output = self._query_sqlite(args)
-                print(f"[codex-tool] success tool={tool_name} output_len={len(_json_text(output))}")
-                return _tool_result(_json_text(output), True)
-            if tool_name == "web_search" and self.enable_web_search_tool:
-                output = await self._web_search(args)
-                print(f"[codex-tool] success tool={tool_name} output_len={len(_json_text(output))}")
-                return _tool_result(_json_text(output), True)
-            print(f"[codex-tool] failed tool={tool_name} reason=unknown tool")
-            return _tool_result(f"unknown tool: {tool_name}", False)
+            output = await self._tools.dispatch(tool_name, args)
+            print(f"[codex-tool] success tool={tool_name} output_len={len(_json_text(output))}")
+            return _tool_result(_json_text(output), True)
         except Exception as e:
             print(f"[codex-tool] failed tool={tool_name} error={e}")
             return _tool_result(str(e), False)
-
-    def _query_sqlite(self, args: dict[str, Any]) -> dict[str, Any]:
-        db_raw = str(args.get("db") or "").strip()
-        sql_raw = str(args.get("sql") or "").strip()
-        limit = args.get("limit", 50)
-        try:
-            limit_int = int(limit)
-        except Exception:
-            limit_int = 50
-        limit_int = max(1, min(limit_int, 200))
-        if not db_raw or not sql_raw:
-            raise ValueError("db 和 sql 不能为空")
-
-        # Model may send an absolute/relative path; normalize to basename and enforce public/*.db boundary.
-        db = Path(db_raw).name.strip()
-        if not db or db.startswith(".") or "/" in db or "\\" in db:
-            raise ValueError("db 参数非法，仅允许数据库文件名")
-
-        sql = sql_raw.strip()
-        if sql.endswith(";"):
-            sql = sql[:-1].rstrip()
-        sql_l = sql.lower().strip()
-        pragma_table_info = re.match(r"^pragma\s+table_info\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)$", sql_l) is not None
-        if not (sql_l.startswith("select") or sql_l.startswith("with") or pragma_table_info):
-            raise ValueError("只允许 SELECT / WITH 查询")
-        # Allow one trailing semicolon (already trimmed), but reject multi-statements and write/ddl keywords.
-        if ";" in sql_l:
-            raise ValueError("SQL 包含禁用关键字")
-        banned = ["insert ", "update ", "delete ", "drop ", "alter ", "attach ", "pragma ", "vacuum "]
-        if any(k in sql_l for k in banned):
-            raise ValueError("SQL 包含禁用关键字")
-
-        db_path = (self.public_dir / db).resolve()
-        if not db_path.exists() or db_path.suffix.lower() != ".db":
-            raise ValueError(f"数据库不存在: {db}")
-        if db_path.parent != self.public_dir.resolve():
-            raise ValueError("数据库路径越界")
-
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-        try:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-            cur.execute(sql)
-            rows = cur.fetchmany(limit_int)
-            out_rows = [dict(row) for row in rows]
-            cols = list(out_rows[0].keys()) if out_rows else [d[0] for d in (cur.description or [])]
-            return {
-                "db": db,
-                "rowCount": len(out_rows),
-                "columns": cols,
-                "rows": out_rows,
-            }
-        finally:
-            conn.close()
-
-    async def _web_search(self, args: dict[str, Any]) -> dict[str, Any]:
-        query = str(args.get("query") or "").strip()
-        max_results = args.get("maxResults", 5)
-        try:
-            n = int(max_results)
-        except Exception:
-            n = 5
-        n = max(1, min(n, 10))
-        if not query:
-            raise ValueError("query 不能为空")
-
-        if self.tavily_api_key:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                r = await client.post(
-                    "https://api.tavily.com/search",
-                    json={
-                        "api_key": self.tavily_api_key,
-                        "query": query,
-                        "max_results": n,
-                        "include_answer": True,
-                    },
-                )
-                r.raise_for_status()
-                data = r.json()
-                results = data.get("results") or []
-                return {
-                    "query": query,
-                    "answer": data.get("answer") or "",
-                    "results": [
-                        {
-                            "title": x.get("title"),
-                            "url": x.get("url"),
-                            "content": x.get("content"),
-                        }
-                        for x in results[:n]
-                    ],
-                }
-
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.get(
-                "https://api.duckduckgo.com/",
-                params={"q": query, "format": "json", "no_html": "1", "no_redirect": "1"},
-            )
-            r.raise_for_status()
-            data = r.json()
-
-        related = data.get("RelatedTopics") or []
-        items: list[dict[str, Any]] = []
-        for it in related:
-            if len(items) >= n:
-                break
-            if isinstance(it, dict) and isinstance(it.get("Text"), str):
-                items.append(
-                    {
-                        "title": it.get("Text"),
-                        "url": it.get("FirstURL") or "",
-                    }
-                )
-            elif isinstance(it, dict) and isinstance(it.get("Topics"), list):
-                for sub in it.get("Topics") or []:
-                    if len(items) >= n:
-                        break
-                    if isinstance(sub, dict) and isinstance(sub.get("Text"), str):
-                        items.append({"title": sub.get("Text"), "url": sub.get("FirstURL") or ""})
-
-        return {
-            "query": query,
-            "answer": data.get("AbstractText") or "",
-            "results": items,
-        }
 
     async def _wait_turn_completed(self, turn_id: str, timeout: int) -> str:
         fut = asyncio.get_running_loop().create_future()

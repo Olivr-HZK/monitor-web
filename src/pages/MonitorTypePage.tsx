@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { currentPathForReturn } from '../utils/navigation';
 import Header from '../components/Header';
 import MonitorList from '../components/MonitorList';
 import Sidebar from '../components/Sidebar';
+import { useAiPageContext } from '../context/AiPageContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import type { MonitorType, MonitorItem, CasualGameMainCategory, CasualGameCompetitorSub, GamePlatformKey, AiProductSubCategory } from '../types';
@@ -16,6 +18,7 @@ const parseMonitorType = (raw?: string): MonitorType | null => {
 
 const MonitorTypePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { monitorType } = useParams();
   const { user, logout } = useAuth();
   const {
@@ -23,8 +26,10 @@ const MonitorTypePage = () => {
     monitorItems,
     weeklyReports,
   } = useData();
+  const { setPageMeta } = useAiPageContext();
 
   const selectedType = parseMonitorType(monitorType);
+  const returnPath = currentPathForReturn(location);
 
   useEffect(() => {
     if (!selectedType) {
@@ -41,17 +46,42 @@ const MonitorTypePage = () => {
   const [selectedAiProductSub, setSelectedAiProductSub] = useState<AiProductSubCategory | null>(null);
 
   useEffect(() => {
+    const s = (location.state as { restoreCasualSourceSection?: 'wechat_douyin' | 'sensortower' } | null)
+      ?.restoreCasualSourceSection;
+    if (s === 'sensortower' || s === 'wechat_douyin') {
+      setSelectedCasualSourceSection(s);
+    }
+  }, [location.key, location.state]);
+
+  useEffect(() => {
     if (selectedType !== '休闲游戏监测') {
       setSelectedCasualGameCategory(null);
       setSelectedGamePlatform(null);
       setSelectedCasualGameCompetitorSub(null);
       return;
     }
+    const hubTarget = (location.state as { casualHubTarget?: 'competitor' | 'our_product' } | null)?.casualHubTarget;
+    if (hubTarget === 'competitor') {
+      setSelectedCasualGameCategory('竞品');
+      setSelectedCasualGameCompetitorSub('社媒更新');
+      setSelectedGamePlatform(null);
+      setSelectedCompany(null);
+      return;
+    }
     if (selectedCasualGameCategory === null) {
       setSelectedCasualGameCategory('周报简要');
       setSelectedGamePlatform('微信');
     }
-  }, [selectedType, selectedCasualGameCategory]);
+  }, [selectedType, selectedCasualGameCategory, location.key]);
+
+  useEffect(() => {
+    if (selectedType !== '休闲游戏监测') return;
+    if ((location.state as { casualHubTarget?: string } | null)?.casualHubTarget !== 'our_product') return;
+    const timer = window.setTimeout(() => {
+      document.getElementById('sidebar-casual-own-product')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [selectedType, location.key, location.state]);
 
   useEffect(() => {
     if (selectedType !== 'AI产品监测') {
@@ -102,12 +132,59 @@ const MonitorTypePage = () => {
     return '休闲游戏监测';
   };
 
+  useEffect(() => {
+    if (!selectedType) return;
+    if (isCasualGame) {
+      setPageMeta({
+        monitorType: '休闲游戏监测',
+        pageTitle: getCasualGamePageTitle(),
+        casualGameCategory: selectedCasualGameCategory ?? undefined,
+        gamePlatform: selectedGamePlatform ?? undefined,
+        casualCompetitorSub: selectedCasualGameCompetitorSub ?? undefined,
+        casualSourceSection: selectedCasualSourceSection,
+        companyFilter: selectedCompany ?? undefined,
+      });
+      return;
+    }
+    if (selectedType === 'AI产品监测') {
+      setPageMeta({
+        monitorType: 'AI产品监测',
+        pageTitle: getAiProductPageTitle(),
+        aiProductSub: selectedAiProductSub ?? undefined,
+      });
+      return;
+    }
+    setPageMeta({
+      monitorType: selectedType,
+      pageTitle: `${selectedType}列表`,
+      companyFilter: selectedCompany ?? undefined,
+    });
+  }, [
+    selectedType,
+    isCasualGame,
+    selectedCasualGameCategory,
+    selectedGamePlatform,
+    selectedCasualGameCompetitorSub,
+    selectedCasualSourceSection,
+    selectedCompany,
+    selectedAiProductSub,
+    setPageMeta,
+  ]);
+
   const handleReportClick = (item: MonitorItem) => {
     if (item.reportContent && item.reportContent.trim().startsWith('{')) {
       try {
         const data = JSON.parse(item.reportContent) as { kind?: string; cardId?: string };
         if (data.kind === 'sensortower_store_card' && data.cardId) {
-          navigate(`/store/${encodeURIComponent(data.cardId)}`);
+          navigate(`/store/${encodeURIComponent(data.cardId)}`, {
+            state: {
+              returnTo: returnPath,
+              ...(selectedType === '休闲游戏监测'
+                ? { casualSourceSection: selectedCasualSourceSection }
+                : {}),
+              ...(selectedCasualGameCategory === '竞品' ? { casualHubTarget: 'competitor' as const } : {}),
+            },
+          });
           return;
         }
       } catch {
@@ -115,7 +192,13 @@ const MonitorTypePage = () => {
       }
     }
     if (item.reportContent) {
-      navigate(`/report/${encodeURIComponent(item.id)}`);
+      navigate(`/report/${encodeURIComponent(item.id)}`, {
+        state: {
+          returnTo: returnPath,
+          ...(selectedType === '休闲游戏监测' ? { casualSourceSection: selectedCasualSourceSection } : {}),
+          ...(selectedCasualGameCategory === '竞品' ? { casualHubTarget: 'competitor' as const } : {}),
+        },
+      });
     }
   };
 
@@ -126,7 +209,7 @@ const MonitorTypePage = () => {
       <Header selectedType={selectedType} onTypeSelect={handleTypeSelect} user={user} onLogout={logout} />
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex gap-8">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {isCasualGame ? (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -139,7 +222,11 @@ const MonitorTypePage = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => navigate('/rankings/casual/wechat_douyin')}
+                      onClick={() =>
+                        navigate('/rankings/casual/wechat_douyin', {
+                          state: { returnTo: returnPath, casualSourceSection: 'wechat_douyin' },
+                        })
+                      }
                       className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,7 +250,11 @@ const MonitorTypePage = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => navigate('/rankings/casual/sensortower')}
+                      onClick={() =>
+                        navigate('/rankings/casual/sensortower', {
+                          state: { returnTo: returnPath, casualSourceSection: 'sensortower' },
+                        })
+                      }
                       className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors border border-violet-200"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,7 +321,7 @@ const MonitorTypePage = () => {
                 headerAction={
                   <button
                     type="button"
-                    onClick={() => navigate('/rankings/ai')}
+                    onClick={() => navigate('/rankings/ai', { state: { returnTo: returnPath } })}
                     className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

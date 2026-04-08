@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AiPageProvider } from './context/AiPageContext';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import HomePage from './pages/HomePage';
@@ -26,7 +27,7 @@ function App() {
     return <Login />;
   }
   return (
-    <>
+    <AiPageProvider>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/type/:monitorType" element={<MonitorTypePage />} />
@@ -38,7 +39,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <AiChatWidget />
-    </>
+    </AiPageProvider>
   );
 }
 

@@ -3,6 +3,7 @@
  * 从CSV文件加载游戏排行榜数据
  */
 
+import { fetchInitForDataUrl } from '../utils/api';
 import Papa from 'papaparse';
 import type { GameRanking, GameRankingItem, GameRankingType } from '../types';
 
@@ -63,8 +64,7 @@ function formatDate(dateStr: string): string {
  */
 export async function loadGameRankingsFromCSV(filePath: string): Promise<GameRanking[]> {
   try {
-    const opts = filePath.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-    const response = await fetch(filePath, opts);
+    const response = await fetch(filePath, fetchInitForDataUrl(filePath));
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV file: ${response.statusText}`);
     }
@@ -222,9 +222,7 @@ export async function loadGameRankingsFromCSV(filePath: string): Promise<GameRan
  * 公共：根据是否走后端 API，决定 fetch 选项
  */
 function getFetchOptions(filePath: string): RequestInit {
-  return filePath.startsWith('/api')
-    ? { credentials: 'include' as RequestCredentials }
-    : {};
+  return fetchInitForDataUrl(filePath);
 }
 
 /**

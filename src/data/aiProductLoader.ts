@@ -15,6 +15,7 @@ import type {
   MonitorItem,
   ReportDocument,
 } from '../types';
+import { fetchInitForDataUrl } from '../utils/api';
 import Papa from 'papaparse';
 
 const REPORT_MD_FILENAME = 'ai产品/竞品动态报告_AI产品.md';
@@ -28,7 +29,7 @@ interface SqlJsDatabase {
 }
 
 function getFetchOptions(url: string): RequestInit {
-  return url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+  return fetchInitForDataUrl(url);
 }
 
 /**
@@ -194,8 +195,7 @@ async function openAiProductsUaDb(getDataUrl?: (filename: string) => string): Pr
     locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
   });
 
-  const fetchOpts = dbUrl.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-  const response = await fetch(dbUrl, fetchOpts);
+  const response = await fetch(dbUrl, fetchInitForDataUrl(dbUrl));
   if (!response.ok) return null;
 
   const buffer = await response.arrayBuffer();

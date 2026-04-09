@@ -37,6 +37,16 @@ const MonitorTypePage = () => {
     }
   }, [selectedType, navigate]);
 
+  /** 旧独立路由「竞品社媒监控」并入休闲游戏侧栏；避免侧栏不展开、顶栏无高亮导致难以切换模块 */
+  useEffect(() => {
+    if (selectedType === '竞品社媒监控') {
+      navigate(`/type/${encodeURIComponent('休闲游戏监测')}`, {
+        replace: true,
+        state: { casualHubTarget: 'competitor' },
+      });
+    }
+  }, [selectedType, navigate]);
+
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const isCasualGame = selectedType === '休闲游戏监测';
   const [selectedCasualGameCategory, setSelectedCasualGameCategory] = useState<CasualGameMainCategory | null>(null);
@@ -204,6 +214,18 @@ const MonitorTypePage = () => {
 
   if (!selectedType) return null;
 
+  if (selectedType === '竞品社媒监控') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 text-sm">
+        正在进入休闲游戏监测…
+      </div>
+    );
+  }
+
+  const goMonitorType = (type: MonitorType) => {
+    navigate(`/type/${encodeURIComponent(type)}`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header selectedType={selectedType} onTypeSelect={handleTypeSelect} user={user} onLogout={logout} />
@@ -294,6 +316,7 @@ const MonitorTypePage = () => {
                   selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
                   selectedCasualSourceSection={selectedCasualSourceSection}
                   pageTitle={getCasualGamePageTitle()}
+                  onNavigateMonitorType={goMonitorType}
                   onItemClick={handleReportClick}
                 />
               </div>
@@ -303,6 +326,7 @@ const MonitorTypePage = () => {
                 selectedType="AI产品监测"
                 selectedAiProductSub={selectedAiProductSub ?? undefined}
                 pageTitle={getAiProductPageTitle()}
+                onNavigateMonitorType={goMonitorType}
                 headerAction={
                   <button
                     type="button"
@@ -322,6 +346,7 @@ const MonitorTypePage = () => {
                 items={monitorItems}
                 selectedType={selectedType}
                 selectedCompanyName={selectedCompany}
+                onNavigateMonitorType={goMonitorType}
                 onItemClick={handleReportClick}
               />
             )}

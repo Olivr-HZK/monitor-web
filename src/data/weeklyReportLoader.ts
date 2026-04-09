@@ -4,6 +4,7 @@
  */
 
 import type { MonitorItem } from '../types';
+import { fetchInitForDataUrl } from '../utils/api';
 
 export interface WeeklyReport {
   id: number;
@@ -112,8 +113,7 @@ export async function loadWeeklyReportsFromDatabase(dbUrl: string = 'competitor_
     });
 
     // 获取数据库文件（支持 /api/data 鉴权）
-    const opts = dbUrl.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-    const response = await fetch(dbUrl, opts);
+    const response = await fetch(dbUrl, fetchInitForDataUrl(dbUrl));
     if (!response.ok) {
       throw new Error(`Failed to fetch database: ${response.statusText}`);
     }

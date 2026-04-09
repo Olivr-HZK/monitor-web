@@ -1,6 +1,6 @@
 # 在 Google Sites 上实现与当前静态站类似效果
 
-当前站点是 React SPA，部署在 **GitHub Pages**（如 `https://Oliver-HZK.github.io/monitor-web/`）。  
+当前站点是 React SPA，部署在 **GitHub Pages**（如 `https://olivr-hzk.github.io/monitor-web/`）。  
 Google Sites 不能直接上传整站，但可以用 **iframe 嵌入** 的方式，在 Google Sites 里“套一层壳”，用户点进去看到的就是你现在的完整页面效果。
 
 ---
@@ -18,14 +18,14 @@ Google Sites 不能直接上传整站，但可以用 **iframe 嵌入** 的方式
      或 **插入** → **嵌入** → **嵌入代码**。
 4. **若用「嵌入网址」**：  
    - 输入你的站点地址，例如：  
-     `https://Oliver-HZK.github.io/monitor-web/`  
+     `https://olivr-hzk.github.io/monitor-web/`  
    - 保存。Google 会生成对应的嵌入块（内部通常是 iframe）。
 5. **若用「嵌入代码」**（可控制高度、是否去边框）：  
    - 在代码框中粘贴下面这段，把 `你的实际地址` 换成上面的 URL：
 
 ```html
 <iframe
-  src="https://Oliver-HZK.github.io/monitor-web/"
+  src="https://olivr-hzk.github.io/monitor-web/"
   title="监测汇总"
   width="100%"
   height="900"
@@ -54,9 +54,9 @@ Google Sites 不能直接上传整站，但可以用 **iframe 嵌入** 的方式
    - 休闲游戏监测  
    - 热点监测  
 2. 每个子页里用 **嵌入代码** 放一个 iframe，`src` 分别指向你 SPA 的对应路由，例如：
-   - 监测首页：`https://Oliver-HZK.github.io/monitor-web/`
-   - AI 榜单：`https://Oliver-HZK.github.io/monitor-web/rankings/ai`
-   - 休闲游戏：`https://Oliver-HZK.github.io/monitor-web/rankings/casual/wechat_douyin`（或你实际路径）
+   - 监测首页：`https://olivr-hzk.github.io/monitor-web/`
+   - AI 榜单：`https://olivr-hzk.github.io/monitor-web/rankings/ai`
+   - 休闲游戏：`https://olivr-hzk.github.io/monitor-web/rankings/casual/wechat_douyin`（或你实际路径）
 3. 这样用户先选 Google Sites 的导航，再在 iframe 里看到对应内容；你站内的侧栏、路由仍然可用。
 
 **注意**：你的 SPA 若用 React Router 的 `BrowserRouter`，且 GitHub Pages 已配置 404 → `index.html`，则上述带 path 的 URL 才能直接打开；否则需用 hash 路由（`/monitor-web/#/rankings/ai`）并在嵌入代码里写带 `#` 的地址。

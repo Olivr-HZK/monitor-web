@@ -17,6 +17,16 @@ export function getApiUrl(path: string): string {
 }
 
 /**
+ * 拉取受 /api/data 保护的数据文件时的 fetch 选项。
+ * 含 VITE_API_BASE_URL 拼出的绝对地址（https://api.../api/data/...），需带 Cookie 才能通过鉴权。
+ */
+export function fetchInitForDataUrl(url: string): RequestInit {
+  return String(url || '').includes('/api/data/')
+    ? { credentials: 'include' as RequestCredentials }
+    : {};
+}
+
+/**
  * 解析后端 JSON 错误体（FastAPI 常用 `detail`，部分接口用 `error`）。
  */
 export function parseApiErrorBody(data: unknown): string {

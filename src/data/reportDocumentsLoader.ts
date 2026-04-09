@@ -7,6 +7,7 @@
  */
 
 import type { MonitorItem, ReportDocument } from '../types';
+import { fetchInitForDataUrl } from '../utils/api';
 
 interface ParsedAiEntry {
   title: string;
@@ -367,7 +368,7 @@ export async function loadReportDocuments(
       return Array.from(new Set(urls.flatMap((url) => [url, encodeURI(url)])));
     };
 
-    const opts = (url: string) => (url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {});
+    const opts = (url: string) => fetchInitForDataUrl(url);
 
     // 1）尝试加载 ai热点/index.json 获取日期文件列表（可选）
     const indexFiles: string[] = [];
@@ -445,9 +446,8 @@ export async function loadReportDocuments(
     const fetchOne = async (filename: string) => {
       const urls = buildCandidateUrls(filename);
       for (const url of urls) {
-        const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
         try {
-          const response = await fetch(url, opts);
+          const response = await fetch(url, fetchInitForDataUrl(url));
           if (!response.ok) {
             console.warn(`${filename} not found or failed to load (status ${response.status})`);
             continue;

@@ -8,10 +8,16 @@ import type {
   SensorTowerRemovedGameItem,
   SensorTowerTop5OverviewItem,
 } from '../types';
+import { fetchInitForDataUrl } from '../utils/api';
 
 type GetDataUrl = (filename: string) => string;
 
 let sensorTowerDbPromise: Promise<any | null> | null = null;
+
+/** 登录态或数据 URL 切换后必须清空，否则会一直复用首次失败结果（如先 401/404、后走 /api/data 仍为空） */
+export function resetSensorTowerDatabaseCache(): void {
+  sensorTowerDbPromise = null;
+}
 
 async function getSensorTowerDatabase(getDataUrl?: GetDataUrl): Promise<any | null> {
   if (!sensorTowerDbPromise) {
@@ -23,8 +29,7 @@ async function getSensorTowerDatabase(getDataUrl?: GetDataUrl): Promise<any | nu
           locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
         });
         const dbPath = getDataUrl ? getDataUrl('sensortower_top100.db') : 'sensortower_top100.db';
-        const opts = dbPath.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-        const res = await fetch(dbPath, opts);
+        const res = await fetch(dbPath, fetchInitForDataUrl(dbPath));
         if (!res.ok) {
           console.error('Failed to fetch sensortower_top100.db:', res.status, res.statusText);
           return null;

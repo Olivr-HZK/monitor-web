@@ -24,6 +24,8 @@ from passlib.hash import pbkdf2_sha256
 from config import (
     PORT,
     CORS_ORIGINS,
+    COOKIE_SAMESITE,
+    COOKIE_SECURE,
     JWT_SECRET,
     LOGIN_USERNAME,
     LOGIN_PASSWORD_HASH,
@@ -170,7 +172,14 @@ async def login(body: LoginBody, request: Request):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     token = create_token(username)
     resp = JSONResponse(content={"user": username})
-    resp.set_cookie("token", token, httponly=True, max_age=7 * 24 * 3600, samesite="lax")
+    resp.set_cookie(
+        "token",
+        token,
+        httponly=True,
+        max_age=7 * 24 * 3600,
+        samesite=COOKIE_SAMESITE,  # type: ignore[arg-type]
+        secure=COOKIE_SECURE,
+    )
     return resp
 
 
@@ -197,7 +206,13 @@ async def debug_cors():
 @app.post("/api/logout")
 async def logout():
     resp = JSONResponse(content={"ok": True})
-    resp.delete_cookie("token")
+    resp.delete_cookie(
+        "token",
+        path="/",
+        secure=COOKIE_SECURE,
+        httponly=True,
+        samesite=COOKIE_SAMESITE,  # type: ignore[arg-type]
+    )
     return resp
 
 

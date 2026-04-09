@@ -13,7 +13,11 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
     { label: '监测汇总', type: '全部', active: selectedType === '全部' },
     { label: 'AI热点', type: 'ai热点监测', active: selectedType === 'ai热点监测' },
     { label: '趋势监测', type: '热点趋势监测', active: selectedType === '热点趋势监测' },
-    { label: '休闲游戏监测', type: '休闲游戏监测', active: selectedType === '休闲游戏监测' },
+    {
+      label: '休闲游戏监测',
+      type: '休闲游戏监测',
+      active: selectedType === '休闲游戏监测' || selectedType === '竞品社媒监控',
+    },
     { label: 'AI产品监测', type: 'AI产品监测', active: selectedType === 'AI产品监测' },
   ];
 

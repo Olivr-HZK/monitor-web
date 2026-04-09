@@ -87,7 +87,7 @@ CORS_ORIGIN=https://app.example.com
 - 多个前端（如预发、生产）用逗号分隔：
 
   ```env
-  CORS_ORIGIN=https://app.example.com,https://Oliver-HZK.github.io
+  CORS_ORIGIN=https://app.example.com,https://olivr-hzk.github.io
   ```
 
 - 不要长期用 `CORS_ORIGIN=*` 配合带 Cookie 的跨域（浏览器会拒绝）。

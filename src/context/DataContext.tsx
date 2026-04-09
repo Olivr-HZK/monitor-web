@@ -8,6 +8,7 @@ import {
   loadSensorTowerStoreChanges,
   loadSensorTowerRemovedGames,
   loadSensorTowerTop5Overview,
+  resetSensorTowerDatabaseCache,
 } from '../data/sensortowerTopLoader';
 import { buildSensorTowerWeeklyItems } from '../data/sensortowerWeeklyReport';
 import {
@@ -17,7 +18,7 @@ import {
   loadAiUaWeeklyReportFromDb,
   loadAiUaCreativeCardsFromDb,
 } from '../data/aiProductLoader';
-import { loadReportsData } from '../data/reportsLoader';
+import { loadReportsData, resetGameplayDatabaseCache } from '../data/reportsLoader';
 import { loadWeeklyReportsFromDatabase } from '../data/weeklyReportLoader';
 import { loadAllDailyReports } from '../data/dailyReportLoader';
 import { loadReportDocuments } from '../data/reportDocumentsLoader';
@@ -178,6 +179,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!shouldLoadData) return;
     const loadData = async () => {
+      // 避免 sql.js 模块级缓存锁死：曾 401/静态 404 后永久 null，改走 API 也不重拉
+      resetSensorTowerDatabaseCache();
+      resetGameplayDatabaseCache();
+
       // 超时保护：避免大文件/慢网络导致永远停在「数据加载中」
       const timeoutMs = 28000;
       const timeoutId = setTimeout(() => {

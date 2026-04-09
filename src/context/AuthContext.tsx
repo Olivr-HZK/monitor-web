@@ -147,10 +147,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         const base = getApiBase().trim();
         if (base) {
+          const isLocal =
+            typeof window !== 'undefined' &&
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+          const pageOrigin = typeof window !== 'undefined' ? window.location.origin : '';
           return {
             ok: false,
-            error:
-              '无法连接后端（多为跨域拦截）。本地开发请删掉 VITE_API_BASE_URL，在 .env.development 里用 VITE_DEV_API_PROXY=你的 API 地址，让请求走 Vite 代理；或把线上 CORS_ORIGIN 配成 http://localhost:5173（不要用 *）。',
+            error: isLocal
+              ? '无法连接后端（多为跨域拦截）。本地请在 .env.development 不要设置 VITE_API_BASE_URL，用 VITE_DEV_API_PROXY=你的 API 地址走 Vite 代理；或在后端 CORS_ORIGIN 中加入 http://localhost:5173（不要用 *）。'
+              : `无法连接后端（多为跨域拦截）。当前是静态页跨域访问 API：请在 API 服务器环境变量 CORS_ORIGIN 中加入「${pageOrigin}」（多个来源用英文逗号分隔；带 Cookie 时不要使用 *）。改完重启后端。若仍失败，以浏览器 Network 里请求头的 Origin 为准核对是否完全一致（含大小写）。`,
           };
         }
         const msg = e instanceof Error ? e.message : String(e);

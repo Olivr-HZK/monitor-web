@@ -63,6 +63,8 @@ interface MonitorListProps {
   headerAction?: React.ReactNode;
   /** 休闲游戏监测：当前数据块（微信/抖音 与 SensorTower 隔离，只显示对应来源的项） */
   selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
+  /** 列表页切换顶层监测类型（如从社媒视图跳到 AI 热点）；有则「分类」下拉会触发路由跳转 */
+  onNavigateMonitorType?: (type: MonitorType) => void;
   onItemClick?: (item: MonitorItem) => void;
 }
 
@@ -79,6 +81,7 @@ const MonitorList = ({
   pageTitle,
   headerAction,
   selectedCasualSourceSection,
+  onNavigateMonitorType,
   onItemClick
 }: MonitorListProps) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -410,6 +413,22 @@ const MonitorList = ({
             </div>
           ) : (
             <>
+              {!isStoreChangeView && isCompetitorSocialView && onNavigateMonitorType && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-slate-600 whitespace-nowrap">切换模块</span>
+                  <select
+                    value={selectedType === '竞品社媒监控' ? '休闲游戏监测' : selectedType}
+                    onChange={(e) => onNavigateMonitorType(e.target.value as MonitorType)}
+                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {monitorTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {!isStoreChangeView &&
                 selectedType === '休闲游戏监测' &&
                 selectedCasualGameCategory === '竞品' &&
@@ -496,6 +515,11 @@ const MonitorList = ({
                     value={selectedType}
                     onChange={(e) => {
                       const newType = e.target.value as MonitorType | '全部';
+                      if (newType === '全部') return;
+                      if (onNavigateMonitorType) {
+                        onNavigateMonitorType(newType as MonitorType);
+                        return;
+                      }
                       if (propSelectedType === undefined) {
                         setInternalSelectedType(newType);
                       }

@@ -52,7 +52,7 @@
 | `JWT_SECRET` | JWT 签名密钥 | 生产必填，且要随机长串 |
 | `LOGIN_USERNAME` | 登录用户名 | 否，默认 admin |
 | `LOGIN_PASSWORD_HASH` | 登录密码哈希（pbkdf2-sha256 或 bcrypt） | 生产必填，否则等于无密码 |
-| `CORS_ORIGIN` | 允许的前端来源，如 `https://Oliver-HZK.github.io` | 生产建议填，本地可 `*` |
+| `CORS_ORIGIN` | 允许的前端来源，如 `https://olivr-hzk.github.io` | 生产建议填，本地可 `*` |
 | `OPENAI_API_KEY` | 大模型 API Key（OpenRouter / OpenAI 等） | 要用 AI 对话必填 |
 | `OPENAI_BASE_URL` | 大模型接口根地址 | 否，默认 OpenAI；用 OpenRouter 则填其 API 地址 |
 | `OPENAI_MODEL` | 模型名 | 否，有默认值 |

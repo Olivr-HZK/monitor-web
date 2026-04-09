@@ -4,6 +4,7 @@
  */
 
 import type { MonitorItem, ReportDocument } from '../types';
+import { fetchInitForDataUrl } from '../utils/api';
 
 /** 可选：后端鉴权时传入，用于拼接受保护数据 URL */
 type GetDataUrl = (filename: string) => string;
@@ -20,7 +21,7 @@ export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<Monit
     return `${yyyy}-${mm}-${dd}`;
   };
   const mdUrl = getDataUrl ? getDataUrl('热点/热点日报.md') : '热点/热点日报.md';
-  const opts = (url: string) => (url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {});
+  const opts = (url: string) => fetchInitForDataUrl(url);
   const baseUrl = (() => {
     const env = (import.meta as { env?: { BASE_URL?: string } }).env;
     return env?.BASE_URL ? String(env.BASE_URL).replace(/\/$/, '') : '';
@@ -164,8 +165,7 @@ export async function loadHotTrendReport(getDataUrl?: GetDataUrl): Promise<Monit
 export async function loadAIDailyReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
     const url = getDataUrl ? getDataUrl('ai热点/小红书周报.md') : 'ai热点/小红书周报.md';
-    const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-    const response = await fetch(url, opts);
+    const response = await fetch(url, fetchInitForDataUrl(url));
     if (!response.ok) {
       console.error('Failed to load ai热点/小红书周报.md');
       return [];
@@ -554,8 +554,7 @@ function parseAIDailyReport(text: string): MonitorItem[] {
 export async function loadUADailyReport(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
   try {
     const url = getDataUrl ? getDataUrl('休闲游戏检测/ua_report_daily.md') : '休闲游戏检测/ua_report_daily.md';
-    const opts = url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
-    const response = await fetch(url, opts);
+    const response = await fetch(url, fetchInitForDataUrl(url));
     if (!response.ok) {
       console.warn('Failed to load 休闲游戏检测/ua_report_daily.md');
       return [];

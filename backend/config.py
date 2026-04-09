@@ -34,6 +34,19 @@ LOGIN_PASSWORD_HASH = _str(os.environ.get("LOGIN_PASSWORD_HASH"))
 CORS_ORIGIN = _str(os.environ.get("CORS_ORIGIN"), "*")
 CORS_ORIGINS = _csv(os.environ.get("CORS_ORIGIN"), ["*"])
 
+# 登录 Cookie：前端与 API 不同站点（如 GitHub Pages → api.xxx）时须 COOKIE_SAMESITE=none + COOKIE_SECURE=true，否则跨站 fetch 不会带上 token，/api/data 全 401
+_raw_cookie_samesite = _str(os.environ.get("COOKIE_SAMESITE"), "lax").lower()
+if _raw_cookie_samesite not in ("lax", "strict", "none"):
+    _raw_cookie_samesite = "lax"
+COOKIE_SAMESITE: str = _raw_cookie_samesite
+_cookie_secure_env = (os.environ.get("COOKIE_SECURE") or "").strip().lower()
+if _cookie_secure_env in ("1", "true", "yes"):
+    COOKIE_SECURE = True
+elif _cookie_secure_env in ("0", "false", "no"):
+    COOKIE_SECURE = False
+else:
+    COOKIE_SECURE = COOKIE_SAMESITE == "none"
+
 FEISHU_APP_ID = _str(os.environ.get("FEISHU_APP_ID") or os.environ.get("app_id"))
 FEISHU_APP_SECRET = _str(os.environ.get("FEISHU_APP_SECRET") or os.environ.get("app_secret"))
 FEISHU_MEDIA_PUBLIC = _bool(os.environ.get("FEISHU_MEDIA_PUBLIC"))
@@ -63,6 +76,7 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", _PROJECT_ROOT / "data")).resolve()
 ALLOWED_PREFIXES = ("ai产品/", "ai热点/", "休闲游戏检测/", "热点/")
 ALLOWED_ROOT_FILES = {
     "competitor_data.db",
+    "sensortower_top100.db",
     "sensortower_applist.db",
     "ai_products_ua.db",
     "wechatdouyin.db",

@@ -13,6 +13,7 @@ import {
 } from '../utils/minigameRankChange';
 import type { MonitorItem, ReportDocument, CasualGameMainCategory } from '../types';
 import type { GamePlatformKey } from '../types';
+import { fetchInitForDataUrl } from '../utils/api';
 
 const REPORTS_BASE = '休闲游戏检测';
 const INDEX_FILENAME = '休闲游戏检测/index.json';
@@ -48,7 +49,7 @@ interface ReportsCsvRow {
 type GetDataUrl = (filename: string) => string;
 
 function getFetchOptions(url: string): RequestInit {
-  return url.startsWith('/api') ? { credentials: 'include' as RequestCredentials } : {};
+  return fetchInitForDataUrl(url);
 }
 
 /** 静态资源 base（Vite base，如 /monitor-web/），保证请求带上前缀 */
@@ -484,6 +485,11 @@ const GAME_NAME_TO_DB_ALIAS: Record<string, string> = {
 
 let gameplayDbPromise: Promise<any | null> | null = null;
 
+/** 与 sensortower 同理：首次 fetch 失败后须允许重试 */
+export function resetGameplayDatabaseCache(): void {
+  gameplayDbPromise = null;
+}
+
 /** 初始化并缓存 wechatdouyin.db（微信/抖音小游戏数据库，含 games / top20_ranking / rank_changes） */
 async function getGameplayDatabase(getDataUrl?: GetDataUrl): Promise<any | null> {
   if (!gameplayDbPromise) {
@@ -494,9 +500,8 @@ async function getGameplayDatabase(getDataUrl?: GetDataUrl): Promise<any | null>
         const SQL = await initSqlJs({
           locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
         });
-        const opts = { credentials: 'include' as RequestCredentials };
         let dbPath = getDataUrl ? getDataUrl('wechatdouyin.db') : 'wechatdouyin.db';
-        let res = await fetch(dbPath, dbPath.startsWith('/api') ? opts : {});
+        let res = await fetch(dbPath, fetchInitForDataUrl(dbPath));
         if (!res.ok && typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
           dbPath = '/wechatdouyin.db';
           res = await fetch(dbPath);

@@ -164,7 +164,7 @@ const Sidebar = ({
                   <button
                     onClick={() => onTypeSelect?.(type)}
                     className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
-                      selectedType === type
+                      selectedType === type || (type === '休闲游戏监测' && selectedType === '竞品社媒监控')
                         ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
                         : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                     }`}
@@ -173,7 +173,7 @@ const Sidebar = ({
                     <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
                   </button>
 
-                  {selectedType === type && (
+                  {(selectedType === type || (type === '休闲游戏监测' && selectedType === '竞品社媒监控')) && (
                     <div className="ml-4 space-y-3">
                       {/* 微信 / 抖音 & SensorTower 两个大块 */}
                       {casualSourceSections.map((section) => (

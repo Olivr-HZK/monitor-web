@@ -5,6 +5,17 @@
 前端：React + TypeScript + Vite + Tailwind CSS  
 后端：FastAPI（Python）
 
+### 前端界面与路由（当前版本）
+
+- **整体风格**：高对比、硬边阴影与粗边框的终端/情报面板风格；正文字体 Plus Jakarta Sans，标题数字用 Outfit（见 `index.html` 字体引用与 `tailwind.config.js` 主题扩展）。
+- **首页**：路由 `/`，展示四类监测入口与汇总统计；顶栏可选「全部 / AI热点 / 趋势监测 / 休闲游戏监测 / AI产品监测」。
+- **按类型工作台**：路由 `/type/:monitorType`（`monitorType` 为 URL 编码的中文类型名，如「休闲游戏监测」）。主内容在左、右侧为「监测源」侧栏（可纵向滚动）。
+- **休闲游戏监测**：默认数据源块为 **SensorTower**，侧栏中 **SensorTower 榜单** 区块在 **微信 / 抖音小游戏** 之上；含周报简要、商店页变化、竞品（社媒 / UA）、我方产品检测占位等。可从工作台进入微信/抖音或 SensorTower 排行榜子页。
+- **独立休闲入口**：构建产物含 `casual.html`，仅休闲游戏相关布局（`src/casual/`），便于单独嵌入或专注使用。
+- **顶栏**：Logo + 类型切换；后端登录时显示用户名与「退出」。不含全局搜索框、通知铃铛、夜间模式开关（以当前代码为准）。
+
+更多面向使用者的界面说明见 **[docs/监测汇总网站说明.md](./docs/监测汇总网站说明.md)**。
+
 ---
 
 ## 依赖清单
@@ -54,6 +65,9 @@
 2. `backend/.env`（后端运行必需配置；示例见 `backend/.env.example`）
 3. 根目录 `.env.development`（本地开发前端联调；至少需要 `VITE_API_BASE_URL`）
 4. 根目录 `.env.staging`（预生产构建用；示例见 `.env.staging.example`）
+5. 根目录 `.env.production`（**生产构建** `npm run build` / `npm run deploy` 时自动加载；当前默认 `VITE_API_BASE_URL=https://api.gurublog.uk`，与公网 API 文档 [https://api.gurublog.uk/docs](https://api.gurublog.uk/docs) 一致）
+
+**后端 CORS**：公网 API 跑在 `api.gurublog.uk` 时，请在服务器上的 `backend/.env` 里设置 `CORS_ORIGIN`。本地用 `npm run dev` 连线上 API 时，需包含 `http://localhost:5173`（见 `backend/.env.example` 当前默认）；上线静态站后再把页面 origin（`https://…`）一并写上。
 
 ### 1) 准备后端登录密码哈希（生产建议）
 
@@ -340,51 +354,9 @@ npm run deploy:staging
 
 MIT
 
-# 监测汇总平台
+---
 
-一个现代化的监测汇总平台，支持 AI 热点检测、热点趋势检测、竞品社媒监控和游戏监控。基于 React + TypeScript + Vite + Tailwind CSS 构建。
-
-## 功能特性
-
-- 📱 响应式设计，适配各种屏幕尺寸
-- 🎨 现代化的 UI 设计
-- 📊 **4 种监测类型**：
-  - 🤖 AI 热点检测
-  - 📈 热点趋势检测
-  - 📱 竞品社媒监控
-  - 🎮 游戏监控
-- 🔍 多维度筛选和排序功能
-- 📚 监测源管理侧边栏
-- 🔎 搜索功能（UI已实现）
-- 📊 趋势分析和情感分析展示
-- 🌓 深色模式切换（UI已实现）
-
-## 技术栈
-
-- **React 19** - UI 框架
-- **TypeScript** - 类型安全
-- **Vite** - 构建工具
-- **Tailwind CSS** - 样式框架
-
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-npm install
-```
-
-### 2. 启动本地后端（FastAPI）
-
-```bash
-cd backend
-# 如有虚拟环境，先激活（示例）：
-# source backend/.venv/bin/activate
-pip install -r requirements.txt
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 3001
-```
-
-- 本地后端配置在 `backend/.env` 中，可参考 `backend/.env.example`。
+## 附录：AI 后端（Codex app-server）可选配置
 
 如需把 AI 对话改成 `codex app-server`（并支持数据库查询、联网搜索工具），在 `backend/.env` 设置：
 
@@ -396,219 +368,4 @@ CODEX_ENABLE_DB_TOOL=true
 CODEX_ENABLE_WEB_SEARCH_TOOL=true
 ```
 
-说明：`codex app-server` 建议配 `OPENAI_BASE_URL=https://api.openai.com/v1`（不建议 OpenRouter）。
-可选：配置 `TAVILY_API_KEY` 提升联网搜索质量；不配时默认走 DuckDuckGo。
-
-### 3. 启动本地前端（开发模式）
-
-在项目根目录：
-
-```bash
-npm run dev
-```
-
-建议在根目录创建 `.env.development`（可从 `.env.development.example` 复制），让前端在开发时直连本地后端：
-
-```env
-VITE_API_BASE_URL=http://localhost:3001
-```
-
-前端开发地址：`http://localhost:5173`
-
-### 4. 构建生产版本
-
-```bash
-npm run build
-```
-
-### 5. 预览生产构建
-
-```bash
-npm run preview
-```
-
-默认预览地址：`http://localhost:4173`
-
----
-
-## 部署静态页 + 后端，以及如何「回到纯静态」
-
-本项目常见部署方式是：
-
-- 前端：静态站（例如 GitHub Pages）
-- 后端：单独部署（例如 Railway 上的 FastAPI）
-
-前端是否「连后端」完全由构建时的 `VITE_API_BASE_URL` 决定，因此可以很容易在「连后端」和「纯静态」之间切换。
-
-### 1. 前置：后端允许静态页域名跨域
-
-在后端环境变量中配置（以 Railway 为例）：
-
-```env
-CORS_ORIGIN=https://你的静态站域名
-```
-
-例如静态页在 GitHub Pages：
-
-```env
-CORS_ORIGIN=https://Oliver-HZK.github.io
-```
-
-记下后端地址（例如）：
-
-```text
-https://monitor-web-production-xxxx.up.railway.app
-```
-
-> 注意：不要带末尾 `/`。
-
-### 2. 部署「连后端」版本的静态页
-
-在项目根目录执行（以 GitHub Pages 为例）：
-
-```bash
-# 1）构建时写入后端地址
-VITE_API_BASE_URL=https://monitor-web-production-xxxx.up.railway.app npm run build
-
-# 2）移除敏感文件（数据库等）
-node scripts/strip-sensitive-from-dist.js
-
-# 3）推送到 GitHub Pages
-npx gh-pages -d dist
-```
-
-构建后的前端会把所有 `/api/...` 请求发到上述后端地址。
-
-### 3. 一键「回到纯静态」版本
-
-如果发现连后端的版本在静态站上有问题，可以随时重新部署一版「纯静态」页面覆盖掉：
-
-```bash
-# 不设置（或清空） VITE_API_BASE_URL，回到纯静态
-VITE_API_BASE_URL= npm run build
-
-node scripts/strip-sensitive-from-dist.js
-npx gh-pages -d dist
-```
-
-- 这不会改源码，也不动 git，只是重新生成 `dist` 并再次部署。
-- 新部署完成后，线上静态页就会恢复为「不连后端，只使用打包进去的数据文件」的模式。
-
-## 项目结构
-
-```
-src/
-├── components/          # React 组件
-│   ├── Header.tsx       # 顶部导航栏
-│   ├── MonitorCard.tsx  # 监测数据卡片组件
-│   ├── MonitorList.tsx  # 监测列表组件
-│   └── Sidebar.tsx     # 右侧监测源边栏
-├── data/               # 数据文件
-│   ├── mockData.ts     # Mock 数据
-│   └── dataLoader.ts   # 数据加载器（CSV/DB）
-├── types/              # TypeScript 类型定义
-│   └── index.ts
-├── App.tsx             # 主应用组件
-└── main.tsx            # 应用入口
-```
-
-## 监测类型说明
-
-### 1. AI 热点检测
-监测 AI 领域的最新热点和动态，包括：
-- 新模型发布
-- 技术突破
-- 行业动态
-- 产品更新
-
-### 2. 热点趋势检测
-分析全网话题趋势，包括：
-- 话题热度变化
-- 趋势方向（上升/下降/稳定）
-- 讨论量统计
-- 趋势预测
-
-### 3. 竞品社媒监控
-监控竞品在社交媒体上的动态，包括：
-- 产品发布
-- 融资消息
-- 用户反馈
-- 营销活动
-
-### 4. 游戏监控
-监测游戏行业相关动态，包括：
-- 游戏上线
-- 版本更新
-- 行业报告
-- 玩家讨论
-
-## 数据集成
-
-当前项目使用 Mock 数据。要集成真实数据源，请参考 `src/data/dataLoader.ts` 中的示例代码。
-
-### 从 CSV 文件读取数据
-
-```typescript
-import { parseCSV } from './data/dataLoader';
-const items = await parseCSV('path/to/monitors.csv');
-```
-
-### 从数据库读取数据
-
-```typescript
-import { loadFromDatabase, loadSourcesFromDatabase } from './data/dataLoader';
-const items = await loadFromDatabase();
-const sources = await loadSourcesFromDatabase();
-```
-
-## CSV 数据格式
-
-监测数据的 CSV 格式示例：
-
-```csv
-id,type,title,source,platform,date,time,views,engagement,description,tags,language,trend,sentiment
-1,ai热点检测,标题,来源,平台,01-28,14:30,12500,892,描述,"AI,GPT-5",中文,up,positive
-```
-
-字段说明：
-- `id`: 唯一标识符
-- `type`: 监测类型（ai热点检测/热点趋势检测/竞品社媒监控/游戏监控）
-- `title`: 标题
-- `source`: 来源
-- `platform`: 平台（微博/Twitter/Reddit等）
-- `date`: 日期（MM-DD格式）
-- `time`: 时间（HH:MM格式）
-- `views`: 浏览量
-- `engagement`: 互动数
-- `description`: 描述
-- `tags`: 标签（用分号分隔）
-- `language`: 语言
-- `trend`: 趋势（up/down/stable）
-- `sentiment`: 情感（positive/negative/neutral）
-
-## 开发说明
-
-### 添加新的监测数据
-
-编辑 `src/data/mockData.ts` 文件，在 `mockMonitorItems` 数组中添加新的监测对象。
-
-### 自定义样式
-
-项目使用 Tailwind CSS，可以直接在组件中使用 Tailwind 类名，或编辑 `tailwind.config.js` 来自定义主题。
-
-## 后续开发建议
-
-1. **数据集成**：实现从 CSV 或数据库读取真实数据
-2. **路由**：添加 React Router 实现多页面导航
-3. **状态管理**：考虑使用 Zustand 或 Redux 管理全局状态
-4. **API 集成**：添加后端 API 接口调用
-5. **用户认证**：实现登录/注册功能
-6. **实时更新**：添加 WebSocket 支持实时数据更新
-7. **数据可视化**：添加图表展示趋势分析
-8. **导出功能**：支持导出监测报告
-9. **通知系统**：重要监测事件的通知提醒
-10. **深色模式**：完善深色模式切换功能
-
-## 许可证
-
-MIT
+说明：`codex app-server` 建议配 `OPENAI_BASE_URL=https://api.openai.com/v1`（不建议 OpenRouter）。可选：配置 `TAVILY_API_KEY` 提升联网搜索质量；不配时默认走 DuckDuckGo。

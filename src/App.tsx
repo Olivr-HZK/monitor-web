@@ -28,17 +28,21 @@ function App() {
   }
   return (
     <AiPageProvider>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/type/:monitorType" element={<MonitorTypePage />} />
-        <Route path="/rankings/ai" element={<AiRankingPage />} />
-        <Route path="/rankings/casual/:section" element={<CasualRankingPage />} />
-        <Route path="/report/:id" element={<ReportDetailPage />} />
-        <Route path="/store/:id" element={<StoreDetailPage />} />
-        <Route path="/gameplay/:source/:gameName" element={<GameplayDetailPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <AiChatWidget />
+      <div className="flex min-h-screen w-full">
+        <AiChatWidget />
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/type/:monitorType" element={<MonitorTypePage />} />
+            <Route path="/rankings/ai" element={<AiRankingPage />} />
+            <Route path="/rankings/casual/:section" element={<CasualRankingPage />} />
+            <Route path="/report/:id" element={<ReportDetailPage />} />
+            <Route path="/store/:id" element={<StoreDetailPage />} />
+            <Route path="/gameplay/:source/:gameName" element={<GameplayDetailPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </div>
     </AiPageProvider>
   );
 }

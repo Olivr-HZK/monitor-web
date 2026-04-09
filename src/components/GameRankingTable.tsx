@@ -28,8 +28,12 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
     if (rankingType === '榜单异动' && platformFilter && platformFilter !== 'all') {
       list = list.filter((it) => {
         const label = (it.platformLabel || '').trim();
-        if (platformFilter === '微信小游戏') return label === '微信小游戏' || label === 'wx';
-        if (platformFilter === '抖音小游戏') return label === '抖音小游戏' || label === 'dy';
+        if (platformFilter === '微信小游戏') {
+          return label === '微信小游戏' || label === 'wx' || label.startsWith('微信小游戏');
+        }
+        if (platformFilter === '抖音小游戏') {
+          return label === '抖音小游戏' || label === 'dy' || label.startsWith('抖音小游戏');
+        }
         return true;
       });
     }
@@ -39,7 +43,8 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
       (it) =>
         (it.name && it.name.toLowerCase().includes(q)) ||
         (it.developer && it.developer.toLowerCase().includes(q)) ||
-        (it.category && it.category.toLowerCase().includes(q))
+        (it.category && it.category.toLowerCase().includes(q)) ||
+        (it.listType && it.listType.toLowerCase().includes(q))
     );
   }, [items, weekFilter, hasWeekRange, searchTerm, rankingType, platformFilter]);
   /** 排名变化展示：数据库带 ↑/↓ 则原样显示；否则按数字或「上升/下降」文案显示为 ↑/↓（没箭头时按上升算） */
@@ -115,7 +120,11 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
   const isCompetitorRanking = rankingType === '竞品动态';
   const isMiniGameRanking = rankingType === '微信小游戏' || rankingType === '抖音小游戏';
 
-  // 微信/抖音小游戏榜单：排名、游戏名称、游戏类型、排名变化、监控日期、开发公司；多周合并时加周区间列与筛选；支持游戏名搜索
+  const hasBoardColumn =
+    isMiniGameRanking &&
+    items.some((it) => it.chartKey !== undefined || (it.listType != null && String(it.listType).trim() !== ''));
+
+  // 微信/抖音小游戏榜单：排名、游戏名称、[榜单]、游戏类型、排名变化、监控日期、开发公司；多周合并时加周区间列与筛选；支持游戏名搜索
   if (isMiniGameRanking) {
     return (
       <div>
@@ -150,11 +159,14 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
           <span className="text-sm text-slate-500">共 {filteredItems.length} 条</span>
         </div>
         <div className="overflow-x-auto -mx-6 max-h-[70vh] overflow-y-auto">
-          <table className="w-full min-w-[800px]">
+          <table className={`w-full ${hasBoardColumn ? 'min-w-[920px]' : 'min-w-[800px]'}`}>
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-200 bg-slate-50">
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">排名</th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏名称</th>
+              {hasBoardColumn && (
+                <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">榜单</th>
+              )}
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏类型</th>
               <th className="text-center py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1">
@@ -191,6 +203,11 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
                     <div className="font-semibold text-slate-900 text-base">{item.name}</div>
                   )}
                 </td>
+                {hasBoardColumn && (
+                  <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600 max-w-[14rem] truncate" title={item.listType || '—'}>
+                    {item.listType || '—'}
+                  </td>
+                )}
                 <td className="py-4 px-6 whitespace-nowrap text-sm text-slate-600">
                   休闲
                 </td>

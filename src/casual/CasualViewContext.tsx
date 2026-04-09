@@ -35,7 +35,7 @@ export const CasualViewProvider = ({ children }: { children: React.ReactNode }) 
   const [selectedCasualGameCompetitorSub, setSelectedCasualGameCompetitorSub] =
     useState<CasualGameCompetitorSub | null>(null);
   const [selectedCasualSourceSection, setSelectedCasualSourceSection] =
-    useState<'wechat_douyin' | 'sensortower'>('wechat_douyin');
+    useState<'wechat_douyin' | 'sensortower'>('sensortower');
   const [selectedAiProductSub, setSelectedAiProductSub] =
     useState<AiProductSubCategory>('产品周报');
 

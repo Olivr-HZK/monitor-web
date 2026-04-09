@@ -3,7 +3,7 @@ import type { MonitorItem, MonitorType } from '../types';
 import type { GamePlatformKey, CasualGameMainCategory, CasualGameCompetitorSub, AiProductSubCategory } from '../types';
 import MonitorCard from './MonitorCard';
 
-/** 与侧栏结构对齐：监测类型 → 数据块（微信/抖音 或 SensorTower，或竞品）→ 子项 */
+/** 与侧栏结构对齐：监测类型 → 数据块（SensorTower 或 微信/抖音，或竞品）→ 子项 */
 function getCasualGameHeading(
   selectedCasualSourceSection: 'wechat_douyin' | 'sensortower' | undefined,
   selectedCasualGameCategory: CasualGameMainCategory | null | undefined,

@@ -11,6 +11,11 @@ node_modules
 dist
 .env
 .env.local
+.env.development
+.env.staging
+.env.production
+*.db-shm
+*.db-wal
 server/.env
 # 用户反馈数据（玩法解析申请等）
 data/

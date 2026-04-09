@@ -6,6 +6,25 @@ import { ChatMarkdown } from './ChatMarkdown';
 
 const STORAGE_KEY_V3 = 'ai-chat-sessions-v3';
 const STORAGE_KEY_V2 = 'ai-chat-sessions-v2';
+const STORAGE_SIDEBAR_COLLAPSED = 'ai-sidebar-collapsed';
+const STORAGE_SIDEBAR_WIDTH = 'ai-sidebar-width';
+const SIDEBAR_WIDTH_DEFAULT = 380;
+const SIDEBAR_WIDTH_MIN = 280;
+const SIDEBAR_WIDTH_MAX = 560;
+
+function loadSidebarPrefs(): { collapsed: boolean; width: number } {
+  try {
+    const c = localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED);
+    const w = localStorage.getItem(STORAGE_SIDEBAR_WIDTH);
+    const parsed = w ? Number.parseInt(w, 10) : NaN;
+    const width = Number.isFinite(parsed)
+      ? Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, parsed))
+      : SIDEBAR_WIDTH_DEFAULT;
+    return { collapsed: c === '1', width };
+  } catch {
+    return { collapsed: false, width: SIDEBAR_WIDTH_DEFAULT };
+  }
+}
 
 export type AiIntentMeta = {
   mode?: string;
@@ -19,6 +38,8 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   intentMeta?: AiIntentMeta;
+  /** 用户对助手本条回复的评价 */
+  feedback?: 'up' | 'down';
 }
 
 interface ChatSession {
@@ -113,7 +134,9 @@ const AiChatWidget = () => {
     [location.pathname, location.search, location.hash, pageMeta]
   );
 
-  const [open, setOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadSidebarPrefs().collapsed);
+  const [sidebarWidth, setSidebarWidth] = useState(() => loadSidebarPrefs().width);
+  const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const loaded = loadSessionsFromStorage();
     if (loaded) return loaded.sessions;
@@ -148,11 +171,47 @@ const AiChatWidget = () => {
   }, [sessions, activeSessionId]);
 
   useEffect(() => {
-    if (!open || messages.length === 0) return;
+    try {
+      localStorage.setItem(STORAGE_SIDEBAR_COLLAPSED, sidebarCollapsed ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_SIDEBAR_WIDTH, String(sidebarWidth));
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (sidebarCollapsed || messages.length === 0) return;
     const el = containerRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, open]);
+  }, [messages, sidebarCollapsed]);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startW: sidebarWidth };
+    const onMove = (ev: MouseEvent) => {
+      const r = resizeRef.current;
+      if (!r) return;
+      const dx = ev.clientX - r.startX;
+      setSidebarWidth(
+        Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, r.startW + dx))
+      );
+    };
+    const onUp = () => {
+      resizeRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const handleStop = () => {
     abortRef.current?.abort();
@@ -181,8 +240,8 @@ const AiChatWidget = () => {
     setInput('');
   };
 
-  const handleToggle = () => {
-    setOpen(!open);
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((c) => !c);
     setError(null);
   };
 
@@ -502,6 +561,7 @@ const AiChatWidget = () => {
   );
 
   const handleSend = async () => {
+    if (loading) return;
     const text = input.trim();
     if (!text) return;
     setInput('');
@@ -512,8 +572,56 @@ const AiChatWidget = () => {
     void runSendWithText(text);
   };
 
+  const handleFeedback = useCallback(
+    (messageId: string, rating: 'up' | 'down') => {
+      setSessions((prev) => {
+        const sid = activeSessionId || prev[0]?.id;
+        if (!sid) return prev;
+        let submitRating: 'up' | 'down' | null = null;
+        const nextSessions = prev.map((s) => {
+          if (s.id !== sid) return s;
+          return {
+            ...s,
+            messages: s.messages.map((msg) => {
+              if (msg.id !== messageId || msg.role !== 'assistant') return msg;
+              const cur = msg.feedback;
+              const nu = cur === rating ? undefined : rating;
+              submitRating = nu ?? null;
+              return { ...msg, feedback: nu };
+            }),
+            updatedAt: Date.now(),
+          };
+        });
+        if (submitRating) {
+          const r = submitRating;
+          const mid = messageId;
+          const path = location.pathname;
+          const sess = sid;
+          queueMicrotask(() => {
+            void fetch(getApiUrl('/api/ai/feedback'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                messageId: mid,
+                rating: r,
+                sessionId: sess,
+                pathname: path,
+              }),
+            }).catch(() => {
+              /* 离线或 CORS 时仍保留本地记录 */
+            });
+          });
+        }
+        return nextSessions;
+      });
+    },
+    [activeSessionId, location.pathname]
+  );
+
   const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
+    if (loading) return;
     if (e.nativeEvent.isComposing || composingRef.current) {
       return;
     }
@@ -527,46 +635,157 @@ const AiChatWidget = () => {
   );
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      {open && (
-        <div className="mb-3 w-[min(100vw-1.5rem,28rem)] sm:w-[min(100vw-2rem,40rem)] rounded-2xl border border-slate-200 bg-white shadow-xl flex flex-row max-h-[min(36rem,88vh)] overflow-hidden">
-          {/* 左侧：对话区 */}
-          <div className="flex flex-col flex-1 min-w-0 min-h-0">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50 gap-1">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-sm">
+    <aside
+      className="relative z-40 flex h-screen shrink-0 flex-col border-r border-slate-200 bg-white shadow-[2px_0_12px_rgba(15,23,42,0.06)]"
+      style={
+        sidebarCollapsed
+          ? { width: 48 }
+          : { width: sidebarWidth, minWidth: SIDEBAR_WIDTH_MIN, maxWidth: SIDEBAR_WIDTH_MAX }
+      }
+    >
+      {sidebarCollapsed ? (
+        <div className="flex h-full flex-col items-center border-r border-slate-200 bg-slate-50 py-3">
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            title="展开 AI 助手"
+            aria-expanded={false}
+            className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg shadow-sm hover:bg-slate-100"
+          >
+            🤖
+          </button>
+          <span
+            className="mt-3 select-none text-[10px] font-medium text-slate-500 [writing-mode:vertical-rl]"
+            style={{ writingMode: 'vertical-rl' }}
+          >
+            监测助手
+          </span>
+        </div>
+      ) : (
+        <>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-row">
+            {/* 左侧：会话列表（与 Cursor 一致，线程在左） */}
+            <aside className="flex w-[7.5rem] sm:w-36 flex-shrink-0 flex-col border-r border-slate-200 bg-slate-50">
+              <div className="border-b border-slate-200 px-2 py-1.5 text-[10px] font-medium text-slate-500">
+                对话
+              </div>
+              <div className="flex-1 space-y-1 overflow-y-auto px-1.5 py-1">
+                {sortedSessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`rounded-lg border text-left text-[11px] ${
+                      s.id === activeSessionId
+                        ? 'border-blue-300 bg-blue-50 text-blue-900'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {renamingId === s.id ? (
+                      <div className="space-y-1 p-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              commitRename();
+                            }
+                            if (e.key === 'Escape') {
+                              setRenamingId(null);
+                              setRenameDraft('');
+                            }
+                          }}
+                          className="w-full rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                          autoFocus
+                        />
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={commitRename}
+                            className="flex-1 rounded bg-blue-600 py-0.5 text-[10px] text-white"
+                          >
+                            保存
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenamingId(null);
+                              setRenameDraft('');
+                            }}
+                            className="flex-1 rounded border border-slate-200 py-0.5 text-[10px]"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSession(s.id)}
+                        className="block w-full truncate px-1.5 py-1.5 text-left"
+                        title={s.title}
+                      >
+                        {s.title}
+                      </button>
+                    )}
+                    {renamingId !== s.id && (
+                      <div className="flex border-t border-slate-100/80">
+                        <button
+                          type="button"
+                          onClick={(e) => startRename(e, s)}
+                          className="flex-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100"
+                          title="重命名"
+                        >
+                          改名
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSession(e, s.id)}
+                          className="flex-1 py-0.5 text-[10px] text-rose-500 hover:bg-rose-50"
+                          title="删除"
+                        >
+                          删
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </aside>
+
+            {/* 右侧：对话区 */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="flex items-center justify-between gap-1 border-b border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm text-white">
                   🤖
                 </span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 truncate">监测助手</div>
-                  <div className="text-[10px] text-slate-500 truncate">对话记录保存在本机浏览器</div>
+                  <div className="truncate text-sm font-semibold text-slate-900">监测助手</div>
+                  <div className="truncate text-[10px] text-slate-500">对话记录保存在本机浏览器</div>
                 </div>
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {loading && (
-                  <button
-                    type="button"
-                    onClick={handleStop}
-                    className="px-2 py-1 text-[11px] rounded-lg border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100"
-                  >
-                    停止
-                  </button>
-                )}
+              <div className="flex flex-shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={handleNewSession}
-                  className="px-2 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-100"
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
                 >
                   新对话
                 </button>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
-                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  onClick={toggleSidebarCollapsed}
+                  title="收起侧栏"
+                  aria-label="收起侧边栏"
+                  className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
-                  <span className="sr-only">关闭</span>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" stroke="currentColor" fill="none">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
                   </svg>
                 </button>
               </div>
@@ -641,6 +860,39 @@ const AiChatWidget = () => {
                         )}
                       </div>
                     )}
+                    {m.role === 'assistant' && !streamPlain && (m.content || '').trim() !== '' && (
+                      <div className="mt-2 flex items-center gap-0.5 border-t border-slate-100 pt-2">
+                        <span className="text-[10px] text-slate-400 mr-1">这条回答</span>
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(m.id, 'up')}
+                          title="有用"
+                          aria-label="点赞"
+                          className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] transition-colors ${
+                            m.feedback === 'up'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'text-slate-500 hover:bg-slate-100 border border-transparent'
+                          }`}
+                        >
+                          <span aria-hidden>👍</span>
+                          有用
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(m.id, 'down')}
+                          title="需改进"
+                          aria-label="点踩"
+                          className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] transition-colors ${
+                            m.feedback === 'down'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : 'text-slate-500 hover:bg-slate-100 border border-transparent'
+                          }`}
+                        >
+                          <span aria-hidden>👎</span>
+                          需改进
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 );
@@ -648,7 +900,7 @@ const AiChatWidget = () => {
               {loading && (
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span className="h-2 w-2 rounded-full bg-slate-300 animate-pulse" />
-                  正在回复…（可点「停止」）
+                  正在回复…（可点输入框右侧「停止」）
                 </div>
               )}
               {error && (
@@ -689,125 +941,50 @@ const AiChatWidget = () => {
                   placeholder="输入问题，回车发送 · Shift+Enter 换行"
                   className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
                 />
-                <button
-                  type="button"
-                  onClick={() => void handleSend()}
-                  disabled={loading || !input.trim()}
-                  className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs disabled:bg-slate-300 disabled:cursor-not-allowed"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path
-                      d="M5 12h14M12 5l7 7-7 7"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+                {loading ? (
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    title="停止生成"
+                    aria-label="停止本次回复"
+                    className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-rose-500 bg-rose-50 text-rose-600 hover:bg-rose-100"
+                  >
+                    <span className="h-2.5 w-2.5 rounded-sm bg-rose-600" aria-hidden />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleSend()}
+                    disabled={!input.trim()}
+                    title="发送"
+                    aria-label="发送"
+                    className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path
+                        d="M5 12h14M12 5l7 7-7 7"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           </div>
+          </div>
 
-          {/* 右侧：会话列表 */}
-          <aside className="w-[7.5rem] sm:w-36 flex-shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col">
-            <div className="px-2 py-1.5 text-[10px] font-medium text-slate-500 border-b border-slate-200">
-              对话
-            </div>
-            <div className="flex-1 overflow-y-auto py-1 px-1.5 space-y-1">
-              {sortedSessions.map((s) => (
-                <div
-                  key={s.id}
-                  className={`rounded-lg border text-left text-[11px] ${
-                    s.id === activeSessionId
-                      ? 'border-blue-300 bg-blue-50 text-blue-900'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {renamingId === s.id ? (
-                    <div className="p-1 space-y-1" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        value={renameDraft}
-                        onChange={(e) => setRenameDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            commitRename();
-                          }
-                          if (e.key === 'Escape') {
-                            setRenamingId(null);
-                            setRenameDraft('');
-                          }
-                        }}
-                        className="w-full rounded border border-slate-300 px-1 py-0.5 text-[11px]"
-                        autoFocus
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={commitRename}
-                          className="flex-1 rounded bg-blue-600 text-white py-0.5 text-[10px]"
-                        >
-                          保存
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRenamingId(null);
-                            setRenameDraft('');
-                          }}
-                          className="flex-1 rounded border border-slate-200 py-0.5 text-[10px]"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleSelectSession(s.id)}
-                      className="w-full text-left px-1.5 py-1.5 truncate block"
-                      title={s.title}
-                    >
-                      {s.title}
-                    </button>
-                  )}
-                  {renamingId !== s.id && (
-                    <div className="flex border-t border-slate-100/80">
-                      <button
-                        type="button"
-                        onClick={(e) => startRename(e, s)}
-                        className="flex-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100"
-                        title="重命名"
-                      >
-                        改名
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteSession(e, s.id)}
-                        className="flex-1 py-0.5 text-[10px] text-rose-500 hover:bg-rose-50"
-                        title="删除"
-                      >
-                        删
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </div>
+          {/* 拖拽调整侧栏宽度（类似 Cursor 可拖分隔条） */}
+          <button
+            type="button"
+            aria-label="拖拽调整侧栏宽度"
+            onMouseDown={handleResizeStart}
+            className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize border-0 bg-transparent p-0 hover:bg-blue-400/30"
+          />
+        </>
       )}
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-colors"
-      >
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-base">
-          🤖
-        </span>
-        <span>{open ? '收起 AI 助手' : 'AI 对话'}</span>
-      </button>
-    </div>
+    </aside>
   );
 };
 

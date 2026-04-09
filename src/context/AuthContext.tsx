@@ -3,7 +3,7 @@
  * 静态模式访问密码：优先从 public/auth-config.json 的 staticPasswordHash 读取，否则用构建时 VITE_STATIC_PASSWORD_HASH
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getApiUrl } from '../utils/api';
+import { getApiBase, getApiUrl } from '../utils/api';
 
 const STATIC_AUTH_KEY = 'static-auth';
 const AUTH_CONFIG_URL = 'auth-config.json';
@@ -73,19 +73,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     setLoading(true);
+    /** 已配置 VITE_API_BASE_URL 时，始终走后端登录页，不因网络/CORS 失败而退回「访问密码」静态门 */
+    const configuredBackend = Boolean(getApiBase().trim());
     try {
       const res = await fetch(getApiUrl('/api/me'), { credentials: 'include' });
       // 只有在 /api/me 正常响应（200 或 401）时，才认为「有后端」
-      // 其它状态（404/5xx 等）一律视为「无后端」，退回静态模式
+      // 其它状态（404/5xx 等）：未配置远程后端时退回静态；已配置则仍保持后端模式以便显示用户名+密码
       if (!(res.ok || res.status === 401)) {
-        setAuthMode('static');
-        const hash = await resolveStaticHash();
-        setStaticHash(hash);
-        if (hash) {
-          const stored = sessionStorage.getItem(STATIC_AUTH_KEY);
-          setUser(stored === hash ? '用户' : null);
+        if (configuredBackend) {
+          setAuthMode('backend');
+          setUser(null);
+          setStaticHash('');
         } else {
-          setUser('用户');
+          setAuthMode('static');
+          const hash = await resolveStaticHash();
+          setStaticHash(hash);
+          if (hash) {
+            const stored = sessionStorage.getItem(STATIC_AUTH_KEY);
+            setUser(stored === hash ? '用户' : null);
+          } else {
+            setUser('用户');
+          }
         }
         return;
       }
@@ -101,23 +109,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } catch {
-      setAuthMode('static');
-      const hash = await resolveStaticHash();
-      setStaticHash(hash);
-      if (hash) {
-        const stored = sessionStorage.getItem(STATIC_AUTH_KEY);
-        setUser(stored === hash ? '用户' : null);
+      if (configuredBackend) {
+        setAuthMode('backend');
+        setUser(null);
+        setStaticHash('');
       } else {
-        setUser('用户');
+        setAuthMode('static');
+        const hash = await resolveStaticHash();
+        setStaticHash(hash);
+        if (hash) {
+          const stored = sessionStorage.getItem(STATIC_AUTH_KEY);
+          setUser(stored === hash ? '用户' : null);
+        } else {
+          setUser('用户');
+        }
       }
     } finally {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
 
   const login = useCallback(
     async (username: string, password: string): Promise<{ ok: boolean; error?: string }> => {
@@ -135,7 +145,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user ?? username);
         return { ok: true };
       } catch (e) {
-        return { ok: false, error: '网络错误' };
+        const base = getApiBase().trim();
+        if (base) {
+          return {
+            ok: false,
+            error:
+              '无法连接后端（多为跨域拦截）。本地开发请删掉 VITE_API_BASE_URL，在 .env.development 里用 VITE_DEV_API_PROXY=你的 API 地址，让请求走 Vite 代理；或把线上 CORS_ORIGIN 配成 http://localhost:5173（不要用 *）。',
+          };
+        }
+        const msg = e instanceof Error ? e.message : String(e);
+        return { ok: false, error: msg ? `网络错误：${msg}` : '网络错误' };
       }
     },
     []

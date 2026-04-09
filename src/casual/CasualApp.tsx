@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AiPageProvider } from '../context/AiPageContext';
 import { useAuth } from '../context/AuthContext';
 import Login from '../components/Login';
 import CasualHomePage from './CasualHomePage';
@@ -24,16 +25,22 @@ function CasualApp() {
   }
 
   return (
-    <CasualViewProvider>
-      <Routes>
-        <Route path="/" element={<CasualHomePage />} />
-        <Route path="/rankings/casual/:section" element={<CasualRankingPage />} />
-        <Route path="/report/:id" element={<ReportDetailPage backTo="/" />} />
-        <Route path="/store/:id" element={<StoreDetailPage backTo="/" />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <AiChatWidget />
-    </CasualViewProvider>
+    <AiPageProvider>
+      <CasualViewProvider>
+        <div className="flex min-h-screen w-full">
+          <AiChatWidget />
+          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+            <Routes>
+              <Route path="/" element={<CasualHomePage />} />
+              <Route path="/rankings/casual/:section" element={<CasualRankingPage />} />
+              <Route path="/report/:id" element={<ReportDetailPage backTo="/" />} />
+              <Route path="/store/:id" element={<StoreDetailPage backTo="/" />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
+        </div>
+      </CasualViewProvider>
+    </AiPageProvider>
   );
 }
 

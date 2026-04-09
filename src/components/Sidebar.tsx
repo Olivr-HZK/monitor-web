@@ -58,7 +58,7 @@ const Sidebar = ({
   showAllTypeButton = true,
   aiProductVisibleSubs,
 }: SidebarProps) => {
-  const [internalCasualSourceSection, setInternalCasualSourceSection] = useState<'wechat_douyin' | 'sensortower'>('wechat_douyin');
+  const [internalCasualSourceSection, setInternalCasualSourceSection] = useState<'wechat_douyin' | 'sensortower'>('sensortower');
   const activeCasualSourceSection = propCasualSourceSection ?? internalCasualSourceSection;
   const setActiveCasualSourceSection = (s: 'wechat_douyin' | 'sensortower') => {
     onCasualSourceSectionSelect?.(s);
@@ -104,34 +104,24 @@ const Sidebar = ({
 
   return (
     <aside className="w-64 flex-shrink-0">
-      <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-y-contain rounded-2xl border border-slate-200 bg-white p-4 [scrollbar-gutter:stable]">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">监测源</h2>
+      <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-y-contain border-2 border-ink bg-white p-4 shadow-brutal-sm [scrollbar-gutter:stable]">
+        <h2 className="text-sm font-display font-bold uppercase tracking-widest text-inkLight mb-4 border-b-2 border-ink/10 pb-2">监测源</h2>
 
         {/* All option */}
         {showAllTypeButton && (
           <div className="mb-4">
             <button
               onClick={() => onTypeSelect?.('全部')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              className={`w-full flex items-center gap-3 px-3 py-2 font-bold transition-all border-2 ${
                 selectedType === '全部'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
+                  : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
               }`}
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="square" strokeLinejoin="miter" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
-              <span className="font-medium">全部</span>
+              <span className="uppercase tracking-widest text-xs">全部</span>
             </button>
           </div>
         )}
@@ -152,12 +142,12 @@ const Sidebar = ({
             )
               return null;
 
-            // 休闲游戏监测：右侧分为两个大块（微信/抖音 & SensorTower），每个下面为 周报简要（玩法拆解已移除）
+            // 休闲游戏监测：右侧分为两个大块（SensorTower & 微信/抖音），每个下面为 周报简要（玩法拆解已移除）
             // 另外保留「竞品监测」块（社媒监控 / UA素材）
             if (type === '休闲游戏监测') {
               const casualSourceSections: { id: 'wechat_douyin' | 'sensortower'; label: string; icon: string }[] = [
-                { id: 'wechat_douyin', label: '微信 / 抖音小游戏', icon: '💬' },
                 { id: 'sensortower', label: 'SensorTower 榜单', icon: '📊' },
+                { id: 'wechat_douyin', label: '微信 / 抖音小游戏', icon: '💬' },
               ];
               const baseCasualSubItems: { key: CasualGameMainCategory; label: string; icon: string }[] = [
                 { key: '周报简要', label: '周报简要', icon: '📋' },
@@ -173,14 +163,14 @@ const Sidebar = ({
                 <div key={type} className="space-y-2">
                   <button
                     onClick={() => onTypeSelect?.(type)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+                    className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
                       selectedType === type
-                        ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                        : 'text-slate-700 hover:bg-slate-100'
+                        ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
+                        : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                     }`}
                   >
-                    <span className="text-lg">{getTypeIcon(type)}</span>
-                    <span>{getTypeLabel(type)}</span>
+                    <span className="text-lg grayscale">{getTypeIcon(type)}</span>
+                    <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
                   </button>
 
                   {selectedType === type && (
@@ -188,13 +178,13 @@ const Sidebar = ({
                       {/* 微信 / 抖音 & SensorTower 两个大块 */}
                       {casualSourceSections.map((section) => (
                         <div key={section.id} className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-inkLight mt-2">
+                            <span className="w-5 h-5 border-2 border-ink/20 flex items-center justify-center flex-shrink-0 grayscale">
                               {section.icon}
                             </span>
-                            <span className="font-semibold">{section.label}</span>
+                            <span>{section.label}</span>
                           </div>
-                          <div className="ml-3 space-y-1">
+                          <div className="ml-2 pl-2 border-l-2 border-ink/10 space-y-1">
                             {[
                               ...baseCasualSubItems,
                               ...(section.id === 'sensortower' ? sensortowerOnlySubItems : []),
@@ -206,18 +196,18 @@ const Sidebar = ({
                                 <button
                                   key={key}
                                   type="button"
-                                  className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition-colors text-left ${
-                                    isSelected ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-700 hover:bg-slate-100'
+                                  className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
+                                    isSelected ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm' : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                                   }`}
                                   onClick={() => {
                                     setActiveCasualSourceSection(section.id);
                                     onCasualGameCategorySelect?.(key);
                                   }}
                                 >
-                                  <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">
+                                  <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
                                     {icon}
                                   </span>
-                                  <span className="flex-1 truncate font-medium">{label}</span>
+                                  <span className="flex-1 truncate text-xs uppercase tracking-wider">{label}</span>
                                 </button>
                               );
                             })}
@@ -226,14 +216,14 @@ const Sidebar = ({
                       ))}
 
                       {/* 竞品监测块：社媒监控 / UA素材 */}
-                      <div className="space-y-1 pt-2 border-t border-slate-200 mt-1">
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                      <div className="space-y-1 pt-3 border-t-2 border-ink/10 mt-2">
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-inkLight">
+                          <span className="w-5 h-5 border-2 border-ink/20 flex items-center justify-center flex-shrink-0 grayscale">
                             📊
                           </span>
-                          <span className="font-semibold">竞品监测</span>
+                          <span>竞品监测</span>
                         </div>
-                        <div className="ml-3 space-y-0.5">
+                        <div className="ml-2 pl-2 border-l-2 border-ink/10 space-y-1">
                           {competitorSubItems.map(({ key: subKey, label: subLabel, icon: subIcon }) => {
                             const isSubSelected =
                               selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === subKey;
@@ -241,18 +231,18 @@ const Sidebar = ({
                               <button
                                 key={subKey}
                                 type="button"
-                                className={`w-full flex items-center gap-2 py-1.5 pl-2 rounded text-xs transition-colors text-left ${
-                                  isSubSelected ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-700 hover:bg-slate-100'
+                                className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
+                                  isSubSelected ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm' : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                                 }`}
                                 onClick={() => {
                                   onCasualGameCategorySelect?.('竞品');
                                   onCasualGameCompetitorSubSelect?.(subKey);
                                 }}
                               >
-                                <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">
+                                <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
                                   {subIcon}
                                 </span>
-                                <span className="flex-1 truncate font-medium">{subLabel}</span>
+                                <span className="flex-1 truncate text-xs uppercase tracking-wider">{subLabel}</span>
                               </button>
                             );
                           })}
@@ -262,16 +252,18 @@ const Sidebar = ({
                       {/* 我方产品检测（占位，后续接入内容） */}
                       <div
                         id="sidebar-casual-own-product"
-                        className="space-y-1 pt-2 border-t border-slate-200 mt-1"
+                        className="space-y-1 pt-3 border-t-2 border-ink/10 mt-2"
                       >
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-inkLight">
+                          <span className="w-5 h-5 border-2 border-ink/20 flex items-center justify-center flex-shrink-0 grayscale">
                             🏠
                           </span>
-                          <span className="font-semibold">我方产品检测</span>
+                          <span>我方产品检测</span>
                         </div>
-                        <div className="ml-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 text-xs text-slate-400">
-                          内容待接入
+                        <div className="ml-2 pl-2 border-l-2 border-ink/10 mt-1">
+                          <div className="border-2 border-dashed border-ink/20 bg-surface/50 px-3 py-3 text-[10px] uppercase font-bold tracking-widest text-inkLight">
+                            内容待接入
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -294,14 +286,14 @@ const Sidebar = ({
                 <div key={type} className="space-y-2">
                   <button
                     onClick={() => onTypeSelect?.(type)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+                    className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
                       selectedType === type
-                        ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                        : 'text-slate-700 hover:bg-slate-100'
+                        ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
+                        : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                     }`}
                   >
-                    <span className="text-lg">{getTypeIcon(type)}</span>
-                    <span>{getTypeLabel(type)}</span>
+                    <span className="text-lg grayscale">{getTypeIcon(type)}</span>
+                    <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
                   </button>
 
                   {selectedType === type && (
@@ -312,15 +304,15 @@ const Sidebar = ({
                           <button
                             key={key}
                             type="button"
-                            className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition-colors text-left ${
-                              isSelected ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-700 hover:bg-slate-100'
+                            className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
+                              isSelected ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm' : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                             }`}
                             onClick={() => onAiProductSubSelect?.(key)}
                           >
-                            <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">
+                            <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
                               {icon}
                             </span>
-                            <span className="flex-1 truncate font-medium">{label}</span>
+                            <span className="flex-1 truncate text-xs uppercase tracking-wider">{label}</span>
                           </button>
                         );
                       })}
@@ -335,14 +327,14 @@ const Sidebar = ({
               <div key={type} className="space-y-2">
                 <button
                   onClick={() => onTypeSelect?.(type)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+                  className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
                     selectedType === type
-                      ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
+                      : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
                   }`}
                 >
-                  <span className="text-lg">{getTypeIcon(type)}</span>
-                  <span>{getTypeLabel(type)}</span>
+                  <span className="text-lg grayscale">{getTypeIcon(type)}</span>
+                  <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
                 </button>
 
                 {selectedType === type && (
@@ -350,17 +342,17 @@ const Sidebar = ({
                     {groupSources.map((source) => (
                       <div
                         key={source.id}
-                        className="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="flex items-start gap-3 p-2 border-2 border-transparent hover:border-ink/20 hover:bg-surface transition-all cursor-pointer"
                       >
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs">
+                        <div className="flex-shrink-0 w-6 h-6 border-2 border-ink/10 flex items-center justify-center text-xs grayscale">
                           {source.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-900 truncate">{source.name}</p>
+                          <p className="text-xs font-bold text-ink uppercase tracking-wider truncate">{source.name}</p>
                           {source.platform && (
-                            <p className="text-xs text-slate-500 mt-0.5">{source.platform}</p>
+                            <p className="text-[10px] font-bold text-inkLight mt-0.5 uppercase tracking-widest">{source.platform}</p>
                           )}
-                          <p className="text-xs text-slate-500 mt-0.5">{source.count}条</p>
+                          <p className="text-[10px] font-bold text-inkLight mt-0.5">{source.count} 条</p>
                         </div>
                       </div>
                     ))}

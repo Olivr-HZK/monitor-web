@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import type { GameRanking, GameRankingType } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import type { GameRanking, GameRankingItem, GameRankingType } from '../types';
 import GameRankingTable from './GameRankingTable';
+
+/** 空 chart_key 在 select value 中的占位，避免与「全部」混淆 */
+const CHART_KEY_EMPTY = '__chart_empty__';
 
 interface GameRankingViewProps {
   rankings: GameRanking[];
@@ -13,42 +16,91 @@ interface GameRankingViewProps {
 }
 
 const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }: GameRankingViewProps) => {
-  const [activeTab, setActiveTab] = useState<GameRankingType>(
-    rankings[0]?.type || '微信小游戏'
-  );
+  const [activeTab, setActiveTab] = useState<GameRankingType>(() => rankings[0]?.type ?? '微信小游戏');
   const [platformFilter, setPlatformFilter] = useState<'all' | '微信小游戏' | '抖音小游戏'>('all');
+  const [chartBoardFilter, setChartBoardFilter] = useState<'all' | string>('all');
+
+  useEffect(() => {
+    if (rankings.length === 0) return;
+    setActiveTab((prev) => (rankings.some((r) => r.type === prev) ? prev : rankings[0]!.type));
+  }, [rankings]);
+
+  useEffect(() => {
+    setChartBoardFilter('all');
+  }, [activeTab]);
 
   const isWechatDouyin = rankings.some(
     (r) => r.type === '微信小游戏' || r.type === '抖音小游戏'
   );
 
   const activeRanking = selectedPlatform
-    ? rankings.find(r => r.type === selectedPlatform)
-    : rankings.find(r => r.type === activeTab);
+    ? rankings.find((r) => r.type === selectedPlatform)
+    : rankings.find((r) => r.type === activeTab);
+
+  const chartBoardOptions = useMemo(() => {
+    if (!activeRanking || activeRanking.type === '榜单异动') return [];
+    const m = new Map<string, string>();
+    for (const it of activeRanking.items) {
+      const k = it.chartKey ?? '';
+      if (!m.has(k)) {
+        m.set(k, it.listType || (k === '' ? '默认榜' : k));
+      }
+    }
+    return Array.from(m.entries())
+      .map(([k, label]) => ({ key: k === '' ? CHART_KEY_EMPTY : k, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'));
+  }, [activeRanking]);
+
+  const showChartBoardFilter =
+    !selectedPlatform &&
+    isWechatDouyin &&
+    activeRanking &&
+    (activeRanking.type === '微信小游戏' || activeRanking.type === '抖音小游戏') &&
+    chartBoardOptions.length > 1;
+
+  const chartFilteredItems: GameRankingItem[] = useMemo(() => {
+    if (!activeRanking) return [];
+    if (activeRanking.type === '榜单异动') return activeRanking.items;
+    if (chartBoardFilter === 'all') return activeRanking.items;
+    const want = chartBoardFilter === CHART_KEY_EMPTY ? '' : chartBoardFilter;
+    return activeRanking.items.filter((it) => (it.chartKey ?? '') === want);
+  }, [activeRanking, chartBoardFilter]);
 
   const handleExportCsv = () => {
-    if (!activeRanking || !activeRanking.items.length) return;
+    if (!activeRanking || chartFilteredItems.length === 0) return;
 
     const type = activeRanking.type;
     const rows: string[] = [];
 
     if (type === '微信小游戏' || type === '抖音小游戏') {
-      // 微信/抖音 Top20：排名, 游戏名称, 开发公司, 排名变化, 监控日期
-      rows.push(['排名', '游戏名称', '开发公司', '排名变化', '监控日期'].join(','));
-      activeRanking.items.forEach((item) => {
-        const cols = [
-          item.rank,
-          `"${(item.name ?? '').replace(/"/g, '""')}"`,
-          `"${(item.developer ?? '').replace(/"/g, '""')}"`,
-          `"${(item.change ?? '').replace(/"/g, '""')}"`,
-          `"${(item.updateDate ?? '').replace(/"/g, '""')}"`,
-        ];
+      const hasBoardCol = chartFilteredItems.some((it) => it.listType || it.chartKey !== undefined);
+      const header = hasBoardCol
+        ? ['排名', '游戏名称', '榜单', '开发公司', '排名变化', '监控日期']
+        : ['排名', '游戏名称', '开发公司', '排名变化', '监控日期'];
+      rows.push(header.join(','));
+      chartFilteredItems.forEach((item) => {
+        const q = (s: string) => `"${(s ?? '').replace(/"/g, '""')}"`;
+        const cols = hasBoardCol
+          ? [
+              item.rank,
+              q(item.name ?? ''),
+              q(item.listType ?? ''),
+              q(item.developer ?? ''),
+              q(item.change ?? ''),
+              q(item.updateDate ?? ''),
+            ]
+          : [
+              item.rank,
+              q(item.name ?? ''),
+              q(item.developer ?? ''),
+              q(item.change ?? ''),
+              q(item.updateDate ?? ''),
+            ];
         rows.push(cols.join(','));
       });
     } else if (type === '榜单异动') {
-      // 榜单异动：当前排名, 游戏名, 平台, 开发公司, 排名变化, 异动类型, 监控日期, 周区间
       rows.push(['当前排名', '游戏名', '平台', '开发公司', '排名变化', '异动类型', '监控日期', '周区间'].join(','));
-      activeRanking.items.forEach((item) => {
+      chartFilteredItems.forEach((item) => {
         const cols = [
           item.rank,
           `"${(item.name ?? '').replace(/"/g, '""')}"`,
@@ -62,7 +114,6 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
         rows.push(cols.join(','));
       });
     } else {
-      // 其他类型暂不导出
       return;
     }
 
@@ -106,7 +157,6 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
 
   return (
     <div className="w-full">
-      {/* 标题 + 返回按钮（从周报页跳转时显示） */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
@@ -120,7 +170,7 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
             {selectedPlatform
               ? '该平台小游戏周榜'
               : isWechatDouyin
-                ? '微信/抖音小游戏人气榜 Top20 & 榜单异动'
+                ? '按平台查看 Top20，可用「榜单」筛选子榜；支持榜单异动'
                 : 'US Top Charts & 榜单异动'}
           </p>
         </div>
@@ -152,7 +202,6 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
         </div>
       </div>
 
-      {/* 仅当未指定平台时显示标签页切换 */}
       {!selectedPlatform && (
         <div className="border-b border-slate-200 mb-4">
           <nav className="flex space-x-2" aria-label="Tabs">
@@ -180,7 +229,6 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
         </div>
       )}
 
-      {/* 微信/抖音排行榜：平台筛选 */}
       {!selectedPlatform && isWechatDouyin && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-slate-600">平台：</label>
@@ -198,13 +246,29 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
             <option value="微信小游戏">微信小游戏</option>
             <option value="抖音小游戏">抖音小游戏</option>
           </select>
+
+          {showChartBoardFilter && (
+            <>
+              <label className="text-sm font-medium text-slate-600">榜单：</label>
+              <select
+                value={chartBoardFilter}
+                onChange={(e) => setChartBoardFilter(e.target.value as 'all' | string)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[12rem]"
+              >
+                <option value="all">全部榜单</option>
+                {chartBoardOptions.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       )}
 
-      {/* 排行榜内容 */}
       {activeRanking && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-          {/* 排行榜头部信息 */}
           <div className="px-8 py-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
             <div className="flex items-center justify-between">
               <div>
@@ -222,16 +286,15 @@ const GameRankingView = ({ rankings, selectedPlatform, onBack, onGameNameClick }
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-slate-900">{activeRanking.items.length}</div>
+                <div className="text-2xl font-bold text-slate-900">{chartFilteredItems.length}</div>
                 <div className="text-sm text-slate-600">款游戏</div>
               </div>
             </div>
           </div>
 
-          {/* 排行榜表格 */}
           <div className="p-6">
             <GameRankingTable
-              items={activeRanking.items}
+              items={chartFilteredItems}
               rankingType={activeRanking.type}
               platformFilter={isWechatDouyin ? platformFilter : undefined}
               onGameNameClick={

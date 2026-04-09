@@ -248,7 +248,25 @@ function sortWeekRangesLatestFirst(weekRanges: string[]): string[] {
   });
 }
 
-/** 从 wechatdouyin.db 的 top20_ranking、rank_changes 两张表加载三榜单：只从这两张表取 week_range，用这些日期在两张表内做精确匹配（WHERE week_range = ?），不参与任何时间计算。 */
+function normalizeChartKeyForSql(chartKey: string): string {
+  return chartKey || '';
+}
+
+function cleanBoardTitle(boardName: string): string {
+  return boardName.replace(/（休闲完整）/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** 榜单异动「平台」列：保留 wx/dy 与细分榜单信息，供筛选与阅读 */
+function formatRankChangePlatformLabel(platformKey: string, boardName: string | null | undefined): string {
+  const base = platformKey === 'wx' ? '微信小游戏' : platformKey === 'dy' ? '抖音小游戏' : platformKey;
+  const raw = boardName != null ? String(boardName).trim() : '';
+  if (!raw) return base;
+  const bn = cleanBoardTitle(raw.replace(/异动$/, '').trim());
+  if (!bn || bn.length < 2) return base;
+  return `${base}（${bn}）`;
+}
+
+/** 从 wechatdouyin.db 的 top20_ranking、rank_changes 加载榜单（微信/抖音合并为平台总表，行上带 chart_key 供前端筛选；另含榜单异动）：week_range 仅来自这两张表，WHERE week_range = ? 精确匹配，不参与时间推算。 */
 export async function loadWechatDouyinRankingsFromDb(
   getDataUrl?: GetDataUrl
 ): Promise<WechatDouyinRankingsByWeek[]> {
@@ -314,32 +332,45 @@ export async function loadWechatDouyinRankingsFromDb(
     return v != null && String(v).trim() !== '' ? String(v).trim() : '--';
   };
 
-  /** 用同一 week_range 在 top20_ranking、rank_changes 两张表中分别做精确匹配查询 */
+  /** 用同一 week_range 在 top20_ranking、rank_changes 两张表中分别做精确匹配查询（微信/抖音各合并为一表，行带 chart_key） */
   const buildRankingsForWeek = (weekRange: string): GameRanking[] => {
     const rankings: GameRanking[] = [];
     const startPart = parseWeekRangeStart(weekRange);
     const updateTime = startPart ? `${startPart} 12:00` : '';
 
     try {
-      const wxStmt = db.prepare(
-        `SELECT rank, game_name, company, rank_change, monitor_date FROM top20_ranking
-         WHERE platform_key = 'wx' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC`
-      );
-      wxStmt.bind([weekRange]);
-      const wxItems: GameRankingItem[] = [];
-      while (wxStmt.step()) {
-        const row = wxStmt.getAsObject() as Record<string, unknown>;
-        const rank = parseInt(String(row?.rank ?? 0), 10) || wxItems.length + 1;
-        wxItems.push({
-          id: `wx-db-${weekRange}-${rank}-${row?.game_name ?? ''}`,
-          rank,
-          name: String(row?.game_name ?? ''),
-          developer: row?.company != null ? String(row.company) : undefined,
-          change: getRankChangeFromRow(row),
-          updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
-        });
-      }
-      wxStmt.free();
+      const loadPlatformTop20 = (platformKey: 'wx' | 'dy') => {
+        const stmt = db.prepare(
+          `SELECT rank, game_name, company, rank_change, monitor_date, board_name, COALESCE(chart_key, '') AS chart_key
+           FROM top20_ranking
+           WHERE platform_key = ? AND week_range = ?
+           ORDER BY COALESCE(chart_key, ''), CAST(rank AS INTEGER) ASC`
+        );
+        stmt.bind([platformKey, weekRange]);
+        const items: GameRankingItem[] = [];
+        let idx = 0;
+        while (stmt.step()) {
+          const row = stmt.getAsObject() as Record<string, unknown>;
+          const ck = normalizeChartKeyForSql(String(row.chart_key ?? ''));
+          const boardRaw = row?.board_name != null ? cleanBoardTitle(String(row.board_name)) : '';
+          const rank = parseInt(String(row?.rank ?? 0), 10) || idx + 1;
+          items.push({
+            id: `${platformKey}-db-${weekRange}-${ck}-${rank}-${idx}-${row?.game_name ?? ''}`,
+            rank,
+            name: String(row?.game_name ?? ''),
+            developer: row?.company != null ? String(row.company) : undefined,
+            change: getRankChangeFromRow(row),
+            updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
+            chartKey: ck,
+            listType: boardRaw || undefined,
+          });
+          idx++;
+        }
+        stmt.free();
+        return items;
+      };
+
+      const wxItems = loadPlatformTop20('wx');
       if (wxItems.length > 0) {
         rankings.push({
           type: '微信小游戏',
@@ -350,25 +381,7 @@ export async function loadWechatDouyinRankingsFromDb(
         });
       }
 
-      const dyStmt = db.prepare(
-        `SELECT rank, game_name, company, rank_change, monitor_date FROM top20_ranking
-         WHERE platform_key = 'dy' AND week_range = ? ORDER BY CAST(rank AS INTEGER) ASC`
-      );
-      dyStmt.bind([weekRange]);
-      const dyItems: GameRankingItem[] = [];
-      while (dyStmt.step()) {
-        const row = dyStmt.getAsObject() as Record<string, unknown>;
-        const rank = parseInt(String(row?.rank ?? 0), 10) || dyItems.length + 1;
-        dyItems.push({
-          id: `dy-db-${weekRange}-${rank}-${row?.game_name ?? ''}`,
-          rank,
-          name: String(row?.game_name ?? ''),
-          developer: row?.company != null ? String(row.company) : undefined,
-          change: getRankChangeFromRow(row),
-          updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
-        });
-      }
-      dyStmt.free();
+      const dyItems = loadPlatformTop20('dy');
       if (dyItems.length > 0) {
         rankings.push({
           type: '抖音小游戏',
@@ -380,8 +393,8 @@ export async function loadWechatDouyinRankingsFromDb(
       }
 
       const changeStmt = db.prepare(
-        `SELECT rank, game_name, company, rank_change, platform_key, platform, monitor_date FROM rank_changes
-         WHERE week_range = ? ORDER BY platform_key, CAST(rank AS INTEGER) ASC`
+        `SELECT rank, game_name, company, rank_change, platform_key, platform, monitor_date, board_name, COALESCE(chart_key, '') AS chart_key FROM rank_changes
+         WHERE week_range = ? ORDER BY platform_key, COALESCE(chart_key, ''), CAST(rank AS INTEGER) ASC`
       );
       changeStmt.bind([weekRange]);
       const changeItems: GameRankingItem[] = [];
@@ -389,8 +402,8 @@ export async function loadWechatDouyinRankingsFromDb(
       while (changeStmt.step()) {
         const row = changeStmt.getAsObject() as Record<string, unknown>;
         const rank = parseInt(String(row?.rank ?? 0), 10) || idx + 1;
-        const platformVal = row?.platform ?? row?.platform_key;
-        const platformLabel = platformVal != null ? String(platformVal) : undefined;
+        const platformKeyRaw = String(row?.platform_key ?? row?.platform ?? '').trim();
+        const platformLabel = formatRankChangePlatformLabel(platformKeyRaw, row?.board_name != null ? String(row.board_name) : undefined);
         changeItems.push({
           id: `change-db-${weekRange}-${idx}-${rank}-${row?.game_name ?? ''}`,
           rank,
@@ -398,7 +411,7 @@ export async function loadWechatDouyinRankingsFromDb(
           developer: row?.company != null ? String(row.company) : undefined,
           change: getRankChangeFromRow(row),
           updateDate: row?.monitor_date != null ? String(row.monitor_date) : '',
-          platformLabel: platformLabel === 'wx' ? '微信小游戏' : platformLabel === 'dy' ? '抖音小游戏' : platformLabel,
+          platformLabel,
         });
         idx++;
       }

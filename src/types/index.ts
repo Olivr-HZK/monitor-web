@@ -43,7 +43,9 @@ export interface GameRankingItem {
   country?: string; // 国家（如 US）
   categoryId?: string; // 品类ID
   category?: string; // 品类名称 / 游戏分类
-  listType?: string; // 榜单类型（如 免费榜）
+  listType?: string; // 榜单类型（如 免费榜）；微信/抖音 DB 子榜时可为榜单名称
+  /** 微信/抖音 wechatdouyin.db 子榜 chart_key，用于筛选（空字符串表示默认榜） */
+  chartKey?: string;
   appId?: string; // App ID
   signal?: string; // 榜单异动：信号
   lastRankRaw?: string; // 榜单异动：上周排名原始值

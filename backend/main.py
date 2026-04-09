@@ -2,6 +2,7 @@
 监测汇总 - FastAPI 后端
 提供：登录鉴权、受保护数据文件、AI 对话代理、玩法解析申请、飞书媒体代理。
 """
+from datetime import datetime
 from pathlib import Path
 import json
 import os
@@ -48,7 +49,13 @@ from config import (
     TAVILY_API_KEY,
     OPENROUTER_HTTP_REFERER,
 )
-from auth import create_token, get_current_user, get_token_from_request, require_user_for_ai
+from auth import (
+    create_token,
+    get_current_user,
+    get_current_user_optional,
+    get_token_from_request,
+    require_user_for_ai,
+)
 from ai_tools import AgentToolDispatcher
 from codex_app_server import CodexAppServerSession, CodexProtocolError
 from knowledge_loader import load_agent_knowledge_text
@@ -258,6 +265,46 @@ async def gameplay_request(body: GameplayRequestBody):
     except Exception as e:
         print("[feedback] 写入失败:", e)
         raise HTTPException(status_code=500, detail="提交失败，请稍后重试")
+
+
+# ---------- AI 助手回复质量反馈（赞 / 踩）----------
+class AiMessageFeedbackBody(BaseModel):
+    messageId: str = ""
+    rating: str = ""  # up | down
+    sessionId: str = ""
+    pathname: str = ""
+
+
+def _append_ai_message_feedback_line(payload: dict) -> None:
+    _ensure_data_dir()
+    path = DATA_DIR / "ai_message_feedback.jsonl"
+    line = json.dumps(payload, ensure_ascii=False)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+@app.post("/api/ai/feedback")
+async def ai_message_feedback(body: AiMessageFeedbackBody, request: Request):
+    """记录用户对某条助手回复的赞/踩；可选登录，便于区分用户。"""
+    mid = (body.messageId or "").strip()
+    r = (body.rating or "").strip().lower()
+    if not mid or r not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="参数无效")
+    user = await get_current_user_optional(request)
+    payload = {
+        "messageId": mid,
+        "rating": r,
+        "sessionId": (body.sessionId or "").strip()[:128],
+        "pathname": (body.pathname or "").strip()[:500],
+        "user": user or "",
+        "at": datetime.utcnow().isoformat() + "Z",
+    }
+    try:
+        _append_ai_message_feedback_line(payload)
+        return {"ok": True}
+    except Exception as e:
+        print("[ai-feedback]", e)
+        raise HTTPException(status_code=500, detail="记录失败，请稍后重试")
 
 
 # ---------- 飞书媒体代理 ----------

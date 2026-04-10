@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
 # 每周一执行：将 sensortower、竞品(-)、wechat-mini-game-ranking-post 的数据库
-# 同步到监测汇总/public 并覆盖原库；用 generate_top5_insight.py 生成最新一周异动分析；
-# 然后执行 npm run deploy，成功后再推送游戏检测周报与竞品周报。
-# 通过「等待源库今日已更新」保证在 sensortower（约 30min～1h）和竞品周报完成后再执行，
+# 同步到监测汇总/public 并覆盖原库，然后推送竞品周报。
+# 通过「等待源库今日已更新」保证在 sensortower（约 30min～1h）等任务后再执行，
 # 而非单纯靠时间点（crontab 建议 11:30 触发，脚本内会轮询等待）。
 #
 # 用法：/Users/oliver/guru/监测汇总/scripts/sync_dbs_and_deploy.sh
@@ -95,7 +94,7 @@ wait_until_sources_ready() {
   done
 }
 
-log "========== 开始同步数据库并部署 =========="
+log "========== 开始同步数据库 =========="
 log "监测汇总目录: $REPO_ROOT"
 log "public 目录: $PUBLIC_DIR"
 
@@ -128,39 +127,7 @@ else
   log_err "未找到 wechat 数据库: $WECHAT_DB，跳过"
 fi
 
-# 4. 使用已同步的 sensortower 库生成最新一周的 Top5 异动分析
-log "开始生成最新一周异动分析（generate_top5_insight.py）..."
-cd "$REPO_ROOT"
-if [ -d "$REPO_ROOT/.venv" ] && [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
-  # shellcheck source=/dev/null
-  source "$REPO_ROOT/.venv/bin/activate"
-fi
-if python3 "$REPO_ROOT/scripts/generate_top5_insight.py" --db "$PUBLIC_DIR/sensortower_top100.db" --out-dir "$PUBLIC_DIR/休闲游戏检测/sensortower_周报" >> "$LOG_FILE" 2>&1; then
-  log "异动分析生成完成"
-else
-  log_err "异动分析生成失败，继续执行部署"
-  # 不 exit，允许后续 deploy 照常进行
-fi
-
-# 5. 在监测汇总下执行 deploy
-log "开始执行 npm run deploy ..."
-cd "$REPO_ROOT"
-if ! npm run deploy >> "$LOG_FILE" 2>&1; then
-  log_err "npm run deploy 失败，不推送游戏周报与竞品周报"
-  exit 1
-fi
-log "npm run deploy 完成"
-
-# 6. deploy 成功后推送游戏检测周报（依赖 sensortower 数据与已部署网站）
-log "开始推送游戏检测周报 ..."
-if /bin/bash "$REPO_ROOT/scripts/run_reports.sh" --content game >> "$LOG_FILE" 2>&1; then
-  log "游戏检测周报推送完成"
-else
-  log_err "游戏检测周报推送失败"
-  exit 1
-fi
-
-# 7. 推送竞品周报
+# 4. 推送竞品周报
 log "开始推送竞品周报 ..."
 if /bin/bash "$GURU_ROOT/-/run-weekly-period-workflow.sh" >> "$LOG_FILE" 2>&1; then
   log "竞品周报推送完成"
@@ -169,4 +136,4 @@ else
   exit 1
 fi
 
-log "========== 同步、部署、游戏周报与竞品周报推送结束 =========="
+log "========== 同步与竞品周报推送结束 =========="

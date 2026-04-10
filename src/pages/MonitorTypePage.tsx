@@ -234,11 +234,11 @@ const MonitorTypePage = () => {
           <div className="flex-1 min-w-0">
             {isCasualGame ? (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-6">
                   <div className="bg-white border-2 border-ink p-5 shadow-brutal-sm flex flex-col justify-between">
                     <div>
-                      <h2 className="text-lg font-display font-bold text-ink uppercase tracking-tight mb-2">微信 / 抖音小游戏</h2>
-                      <p className="text-sm font-medium text-inkLight mb-4">
+                      <h2 className="text-lg font-display font-bold text-ink uppercase tracking-tight mb-2 break-words">微信 / 抖音小游戏</h2>
+                      <p className="text-sm font-medium text-inkLight mb-4 line-clamp-4 md:line-clamp-none">
                         查看微信与抖音小游戏的最新排行榜，关注平台热门与新进榜小游戏表现。
                       </p>
                     </div>
@@ -249,19 +249,19 @@ const MonitorTypePage = () => {
                           state: { returnTo: returnPath, casualSourceSection: 'wechat_douyin' },
                         })
                       }
-                      className="inline-flex items-center justify-center px-4 py-2 bg-white border-2 border-ink text-ink text-sm font-bold uppercase tracking-widest hover:bg-ink hover:text-surface transition-colors shadow-brutal-sm hover:shadow-brutal"
+                      className="inline-flex items-center justify-center px-4 py-2 bg-white border-2 border-ink text-ink text-sm font-bold uppercase tracking-widest hover:bg-ink hover:text-surface transition-colors shadow-brutal-sm hover:shadow-brutal mt-auto"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path strokeLinecap="square" strokeLinejoin="miter" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
-                      查看排行榜
+                      <span className="truncate">查看排行榜</span>
                     </button>
                   </div>
 
                   <div className="bg-white border-2 border-ink p-5 shadow-brutal-sm flex flex-col justify-between">
                     <div>
-                      <h2 className="text-lg font-display font-bold text-ink uppercase tracking-tight mb-2">SensorTower 榜单</h2>
-                      <p className="text-sm font-medium text-inkLight mb-4">
+                      <h2 className="text-lg font-display font-bold text-ink uppercase tracking-tight mb-2 break-words">SensorTower 榜单</h2>
+                      <p className="text-sm font-medium text-inkLight mb-4 line-clamp-4 md:line-clamp-none">
                         查看 iOS Top100、Android Top100 及榜单异动，追踪全球重点休闲游戏表现。
                       </p>
                     </div>
@@ -272,19 +272,19 @@ const MonitorTypePage = () => {
                           state: { returnTo: returnPath, casualSourceSection: 'sensortower' },
                         })
                       }
-                      className="inline-flex items-center justify-center px-4 py-2 bg-white border-2 border-ink text-ink text-sm font-bold uppercase tracking-widest hover:bg-ink hover:text-surface transition-colors shadow-brutal-sm hover:shadow-brutal"
+                      className="inline-flex items-center justify-center px-4 py-2 bg-white border-2 border-ink text-ink text-sm font-bold uppercase tracking-widest hover:bg-ink hover:text-surface transition-colors shadow-brutal-sm hover:shadow-brutal mt-auto"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path strokeLinecap="square" strokeLinejoin="miter" d="M3 3v18h18M7 15l4-8 4 6 3-5" />
                       </svg>
-                      查看排行榜
+                      <span className="truncate">查看排行榜</span>
                     </button>
                   </div>
 
                   <div className="bg-white border-2 border-ink p-5 shadow-brutal-sm flex flex-col justify-between">
                     <div>
-                      <h2 className="text-lg font-display font-bold text-ink uppercase tracking-tight mb-2">竞品监测</h2>
-                      <p className="text-sm font-medium text-inkLight mb-4">
+                      <h2 className="text-lg font-display font-bold text-ink uppercase tracking-tight mb-2 break-words">竞品监测</h2>
+                      <p className="text-sm font-medium text-inkLight mb-4 line-clamp-4 md:line-clamp-none">
                         快速进入休闲游戏竞品监控视图，查看社媒更新与 UA 素材等内容。
                       </p>
                     </div>
@@ -295,12 +295,12 @@ const MonitorTypePage = () => {
                         setSelectedCasualGameCompetitorSub('社媒更新');
                         setSelectedCompany(null);
                       }}
-                      className="inline-flex items-center justify-center px-4 py-2 bg-white border-2 border-ink text-ink text-sm font-bold uppercase tracking-widest hover:bg-ink hover:text-surface transition-colors shadow-brutal-sm hover:shadow-brutal"
+                      className="inline-flex items-center justify-center px-4 py-2 bg-white border-2 border-ink text-ink text-sm font-bold uppercase tracking-widest hover:bg-ink hover:text-surface transition-colors shadow-brutal-sm hover:shadow-brutal mt-auto"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path strokeLinecap="square" strokeLinejoin="miter" d="M11 17l-3-3m0 0l3-3m-3 3h8m4 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      打开竞品监测
+                      <span className="truncate">打开竞品监测</span>
                     </button>
                   </div>
                 </div>

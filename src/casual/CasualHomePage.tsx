@@ -103,11 +103,11 @@ const CasualHomePage = () => {
           <div className="flex-1 min-w-0 space-y-8">
             {selectedType === '休闲游戏监测' ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                   <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900 mb-2">微信 / 抖音小游戏</h2>
-                      <p className="text-sm text-slate-600 mb-4">
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2 break-words">微信 / 抖音小游戏</h2>
+                      <p className="text-sm text-slate-600 mb-4 line-clamp-4 md:line-clamp-none">
                         查看微信与抖音小游戏的最新排行榜，关注平台热门与新进榜小游戏表现。
                       </p>
                     </div>
@@ -116,9 +116,9 @@ const CasualHomePage = () => {
                       onClick={() =>
                         navigate('/rankings/casual/wechat_douyin', { state: stateWithReturnTo(location) })
                       }
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 mt-auto"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -126,14 +126,14 @@ const CasualHomePage = () => {
                           d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                         />
                       </svg>
-                      微信/抖音排行榜
+                      <span className="truncate">微信/抖音排行榜</span>
                     </button>
                   </div>
 
                   <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900 mb-2">SensorTower 榜单</h2>
-                      <p className="text-sm text-slate-600 mb-4">
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2 break-words">SensorTower 榜单</h2>
+                      <p className="text-sm text-slate-600 mb-4 line-clamp-4 md:line-clamp-none">
                         查看 iOS Top100、Android Top100 及榜单异动，追踪全球重点休闲游戏表现。
                       </p>
                     </div>
@@ -142,9 +142,9 @@ const CasualHomePage = () => {
                       onClick={() =>
                         navigate('/rankings/casual/sensortower', { state: stateWithReturnTo(location) })
                       }
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors border border-violet-200"
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors border border-violet-200 mt-auto"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -152,14 +152,14 @@ const CasualHomePage = () => {
                           d="M3 3v18h18M7 15l4-8 4 6 3-5"
                         />
                       </svg>
-                      SensorTower 排行榜
+                      <span className="truncate">SensorTower 排行榜</span>
                     </button>
                   </div>
 
                   <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900 mb-2">竞品监测</h2>
-                      <p className="text-sm text-slate-600 mb-4">
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2 break-words">竞品监测</h2>
+                      <p className="text-sm text-slate-600 mb-4 line-clamp-4 md:line-clamp-none">
                         快速进入休闲游戏竞品监控视图，查看社媒更新与 UA 素材等内容。
                       </p>
                     </div>
@@ -170,9 +170,9 @@ const CasualHomePage = () => {
                         setSelectedCasualGameCompetitorSub('社媒更新');
                         setSelectedCompany(null);
                       }}
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors border border-emerald-200"
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors border border-emerald-200 mt-auto"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -180,7 +180,7 @@ const CasualHomePage = () => {
                           d="M11 17l-3-3m0 0l3-3m-3 3h8m4 0a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      打开竞品监测
+                      <span className="truncate">打开竞品监测</span>
                     </button>
                   </div>
                 </div>

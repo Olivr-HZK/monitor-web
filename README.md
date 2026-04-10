@@ -52,22 +52,17 @@
 
 ## 环境变量与配置文件
 
-项目中存在多处 `.env`，不同命令读取的也不一样。核心规则：
+按 **两套前端、一套后端** 记即可（细则见 **[docs/env说明.md](./docs/env说明.md)**）：
 
-- `VITE_` 开头的变量只在 **前端构建时**生效（会被打进浏览器代码）
-- 后端读取进程环境变量；dotenv 会加载：
-  1) 根目录 `.env`  
-  2) 然后 `backend/.env`（覆盖根目录同名变量）
+| | 文件 | 说明 |
+|--|------|------|
+| **前端 · 本地开发** | `.env.development` | `npm run dev` 时加载；`VITE_*` 会打进前端 |
+| **前端 · 静态站构建（如 GitHub Pages）** | `.env.production`（或构建时注入 `VITE_*`） | `npm run build` / `npm run deploy`；典型配置 `VITE_API_BASE_URL=https://api.gurublog.uk`，与 [API 文档](https://api.gurublog.uk/docs) 一致 |
+| **后端 · FastAPI（含本机与经 Cloudflare 暴露的同一进程）** | 先根目录 `.env`，再 **`backend/.env`**（覆盖） | 登录、CORS、`OPENAI_*` 等 |
 
-需要你关注的文件：
+另：**根目录 `.env`** 还给脚本、定时任务用。`VITE_` 仅在前端构建/开发时生效。
 
-1. 根目录 `.env`（给后端/脚本做默认值；示例见 `.env.example`）
-2. `backend/.env`（后端运行必需配置；示例见 `backend/.env.example`）
-3. 根目录 `.env.development`（本地开发前端联调；至少需要 `VITE_API_BASE_URL`）
-4. 根目录 `.env.staging`（预生产构建用；示例见 `.env.staging.example`）
-5. 根目录 `.env.production`（**生产构建** `npm run build` / `npm run deploy` 时自动加载；当前默认 `VITE_API_BASE_URL=https://api.gurublog.uk`，与公网 API 文档 [https://api.gurublog.uk/docs](https://api.gurublog.uk/docs) 一致）
-
-**后端 CORS**：公网 API 跑在 `api.gurublog.uk` 时，请在服务器上的 `backend/.env` 里设置 `CORS_ORIGIN`。本地用 `npm run dev` 连线上 API 时，需包含 `http://localhost:5173`（见 `backend/.env.example` 当前默认）；上线静态站后再把页面 origin（`https://…`）一并写上。
+**后端 CORS**：公网 API 在 `api.gurublog.uk` 时，在 **`backend/.env`** 里设置 `CORS_ORIGIN`，包含静态站 origin（如 `https://olivr-hzk.github.io`）及本地 `http://localhost:5173`（见 `backend/.env.example`）。
 
 ### 1) 准备后端登录密码哈希（生产建议）
 
@@ -130,15 +125,9 @@ npm install
 npm run dev
 ```
 
-本地联调关键：确保根目录 `.env.development`（可从 `.env.development.example` 复制）至少包含：
+本地联调：按需复制 `.env.development.example` 为 `.env.development`。开发模式下 Vite 会将 **`/api` 代理到本机后端**（见 `vite.config.ts`），一般不必再配直连的 `VITE_API_BASE_URL`。
 
-```env
-VITE_API_BASE_URL=http://localhost:3001
-```
-
-前端开发地址：`http://localhost:5173`
-
-开发模式下，Vite 已配置了对 `/api` 的本地代理（避免部分接口 404）。
+前端开发地址示例：`http://localhost:5173/monitor-web/`
 
 ---
 
@@ -160,6 +149,12 @@ npm run preview
 ```
 
 `npm run preview` 默认地址：`http://localhost:4173`
+
+**GitHub Pages 静态站 + 本机后端经 Cloudflare 暴露（`https://api.gurublog.uk`）**
+
+1. 复制 **`.env.production.example`** 为 **`.env.production`**（已加入 `.gitignore`），其中 **`VITE_API_BASE_URL=https://api.gurublog.uk`**。
+2. 在本机已能登录 GitHub 的终端执行：**`npm run deploy:api`**（会执行 `npm run build`、`STRIP_DIST_DB=1` 去掉 `dist` 中的 `.db`，再把 `dist` 推到 **`gh-pages`** 分支）。
+3. 后端 **`backend/.env`** 里 **`CORS_ORIGIN`** 须包含静态页 origin，例如 **`https://olivr-hzk.github.io`**（与 `package.json` 的 `homepage` 一致）。
 
 ---
 

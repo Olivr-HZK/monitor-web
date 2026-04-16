@@ -73,16 +73,7 @@ AI_CHAT_REQUIRE_AUTH = os.environ.get("NODE_ENV") == "production" and os.environ
 PUBLIC_DIR = Path(os.environ.get("PUBLIC_DIR", _PROJECT_ROOT / "public")).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", _PROJECT_ROOT / "data")).resolve()
 
-ALLOWED_PREFIXES = ("ai产品/", "ai热点/", "休闲游戏检测/", "热点/")
-ALLOWED_ROOT_FILES = {
-    "competitor_data.db",
-    "sensortower_top100.db",
-    "sensortower_applist.db",
-    "ai_products_ua.db",
-    "wechatdouyin.db",
-    "videos.db",
-    "周报谷歌表单.csv",
-    "热点日报.md",
-    "report_documents.json",
-    "auth-config.json",
-}
+# GET /api/data：已登录用户可读取 PUBLIC_DIR 下任意相对路径（子目录、根目录 .db/.csv/.md 等），
+# 不再维护「允许列表」；安全边界见 main.serve_data（禁止 ..、解析后必须在 PUBLIC_DIR 内）。
+# 以下**仅 basename** 不通过 API 返回（避免把含敏感配置的静态门文件当附件拉取）。
+DATA_SERVE_DENYLIST_BASENAMES = frozenset({"auth-config.json"})

@@ -169,11 +169,14 @@ def openai_style_tools_schema(
                 "type": "function",
                 "function": {
                     "name": "query_sqlite",
-                    "description": "查询监测平台 SQLite 数据库（只读）。仅允许 SELECT / WITH；不确定列名时可用 PRAGMA table_info(表名)。",
+                    "description": "查询监测平台 SQLite 数据库（只读）。仅允许 SELECT / WITH；不确定列名时可用 PRAGMA table_info(表名)。db 可为 public 根目录下任意 .db，不必与当前浏览页面「默认」数据源一致；需要多源数据时对不同 db 多次调用。",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "db": {"type": "string", "description": "数据库文件名，如 wechatdouyin.db"},
+                            "db": {
+                                "type": "string",
+                                "description": "仅文件名，如 wechatdouyin.db、sensortower_top100.db、competitor_data.db（按问题选择，可跨页面对应多库）",
+                            },
                             "sql": {"type": "string", "description": "SQL 查询语句"},
                             "limit": {"type": "integer", "description": "最多返回行数，默认 50，最大 200"},
                         },

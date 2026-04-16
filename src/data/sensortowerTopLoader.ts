@@ -50,12 +50,17 @@ function metadataKey(appId: string, platform: 'iOS' | 'Android'): string {
   return `${appId}|${platform === 'iOS' ? 'ios' : 'android'}`;
 }
 
-/** 从 app_metadata 表加载 Map，用于按 app_id + platform 补全名称、发行商、发行日期、URL */
-function loadAppMetadataMap(db: any): Map<string, { name: string; publisher_name: string; release_date: string; url: string }> {
-  const map = new Map<string, { name: string; publisher_name: string; release_date: string; url: string }>();
+/** 从 app_metadata 表加载 Map，用于按 app_id + platform 补全名称、发行商、发行日期、URL、图标 */
+function loadAppMetadataMap(
+  db: any
+): Map<string, { name: string; publisher_name: string; release_date: string; url: string; iconUrl: string }> {
+  const map = new Map<
+    string,
+    { name: string; publisher_name: string; release_date: string; url: string; iconUrl: string }
+  >();
   try {
     const stmt = db.prepare(
-      `SELECT app_id, os, name, publisher_name, release_date, url FROM app_metadata`
+      `SELECT app_id, os, name, publisher_name, release_date, url, icon_url FROM app_metadata`
     );
     while (stmt.step()) {
       const row: any = stmt.getAsObject();
@@ -66,6 +71,7 @@ function loadAppMetadataMap(db: any): Map<string, { name: string; publisher_name
         publisher_name: String(row.publisher_name ?? ''),
         release_date: String(row.release_date ?? ''),
         url: String(row.url ?? ''),
+        iconUrl: String(row.icon_url ?? '').trim(),
       });
     }
     stmt.free();
@@ -621,6 +627,8 @@ export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promi
         changeType: String(row.change_type ?? ''),
         metadataAppName: meta?.name || undefined,
         appUrl: meta?.url || undefined,
+        iconUrl:
+          meta?.iconUrl && /^https?:\/\//i.test(meta.iconUrl) ? meta.iconUrl : undefined,
         publisherName: (row.publisher_name != null && String(row.publisher_name).trim() !== '')
           ? String(row.publisher_name)
           : (meta?.publisher_name || undefined),
@@ -923,6 +931,8 @@ export async function loadSensorTowerRemovedGames(
         appId,
         appName: String(row.app_name ?? '') || meta?.name || appId,
         storeUrl: String(row.store_url ?? '') || meta?.url || undefined,
+        iconUrl:
+          meta?.iconUrl && /^https?:\/\//i.test(meta.iconUrl) ? meta.iconUrl : undefined,
         reason: String(row.reason ?? '').trim() || undefined,
       });
     }

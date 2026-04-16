@@ -37,6 +37,14 @@ function formatNameWithLink(name: string, url?: string): string {
   return `[${name}](${url})`;
 }
 
+/** 与 `scripts/send_sensortower_weekly_push.py` 中 `_markdown_icon_prefix` 一致：行内小图，URL 括号编码避免破坏 Markdown */
+function markdownIconPrefix(iconUrl?: string): string {
+  const u = (iconUrl || '').trim();
+  if (!u || !/^https?:\/\//i.test(u)) return '';
+  const uEsc = u.replace(/\(/g, '%28').replace(/\)/g, '%29');
+  return `![ ](${uEsc}) `;
+}
+
 function formatChartTypeLabel(chartType: string): string {
   const normalized = (chartType || '').trim().toLowerCase();
   if (normalized.includes('free')) return '免费榜';
@@ -96,6 +104,7 @@ function buildWeekReportMd(
     } else if (storeUrl) {
       name = formatNameWithLink(nameRaw, storeUrl);
     }
+    name = markdownIconPrefix(base.iconUrl) + name;
     const publisher = base.publisherName || '—';
     if (group.length === 1) {
       lines.push(
@@ -147,6 +156,7 @@ function buildWeekReportMd(
     } else if (storeUrl) {
       name = formatNameWithLink(nameRaw, storeUrl);
     }
+    name = markdownIconPrefix(base.iconUrl) + name;
     const publisher = base.publisherName || '—';
     if (group.length === 1) {
       lines.push(
@@ -192,7 +202,7 @@ function buildWeekReportMd(
   );
   if (removedGames.length > 0) {
     for (const row of removedGames) {
-      const name = formatNameWithLink(row.appName || row.appId, row.storeUrl);
+      const name = markdownIconPrefix(row.iconUrl) + formatNameWithLink(row.appName || row.appId, row.storeUrl);
       lines.push(
         `| ${name} | ${formatCountryToZh(row.country) || row.country} | ${formatChartTypeLabel(row.chartType)} | ${row.platform} | ${row.reason || '—'} |`
       );

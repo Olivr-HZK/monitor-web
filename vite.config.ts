@@ -26,6 +26,12 @@ export default defineConfig(({ mode }) => {
       : {}),
     base: process.env.VITE_BASE || '/monitor-web/',
     server: {
+      // Cloudflare Quick Tunnel / ngrok 等会通过非 localhost 的 Host 访问，否则 Vite 会报 Blocked request
+      ...(isDev
+        ? {
+            allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', '.loca.lt'] as const,
+          }
+        : {}),
       proxy: {
         '/api': {
           target: devApiProxy,

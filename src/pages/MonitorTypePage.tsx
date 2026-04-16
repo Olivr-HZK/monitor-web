@@ -7,7 +7,15 @@ import Sidebar from '../components/Sidebar';
 import { useAiPageContext } from '../context/AiPageContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import type { MonitorType, MonitorItem, CasualGameMainCategory, CasualGameCompetitorSub, GamePlatformKey, AiProductSubCategory } from '../types';
+import type {
+  MonitorType,
+  MonitorItem,
+  CasualGameMainCategory,
+  CasualGameCompetitorSub,
+  CasualGameOurProductSub,
+  GamePlatformKey,
+  AiProductSubCategory,
+} from '../types';
 
 const parseMonitorType = (raw?: string): MonitorType | null => {
   if (!raw) return null;
@@ -53,6 +61,7 @@ const MonitorTypePage = () => {
   const [selectedGamePlatform, setSelectedGamePlatform] = useState<GamePlatformKey | null>(null);
   const [selectedCasualGameCompetitorSub, setSelectedCasualGameCompetitorSub] = useState<CasualGameCompetitorSub | null>(null);
   const [selectedCasualSourceSection, setSelectedCasualSourceSection] = useState<'wechat_douyin' | 'sensortower'>('sensortower');
+  const [selectedCasualOurProductSub, setSelectedCasualOurProductSub] = useState<CasualGameOurProductSub>('日总结');
   const [selectedAiProductSub, setSelectedAiProductSub] = useState<AiProductSubCategory | null>(null);
 
   useEffect(() => {
@@ -78,11 +87,25 @@ const MonitorTypePage = () => {
       setSelectedCompany(null);
       return;
     }
+    if (hubTarget === 'our_product') {
+      setSelectedCasualGameCategory('我方产品');
+      setSelectedCasualOurProductSub('日总结');
+      setSelectedCasualGameCompetitorSub(null);
+      setSelectedGamePlatform(null);
+      setSelectedCompany(null);
+      return;
+    }
     if (selectedCasualGameCategory === null) {
       setSelectedCasualGameCategory('周报简要');
       setSelectedGamePlatform('微信');
     }
   }, [selectedType, selectedCasualGameCategory, location.key]);
+
+  useEffect(() => {
+    if (selectedCasualGameCategory !== '我方产品') {
+      setSelectedCasualOurProductSub('日总结');
+    }
+  }, [selectedCasualGameCategory]);
 
   useEffect(() => {
     if (selectedType !== '休闲游戏监测') return;
@@ -128,6 +151,11 @@ const MonitorTypePage = () => {
   const getCasualGamePageTitle = () => {
     if (!selectedCasualGameCategory) return '休闲游戏监测';
     if (selectedCasualGameCategory === '周报简要') return '休闲游戏监测 - 周报简要';
+    if (selectedCasualGameCategory === '我方产品') {
+      const sub = selectedCasualOurProductSub ?? '日总结';
+      if (sub === '日总结') return '休闲游戏监测 - 我方产品 · US 免费榜日总结';
+      return '休闲游戏监测 - 我方产品 · 按产品追溯';
+    }
     if (selectedCasualGameCategory === '商店页变化') return '休闲游戏监测 - 商店页变化';
     if (selectedCasualGameCategory === '新游戏') {
       return selectedGamePlatform ? `休闲游戏监测 - 新游戏 - ${selectedGamePlatform}` : '休闲游戏监测 - 新游戏';
@@ -178,6 +206,7 @@ const MonitorTypePage = () => {
     selectedCasualSourceSection,
     selectedCompany,
     selectedAiProductSub,
+    selectedCasualOurProductSub,
     setPageMeta,
   ]);
 
@@ -193,6 +222,7 @@ const MonitorTypePage = () => {
                 ? { casualSourceSection: selectedCasualSourceSection }
                 : {}),
               ...(selectedCasualGameCategory === '竞品' ? { casualHubTarget: 'competitor' as const } : {}),
+              ...(selectedCasualGameCategory === '我方产品' ? { casualHubTarget: 'our_product' as const } : {}),
             },
           });
           return;
@@ -207,6 +237,7 @@ const MonitorTypePage = () => {
           returnTo: returnPath,
           ...(selectedType === '休闲游戏监测' ? { casualSourceSection: selectedCasualSourceSection } : {}),
           ...(selectedCasualGameCategory === '竞品' ? { casualHubTarget: 'competitor' as const } : {}),
+          ...(selectedCasualGameCategory === '我方产品' ? { casualHubTarget: 'our_product' as const } : {}),
         },
       });
     }
@@ -315,6 +346,7 @@ const MonitorTypePage = () => {
                   selectedGamePlatform={selectedGamePlatform ?? undefined}
                   selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
                   selectedCasualSourceSection={selectedCasualSourceSection}
+                  selectedCasualOurProductSub={selectedCasualOurProductSub}
                   pageTitle={getCasualGamePageTitle()}
                   onNavigateMonitorType={goMonitorType}
                   onItemClick={handleReportClick}
@@ -381,6 +413,8 @@ const MonitorTypePage = () => {
             onAiProductSubSelect={setSelectedAiProductSub}
             selectedCasualSourceSection={selectedCasualSourceSection}
             onCasualSourceSectionSelect={setSelectedCasualSourceSection}
+            selectedCasualOurProductSub={selectedCasualOurProductSub}
+            onCasualOurProductSubSelect={setSelectedCasualOurProductSub}
           />
         </div>
         {dataLoading && (

@@ -4,6 +4,7 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { getApiBase, getApiUrl } from '../utils/api';
+import { resetOurProductDatabaseCache } from '../data/ourProductDailyLoader';
 
 const STATIC_AUTH_KEY = 'static-auth';
 const AUTH_CONFIG_URL = 'auth-config.json';
@@ -142,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) {
           return { ok: false, error: data.error || '登录失败' };
         }
+        resetOurProductDatabaseCache();
         setUser(data.user ?? username);
         return { ok: true };
       } catch (e) {
@@ -173,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, error: '密码错误' };
       }
       sessionStorage.setItem(STATIC_AUTH_KEY, staticHash);
+      resetOurProductDatabaseCache();
       setUser('用户');
       return { ok: true };
     },

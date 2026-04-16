@@ -1,16 +1,32 @@
 import { useState, useMemo } from 'react';
 import type { MonitorItem, MonitorType } from '../types';
-import type { GamePlatformKey, CasualGameMainCategory, CasualGameCompetitorSub, AiProductSubCategory } from '../types';
+import type {
+  GamePlatformKey,
+  CasualGameMainCategory,
+  CasualGameCompetitorSub,
+  CasualGameOurProductSub,
+  AiProductSubCategory,
+} from '../types';
 import MonitorCard from './MonitorCard';
+import OurProductDevelopingPlaceholder from './OurProductDevelopingPlaceholder';
 
 /** 与侧栏结构对齐：监测类型 → 数据块（SensorTower 或 微信/抖音，或竞品）→ 子项 */
 function getCasualGameHeading(
   selectedCasualSourceSection: 'wechat_douyin' | 'sensortower' | undefined,
   selectedCasualGameCategory: CasualGameMainCategory | null | undefined,
   selectedGamePlatform: GamePlatformKey | null | undefined,
-  selectedCasualGameCompetitorSub: CasualGameCompetitorSub | null | undefined
+  selectedCasualGameCompetitorSub: CasualGameCompetitorSub | null | undefined,
+  selectedCasualOurProductSub?: CasualGameOurProductSub | null
 ): { crumbs: string[]; headline: string } {
   const root = '休闲游戏监测';
+  if (selectedCasualGameCategory === '我方产品') {
+    const sub = selectedCasualOurProductSub ?? '日总结';
+    const leaf = sub === '日总结' ? '日总结' : '按产品追溯';
+    return {
+      crumbs: [root, '我方产品检测', leaf],
+      headline: sub === '日总结' ? 'US 免费榜日总结' : '我方产品 · 按产品追溯',
+    };
+  }
   if (selectedCasualGameCategory === '竞品') {
     const sub =
       selectedCasualGameCompetitorSub === '社媒更新'
@@ -63,6 +79,8 @@ interface MonitorListProps {
   headerAction?: React.ReactNode;
   /** 休闲游戏监测：当前数据块（微信/抖音 与 SensorTower 隔离，只显示对应来源的项） */
   selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
+  /** 我方产品：US 免费榜日总结 / 按产品追溯（均为占位） */
+  selectedCasualOurProductSub?: CasualGameOurProductSub | null;
   /** 列表页切换顶层监测类型（如从社媒视图跳到 AI 热点）；有则「分类」下拉会触发路由跳转 */
   onNavigateMonitorType?: (type: MonitorType) => void;
   onItemClick?: (item: MonitorItem) => void;
@@ -81,6 +99,7 @@ const MonitorList = ({
   pageTitle,
   headerAction,
   selectedCasualSourceSection,
+  selectedCasualOurProductSub,
   onNavigateMonitorType,
   onItemClick
 }: MonitorListProps) => {
@@ -128,6 +147,11 @@ const MonitorList = ({
   const isWeeklySummaryView =
     selectedType === '休闲游戏监测' && selectedCasualGameCategory === '周报简要';
 
+  /** 我方产品：侧栏两项均为占位，不展示卡片列表 */
+  const isOurProductView =
+    selectedType === '休闲游戏监测' && selectedCasualGameCategory === '我方产品';
+  const ourProductSub = selectedCasualOurProductSub ?? '日总结';
+
   /** 商店页变化：只保留日期 + 游戏名搜索 */
   const isStoreChangeView =
     selectedType === '休闲游戏监测' && selectedCasualGameCategory === '商店页变化';
@@ -139,7 +163,8 @@ const MonitorList = ({
     if (!isWeeklySummaryView) return [];
     const dates = new Set<string>();
     for (const it of items) {
-      if (it.type !== '休闲游戏监测' || it.casualGameCategory !== '周报简要') continue;
+      if (it.type !== '休闲游戏监测') continue;
+      if (it.casualGameCategory !== '周报简要') continue;
       if (selectedCasualSourceSection === 'sensortower' && it.casualGameSource !== 'sensortower') continue;
       if (selectedCasualSourceSection !== 'sensortower' && it.casualGameSource === 'sensortower') continue;
       if (it.date) dates.add(it.date);
@@ -174,32 +199,38 @@ const MonitorList = ({
     // 休闲游戏监测：按 周报简要 / 新游戏 / 新玩法 / 玩法拆解 / 竞品动态；并与 微信/抖音 vs SensorTower 数据块隔离
     if (selectedType === '休闲游戏监测') {
       filtered = filtered.filter((item) => item.type === '休闲游戏监测');
-      if (selectedCasualSourceSection === 'sensortower') {
-        filtered = filtered.filter((item) => item.casualGameSource === 'sensortower');
+      if (selectedCasualGameCategory === '我方产品') {
+        filtered = [];
       } else {
-        filtered = filtered.filter((item) => item.casualGameSource !== 'sensortower');
-      }
-      if (selectedCasualGameCategory) {
-        filtered = filtered.filter((item) => item.casualGameCategory === selectedCasualGameCategory);
-        if (selectedCasualGameCategory === '新游戏' && (platformFilter !== '全部' || selectedGamePlatform)) {
-          const platform = platformFilter !== '全部' ? platformFilter : selectedGamePlatform;
-          if (platform) filtered = filtered.filter((item) => item.platform === platform);
+        if (selectedCasualSourceSection === 'sensortower') {
+          filtered = filtered.filter((item) => item.casualGameSource === 'sensortower');
+        } else {
+          filtered = filtered.filter(
+            (item) => item.casualGameSource !== 'sensortower' && item.casualGameSource !== 'our_product'
+          );
         }
-        if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub) {
-          filtered = filtered.filter((item) => item.casualGameCompetitorSub === selectedCasualGameCompetitorSub);
+        if (selectedCasualGameCategory) {
+          filtered = filtered.filter((item) => item.casualGameCategory === selectedCasualGameCategory);
+          if (selectedCasualGameCategory === '新游戏' && (platformFilter !== '全部' || selectedGamePlatform)) {
+            const platform = platformFilter !== '全部' ? platformFilter : selectedGamePlatform;
+            if (platform) filtered = filtered.filter((item) => item.platform === platform);
+          }
+          if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub) {
+            filtered = filtered.filter((item) => item.casualGameCompetitorSub === selectedCasualGameCompetitorSub);
+          }
         }
-      }
-      // 竞品动态-社媒监控：同时包含「竞品社媒监控」类型的周报，并按公司筛选
-      if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新') {
-        let competitorSocial = items.filter((item) => item.type === '竞品社媒监控');
-        if (selectedCompanyName) {
-          competitorSocial = competitorSocial.filter((item) => item.companyName === selectedCompanyName);
+        // 竞品动态-社媒监控：同时包含「竞品社媒监控」类型的周报，并按公司筛选
+        if (selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === '社媒更新') {
+          let competitorSocial = items.filter((item) => item.type === '竞品社媒监控');
+          if (selectedCompanyName) {
+            competitorSocial = competitorSocial.filter((item) => item.companyName === selectedCompanyName);
+          }
+          filtered = [...filtered, ...competitorSocial];
         }
-        filtered = [...filtered, ...competitorSocial];
-      }
-      // 周报简要（含 SensorTower 周报）：按日期筛选
-      if (selectedCasualGameCategory === '周报简要' && weeklySummaryDate !== 'all') {
-        filtered = filtered.filter((item) => item.date === weeklySummaryDate);
+        // 周报简要（含 SensorTower 周报）：按日期筛选
+        if (selectedCasualGameCategory === '周报简要' && weeklySummaryDate !== 'all') {
+          filtered = filtered.filter((item) => item.date === weeklySummaryDate);
+        }
       }
       // 商店页变化：按日期 + 游戏名搜索
       if (selectedCasualGameCategory === '商店页变化') {
@@ -292,10 +323,12 @@ const MonitorList = ({
     sortBy,
     timeRange,
     isWechatDouyinWeeklyBrief,
+    isWeeklySummaryView,
     weeklySummaryDate,
     isStoreChangeView,
     storeChangeDate,
     storeChangeSearch,
+    selectedCasualOurProductSub,
   ]);
 
   const casualHeading =
@@ -304,7 +337,8 @@ const MonitorList = ({
           selectedCasualSourceSection,
           selectedCasualGameCategory,
           selectedGamePlatform,
-          selectedCasualGameCompetitorSub
+          selectedCasualGameCompetitorSub,
+          selectedCasualOurProductSub
         )
       : null;
 
@@ -351,6 +385,7 @@ const MonitorList = ({
       </div>
 
       {/* Filters：周报简要（含 SensorTower 周报）只保留日期筛选；微信/抖音周报仅时间；其他场景显示完整筛选 */}
+      {!isOurProductView && (
       <div className="mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-start gap-4">
           {isWeeklySummaryView ? (
@@ -570,7 +605,7 @@ const MonitorList = ({
           )}
         </div>
 
-        {showAdvancedFilters && !isWechatDouyinWeeklyBrief && !isWeeklySummaryView && !isStoreChangeView && (
+        {showAdvancedFilters && !isWechatDouyinWeeklyBrief && !isWeeklySummaryView && !isStoreChangeView && !isOurProductView && (
           <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -595,24 +630,32 @@ const MonitorList = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Results Count */}
-      <div className="mb-4 text-sm text-slate-600">
-        共找到 <span className="font-semibold text-slate-900">{filteredAndSortedItems.length}</span> 条监测数据
-      </div>
-
-      {/* Monitor List */}
-      <div className="space-y-0">
-        {filteredAndSortedItems.length > 0 ? (
-          filteredAndSortedItems.map((item) => (
-            <MonitorCard key={item.id} item={item} onClick={onItemClick} />
-          ))
-        ) : (
-          <div className="py-12 text-center text-slate-500">
-            <p>暂无监测数据</p>
-          </div>
-        )}
-      </div>
+      {!isOurProductView && (
+        <div className="mb-4 text-sm text-slate-600">
+          共找到 <span className="font-semibold text-slate-900">{filteredAndSortedItems.length}</span> 条监测数据
+        </div>
+      )}
+      {/* 我方产品：侧栏两项均为占位 */}
+      {isOurProductView ? (
+        <div className="space-y-0">
+          <OurProductDevelopingPlaceholder sub={ourProductSub} />
+        </div>
+      ) : (
+        <div className="space-y-0">
+          {filteredAndSortedItems.length > 0 ? (
+            filteredAndSortedItems.map((item) => (
+              <MonitorCard key={item.id} item={item} onClick={onItemClick} />
+            ))
+          ) : (
+            <div className="py-12 text-center text-slate-500">
+              <p>暂无监测数据</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

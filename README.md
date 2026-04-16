@@ -264,9 +264,9 @@ npm run deploy:staging
 - `POST /api/logout`：登出
 - `POST /api/ai/chat`：AI 对话代理（生产环境可配置是否强制登录）
 - `POST /api/feedback/gameplay-request`：玩法解析申请（可触发飞书/企微 webhook）
-- `GET /api/data/{filename}`：受保护数据文件下载（需要登录，按白名单校验）
+- `GET /api/data/{相对路径}`：受保护静态资源（需要登录）。映射到 **`PUBLIC_DIR`（默认仓库 `public/`）** 下任意相对路径；校验路径不得含 `..`、解析后必须在 `PUBLIC_DIR` 内；少数敏感 basename（如 `auth-config.json`）不返回（见 `backend/config.py` 中 `DATA_SERVE_DENYLIST_BASENAMES`）。**不再维护**「根文件 / 子目录前缀」白名单。
 
-受保护数据文件由后端鉴权接口 `/api/data/...` 按白名单提供；而静态部署时仅会额外删除 `scripts/strip-sensitive-from-dist.js` 指定的部分 json/csv/md（避免被直接公开下载）。
+受保护数据由后端鉴权接口 `/api/data/...` 按上述规则提供；静态部署时仍会执行 `scripts/strip-sensitive-from-dist.js`，从 `dist` 删除不应公开的 json/csv/md 等（避免被静态站直接下载）。
 
 ---
 

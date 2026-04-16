@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
-  const { login, loginStatic, staticPasswordRequired } = useAuth();
+  const { authMode, login, loginStatic, staticPasswordRequired } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -28,7 +28,7 @@ export default function Login() {
       <div className="w-full max-w-sm rounded-lg bg-white shadow p-6">
         <h1 className="text-xl font-semibold text-gray-800 mb-6 text-center">监测汇总平台</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!staticPasswordRequired && (
+          {authMode === 'backend' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
               <input

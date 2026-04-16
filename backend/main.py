@@ -31,8 +31,7 @@ from config import (
     LOGIN_PASSWORD_HASH,
     PUBLIC_DIR,
     DATA_DIR,
-    ALLOWED_PREFIXES,
-    ALLOWED_ROOT_FILES,
+    DATA_SERVE_DENYLIST_BASENAMES,
     FEISHU_APP_ID,
     FEISHU_APP_SECRET,
     FEISHU_MEDIA_PUBLIC,
@@ -88,7 +87,26 @@ def _format_page_context(ctx: dict[str, Any] | None) -> str:
         lines.append(f"- {key}: {val}")
     if not lines:
         return ""
-    return "【页面上下文】\n" + "\n".join(lines)
+    header = (
+        "【页面上下文】（仅表示用户当前浏览位置，便于结合语境；"
+        "不限制你只能使用某一数据库。若用户问题涉及其他榜单、其他监测类型或需交叉核对，"
+        "应使用 query_sqlite 按需查询 public/ 根目录下任意相关的 .db 文件名，可多次调用不同 db。）\n"
+    )
+    return header + "\n".join(lines)
+
+
+def _public_db_catalog_for_prompt() -> str:
+    """列出 public 根目录下 .db，避免模型误以为只能查当前页面对应库。"""
+    try:
+        names = sorted(p.name for p in PUBLIC_DIR.glob("*.db") if p.is_file())
+    except OSError:
+        return ""
+    if not names:
+        return ""
+    return (
+        "\n\n【可用的 SQLite 文件名（query_sqlite 的 db 只填文件名）】\n"
+        + ", ".join(names)
+    )
 
 
 def _sse_event(event: str, data: dict) -> str:
@@ -401,10 +419,14 @@ def _build_system_content() -> str:
     base = (
         "你是「监测汇总」内部平台的智能助手，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。"
         "用简洁中文回答；若问题超出本平台范围，也可做一般性说明。"
+        "\n\n【数据工具】使用 query_sqlite 时，db 参数可为 public 目录下任意已存在的 .db 文件名；"
+        "用户当前所在页面（页面上下文）只帮助理解提问背景，不要求你只查「与当前页面对应」的那一个库。"
+        "若问题涉及微信/抖音榜、SensorTower、竞品、AI 产品等多源数据，应分别查询对应库或多次调用，直到能回答为止。"
     )
     knowledge = _get_agent_knowledge()
     if knowledge:
         base += "\n\n【平台知识库（供回答时参考）】\n" + knowledge
+    base += _public_db_catalog_for_prompt()
     return base
 
 
@@ -430,6 +452,11 @@ def _compose_codex_user_message(user_text: str, page_context: dict[str, Any] | N
     parts: list[str] = []
     if knowledge:
         parts.append("【平台知识库（供回答时参考）】\n" + knowledge)
+    parts.append(
+        "【数据工具说明】query_sqlite 的 db 可为 public 根目录下任意 .db 文件名；"
+        "当前页面仅作语境参考，不限制只查某一库；跨榜单或跨监测类型时请分别查询对应库。"
+        + _public_db_catalog_for_prompt()
+    )
     page_block = _format_page_context(page_context)
     if page_block:
         parts.append(page_block)
@@ -687,23 +714,24 @@ async def ai_chat(body: AIChatBody, request: Request):
 # ---------- 受保护数据文件 ----------
 @app.get("/api/data/{filename:path}")
 async def serve_data(filename: str, request: Request):
+    """已登录用户可访问 public 目录下任意相对路径（不再按白名单目录/文件名限制）。"""
     await get_current_user(request)
     decoded = urllib.parse.unquote(filename)
     if not decoded or ".." in decoded:
         raise HTTPException(status_code=400, detail="非法路径")
-    if "/" in decoded:
-        if not any(decoded.startswith(p) for p in ALLOWED_PREFIXES):
-            raise HTTPException(status_code=400, detail="非法路径")
-        file_path = PUBLIC_DIR / decoded
-    else:
-        if decoded not in ALLOWED_ROOT_FILES:
-            raise HTTPException(status_code=404, detail="文件不存在")
-        file_path = PUBLIC_DIR / decoded
+    rel = decoded.replace("\\", "/").lstrip("/")
+    if not rel:
+        raise HTTPException(status_code=400, detail="非法路径")
+    basename = Path(rel).name
+    if basename.startswith("."):
+        raise HTTPException(status_code=400, detail="非法路径")
+    if basename in DATA_SERVE_DENYLIST_BASENAMES:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    file_path = (PUBLIC_DIR / rel).resolve()
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
-    real = file_path.resolve()
     base = PUBLIC_DIR.resolve()
-    if os.path.commonpath([str(real), str(base)]) != str(base):
+    if os.path.commonpath([str(file_path), str(base)]) != str(base):
         raise HTTPException(status_code=404, detail="文件不存在")
     return FileResponse(file_path)
 

@@ -12,9 +12,11 @@ export interface MarkdownRendererProps {
   className?: string;
 }
 
-function renderInlineMarkdown(
+/** 粗体、链接、裸 URL（不含行内 `![alt](url)`，避免与链接语法冲突） */
+function renderInlineMarkdownCore(
   text: string,
-  onInternalLinkClick?: (id: string) => void
+  onInternalLinkClick?: (id: string) => void,
+  keyFragment = ''
 ): React.ReactNode[] {
   const parts: (string | React.ReactElement)[] = [];
   let currentIndex = 0;
@@ -28,7 +30,7 @@ function renderInlineMarkdown(
       parts.push(text.substring(lastIndex, match.index));
     }
     parts.push(
-      <strong key={currentIndex++} className="font-semibold text-slate-900">
+      <strong key={`${keyFragment}s-${currentIndex++}`} className="font-semibold text-slate-900">
         {renderInlineMarkdown(match[1], onInternalLinkClick)}
       </strong>
     );
@@ -55,7 +57,7 @@ function renderInlineMarkdown(
         const entryId = isEntryLink ? href.replace(/^#entry:/, '') : '';
         finalParts.push(
           <a
-            key={`link-${partIndex}-${currentIndex++}`}
+            key={`${keyFragment}link-${partIndex}-${currentIndex++}`}
             href={href}
             {...(isEntryLink && onInternalLinkClick
               ? {
@@ -100,7 +102,7 @@ function renderInlineMarkdown(
         const url = urlMatch[1];
         withUrls.push(
           <a
-            key={`url-${partIndex}-${currentIndex++}`}
+            key={`${keyFragment}url-${partIndex}-${currentIndex++}`}
             href={url}
             target="_blank"
             rel="noopener noreferrer"
@@ -120,7 +122,47 @@ function renderInlineMarkdown(
     }
   });
 
-  return withUrls.length > 0 ? withUrls : [<span key="empty">{text}</span>];
+  return withUrls.length > 0 ? withUrls : [<span key={`${keyFragment}empty`}>{text}</span>];
+}
+
+/** 行内 Markdown：含 `![ ](url)` 小图标（与 ST 推送一致），以及粗体、链接、裸 URL */
+function renderInlineMarkdown(
+  text: string,
+  onInternalLinkClick?: (id: string) => void
+): React.ReactNode[] {
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const nodes: React.ReactNode[] = [];
+  let pos = 0;
+  let imgMatch: RegExpExecArray | null;
+  let seg = 0;
+  while ((imgMatch = imgRegex.exec(text)) !== null) {
+    if (imgMatch.index > pos) {
+      nodes.push(
+        ...renderInlineMarkdownCore(text.slice(pos, imgMatch.index), onInternalLinkClick, `c${seg++}-`)
+      );
+    }
+    const alt = imgMatch[1];
+    const src = imgMatch[2];
+    const inlineIcon = !alt.trim();
+    nodes.push(
+      <img
+        key={`c${seg++}-img`}
+        src={src}
+        alt={alt.trim() || '图标'}
+        className={
+          inlineIcon
+            ? 'inline-block h-5 w-5 shrink-0 rounded object-cover align-middle mr-1'
+            : 'inline-block max-h-40 rounded align-middle'
+        }
+        loading="lazy"
+      />
+    );
+    pos = imgMatch.index + imgMatch[0].length;
+  }
+  if (pos < text.length) {
+    nodes.push(...renderInlineMarkdownCore(text.slice(pos), onInternalLinkClick, `c${seg}-`));
+  }
+  return nodes.length > 0 ? nodes : [<span key="empty-root">{text}</span>];
 }
 
 const MarkdownRenderer = ({

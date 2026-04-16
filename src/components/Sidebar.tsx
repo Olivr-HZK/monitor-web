@@ -4,6 +4,7 @@ import type {
   GamePlatformKey,
   CasualGameMainCategory,
   CasualGameCompetitorSub,
+  CasualGameOurProductSub,
   AiProductSubCategory,
 } from '../types';
 
@@ -29,6 +30,9 @@ interface SidebarProps {
   /** 休闲游戏监测：当前选中的数据块（微信/抖音 与 SensorTower 隔离） */
   selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
   onCasualSourceSectionSelect?: (section: 'wechat_douyin' | 'sensortower') => void;
+  /** 我方产品：US 免费榜日总结 / 按产品追溯（占位） */
+  selectedCasualOurProductSub?: CasualGameOurProductSub | null;
+  onCasualOurProductSubSelect?: (sub: CasualGameOurProductSub) => void;
   /** 控制在侧边栏中展示哪些监测类型（默认展示全部） */
   visibleTypes?: (MonitorType | '全部')[];
   /** 是否显示最上方的「全部」按钮（默认显示） */
@@ -54,6 +58,8 @@ const Sidebar = ({
   onAiProductSubSelect,
   selectedCasualSourceSection: propCasualSourceSection,
   onCasualSourceSectionSelect,
+  selectedCasualOurProductSub,
+  onCasualOurProductSubSelect,
   visibleTypes,
   showAllTypeButton = true,
   aiProductVisibleSubs,
@@ -249,7 +255,7 @@ const Sidebar = ({
                         </div>
                       </div>
 
-                      {/* 我方产品检测（占位，后续接入内容） */}
+                      {/* 我方产品检测：占位待开发 */}
                       <div
                         id="sidebar-casual-own-product"
                         className="space-y-1 pt-3 border-t-2 border-ink/10 mt-2"
@@ -260,10 +266,37 @@ const Sidebar = ({
                           </span>
                           <span>我方产品检测</span>
                         </div>
-                        <div className="ml-2 pl-2 border-l-2 border-ink/10 mt-1">
-                          <div className="border-2 border-dashed border-ink/20 bg-surface/50 px-3 py-3 text-[10px] uppercase font-bold tracking-widest text-inkLight">
-                            内容待接入
-                          </div>
+                        <div className="ml-2 pl-2 border-l-2 border-ink/10 mt-1 space-y-1">
+                          {(
+                            [
+                              { key: '日总结' as const, label: 'US 免费榜日总结', icon: '📌' },
+                              { key: '按产品追溯' as const, label: '按产品追溯', icon: '📈' },
+                            ] as const
+                          ).map(({ key, label, icon }) => {
+                            const activeSub = selectedCasualOurProductSub ?? '日总结';
+                            const isSubSelected =
+                              selectedCasualGameCategory === '我方产品' && activeSub === key;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
+                                  isSubSelected
+                                    ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm'
+                                    : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
+                                }`}
+                                onClick={() => {
+                                  onCasualGameCategorySelect?.('我方产品');
+                                  onCasualOurProductSubSelect?.(key);
+                                }}
+                              >
+                                <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
+                                  {icon}
+                                </span>
+                                <span className="flex-1 truncate text-xs uppercase tracking-wider">{label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>

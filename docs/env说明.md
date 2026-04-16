@@ -23,6 +23,7 @@
 - 文件：**`.env.development`**
 - 常用：`VITE_API_BASE_URL`（若需直连后端；当前 Vite 开发模式亦可用代理把 `/api` 转到本机 3001，见 `vite.config.ts`）
 - 开发地址示例：`http://localhost:5173/monitor-web/`
+- **Tunnel / 临时域名**：用 Cloudflare Quick Tunnel、ngrok、loca.lt 等把本机 `5173` 暴露出去时，`vite.config.ts` 已对常见 Tunnel 域名配置 **`server.allowedHosts`**，避免 Vite 因非 `localhost` 的 `Host` 报 `Blocked request`。若仍报错，在 `vite.config.ts` 的 `allowedHosts` 中追加你的域名后缀。
 
 ---
 
@@ -31,6 +32,7 @@
 - 文件：**`.env.production`**（可选；不配时看根 `.env` 里 `VITE_*` 或构建时环境变量）
 - 常用：**`VITE_API_BASE_URL`** = 公网 API 根地址（不要末尾 `/`），例如 `https://api.gurublog.uk`
 - 其它：`VITE_BASE`（子路径如 `/monitor-web/`）、`VITE_STATIC_PASSWORD_HASH`（静态访问密码，按需）
+- **不配 `VITE_API_BASE_URL`、且部署在子路径（如 GitHub Pages 的 `/monitor-web/`）时**：生产构建会把 API 请求拼成 **`BASE_URL + /api/...`**（见 `src/utils/api.ts` 中 `getApiUrl`），避免误请求站点根 `/api` 被其它网关拦截。需要独立后端域名时仍应设置 `VITE_API_BASE_URL`。
 
 ---
 

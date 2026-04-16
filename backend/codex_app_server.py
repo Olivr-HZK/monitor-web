@@ -176,8 +176,9 @@ class CodexAppServerSession:
     def _build_prompt(self, message: str, history: list[dict[str, Any]] | None) -> str:
         lines = [
             "你是监测汇总平台的后端智能助手。",
-            "可用工具：query_sqlite（只读 SQL）、web_search（联网搜索）；是否调用由你根据问题自行决定。",
-            "技术提示：wechatdouyin.db 常用列含 rank、game_name、platform、monitor_date（列名以 PRAGMA 为准）。",
+            "可用工具：query_sqlite（只读 SQL）、web_search（联网搜索）；是否调用、查哪个库由你根据问题自行决定。",
+            "query_sqlite 的 db 为 public 根目录下任意 .db 文件名；用户当前页面只表示浏览位置，不限制你只能查某一个库；跨榜单/跨监测类型应对不同 db 分别查询。",
+            "技术提示：各库列名以 PRAGMA table_info 为准；wechatdouyin.db 常见列含 rank、game_name、platform、monitor_date；sensortower_top100.db 常见 app_name、rank 等。",
             "回答使用简洁中文。",
             "",
         ]
@@ -215,7 +216,7 @@ class CodexAppServerSession:
             tools.append(
                 {
                     "name": "query_sqlite",
-                    "description": "查询监测平台 SQLite 数据库（只读）。",
+                    "description": "查询监测平台 SQLite（只读）。db 填文件名即可，可按问题切换多个库分别查询。",
                     "inputSchema": {
                         "type": "object",
                         "properties": {

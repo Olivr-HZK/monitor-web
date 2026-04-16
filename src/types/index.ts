@@ -14,10 +14,20 @@ export type GamePlatformKey = '微信' | '抖音' | 'iOS' | '安卓';
  * - 玩法拆解：汇总视图，同时包含 新游戏 + 新玩法
  * - 竞品：竞品动态（社媒更新 / UA素材）
  */
-export type CasualGameMainCategory = '新游戏' | '新玩法' | '玩法拆解' | '竞品' | '周报简要' | '商店页变化';
+export type CasualGameMainCategory =
+  | '新游戏'
+  | '新玩法'
+  | '玩法拆解'
+  | '竞品'
+  | '周报简要'
+  | '商店页变化'
+  | '我方产品';
 
 /** 竞品下的两个小类 */
 export type CasualGameCompetitorSub = '社媒更新' | 'UA素材';
+
+/** 我方产品检测下的视图：US 免费榜日总结 / 按产品追溯（均为占位时可扩展） */
+export type CasualGameOurProductSub = '日总结' | '按产品追溯';
 
 export const GAME_PLATFORM_TO_RANKING_TYPE: Record<GamePlatformKey, GameRankingType> = {
   '微信': '微信小游戏',
@@ -113,6 +123,8 @@ export interface SensorTowerRankChangeItem {
   metadataAppName?: string;
   /** 来自 app_metadata：应用商店 URL */
   appUrl?: string;
+  /** 来自 app_metadata：应用图标 URL（周报 Markdown 行内小图，与推送脚本一致） */
+  iconUrl?: string;
   /** 来自 app_metadata：开发/发行公司 */
   publisherName?: string;
   /** 来自 app_metadata：发行日期 */
@@ -210,6 +222,8 @@ export interface SensorTowerRemovedGameItem {
   appId: string;
   appName: string;
   storeUrl?: string;
+  /** 来自 app_metadata.icon_url，用于周报行内图标 */
+  iconUrl?: string;
   reason?: string;
 }
 
@@ -402,7 +416,7 @@ export interface MonitorItem {
   /** 休闲游戏监测：大类（新游戏/新玩法/竞品） */
   casualGameCategory?: CasualGameMainCategory;
   /** 休闲游戏监测-数据来源块：仅微信/抖音 或 仅 SensorTower，用于前后端隔离 */
-  casualGameSource?: 'wechat_douyin' | 'sensortower';
+  casualGameSource?: 'wechat_douyin' | 'sensortower' | 'our_product';
   /** 休闲游戏监测-竞品：小类（社媒更新/UA素材） */
   casualGameCompetitorSub?: CasualGameCompetitorSub;
   /** AI产品监测：子类（排行榜/产品周报/UA素材） */

@@ -12,8 +12,17 @@ export function getApiBase(): string {
 /** 拼出完整 API 地址，path 如 '/api/me' 或 'api/ai/chat' */
 export function getApiUrl(path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`;
-  const base = getApiBase();
-  return base ? `${base}${p}` : p;
+  const base = getApiBase().trim();
+  if (base) return `${base.replace(/\/$/, '')}${p}`;
+  // 开发模式保持以站点根开头的 /api/...，以便 Vite server.proxy 命中 /api。
+  // 生产构建且走同源相对 API 时拼上 Vite base（如 GitHub Pages 的 /monitor-web/），
+  // 避免误请求 https://host/api/me 被其它网关当成「有后端」从而出现用户名+密码登录页。
+  if (import.meta.env.PROD) {
+    const viteBase = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
+    const basePrefix = viteBase.replace(/\/+$/, '');
+    if (basePrefix) return `${basePrefix}${p}`;
+  }
+  return p;
 }
 
 /**

@@ -28,9 +28,17 @@ const CasualHomePage = () => {
     setSelectedCasualGameCompetitorSub,
     selectedCasualSourceSection,
     setSelectedCasualSourceSection,
+    selectedCasualOurProductSub,
+    setSelectedCasualOurProductSub,
     selectedAiProductSub,
     setSelectedAiProductSub,
   } = useCasualView();
+
+  useEffect(() => {
+    if (selectedCasualGameCategory !== '我方产品') {
+      setSelectedCasualOurProductSub('日总结');
+    }
+  }, [selectedCasualGameCategory, setSelectedCasualOurProductSub]);
 
   useEffect(() => {
     const s = (location.state as { restoreCasualSourceSection?: 'wechat_douyin' | 'sensortower' } | null)
@@ -56,6 +64,11 @@ const CasualHomePage = () => {
   const getCasualGamePageTitle = () => {
     if (!selectedCasualGameCategory) return '休闲游戏监测';
     if (selectedCasualGameCategory === '周报简要') return '休闲游戏监测 - 周报简要';
+    if (selectedCasualGameCategory === '我方产品') {
+      const sub = selectedCasualOurProductSub ?? '日总结';
+      if (sub === '日总结') return '休闲游戏监测 - 我方产品 · US 免费榜日总结';
+      return '休闲游戏监测 - 我方产品 · 按产品追溯';
+    }
     if (selectedCasualGameCategory === '商店页变化') return '休闲游戏监测 - 商店页变化';
     if (selectedCasualGameCategory === '新游戏') {
       return selectedGamePlatform
@@ -195,6 +208,7 @@ const CasualHomePage = () => {
                   selectedGamePlatform={selectedGamePlatform ?? undefined}
                   selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
                   selectedCasualSourceSection={selectedCasualSourceSection}
+                  selectedCasualOurProductSub={selectedCasualOurProductSub}
                   pageTitle={getCasualGamePageTitle()}
                   onItemClick={handleReportClick}
                 />
@@ -247,6 +261,8 @@ const CasualHomePage = () => {
             onCasualGameCompetitorSubSelect={setSelectedCasualGameCompetitorSub}
             selectedCasualSourceSection={selectedCasualSourceSection}
             onCasualSourceSectionSelect={setSelectedCasualSourceSection}
+            selectedCasualOurProductSub={selectedCasualOurProductSub}
+            onCasualOurProductSubSelect={setSelectedCasualOurProductSub}
             selectedAiProductSub={selectedAiProductSub}
             onAiProductSubSelect={handleAiProductSubSelect}
             visibleTypes={['休闲游戏监测', 'AI产品监测']}

@@ -3,6 +3,7 @@ import type {
   MonitorType,
   CasualGameMainCategory,
   CasualGameCompetitorSub,
+  CasualGameOurProductSub,
   GamePlatformKey,
   AiProductSubCategory,
 } from '../types';
@@ -20,6 +21,8 @@ interface CasualViewState {
   setSelectedCasualGameCompetitorSub: (sub: CasualGameCompetitorSub | null) => void;
   selectedCasualSourceSection: 'wechat_douyin' | 'sensortower';
   setSelectedCasualSourceSection: (section: 'wechat_douyin' | 'sensortower') => void;
+  selectedCasualOurProductSub: CasualGameOurProductSub;
+  setSelectedCasualOurProductSub: (sub: CasualGameOurProductSub) => void;
   selectedAiProductSub: AiProductSubCategory;
   setSelectedAiProductSub: (sub: AiProductSubCategory) => void;
 }
@@ -36,6 +39,8 @@ export const CasualViewProvider = ({ children }: { children: React.ReactNode }) 
     useState<CasualGameCompetitorSub | null>(null);
   const [selectedCasualSourceSection, setSelectedCasualSourceSection] =
     useState<'wechat_douyin' | 'sensortower'>('sensortower');
+  const [selectedCasualOurProductSub, setSelectedCasualOurProductSub] =
+    useState<CasualGameOurProductSub>('日总结');
   const [selectedAiProductSub, setSelectedAiProductSub] =
     useState<AiProductSubCategory>('产品周报');
 
@@ -54,6 +59,8 @@ export const CasualViewProvider = ({ children }: { children: React.ReactNode }) 
         setSelectedCasualGameCompetitorSub,
         selectedCasualSourceSection,
         setSelectedCasualSourceSection,
+        selectedCasualOurProductSub,
+        setSelectedCasualOurProductSub,
         selectedAiProductSub,
         setSelectedAiProductSub,
       }}

@@ -27,6 +27,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from wecom_webhook import wecom_webhook_succeeded
+
 
 def read_report(path: Path) -> str:
     """读取 Markdown 报告内容并返回字符串。"""
@@ -92,8 +94,8 @@ def send_to_feishu(webhook: str, text: str) -> None:
         print("[飞书] 发送成功")
 
 
-def send_to_wechat(webhook: str, text: str) -> None:
-    """通过企业微信机器人发送 Markdown 消息。"""
+def send_to_wechat(webhook: str, text: str) -> bool:
+    """通过企业微信机器人发送 Markdown 消息。返回 True 表示 errcode==0。"""
     payload = {
         "msgtype": "markdown",
         "markdown": {
@@ -101,10 +103,12 @@ def send_to_wechat(webhook: str, text: str) -> None:
         },
     }
     status, resp_text = post_json(webhook, payload)
-    if status != 200:
-        print(f"[企业微信] 发送失败，status={status}, resp={resp_text}", file=sys.stderr)
-    else:
+    ok, reason = wecom_webhook_succeeded(status, resp_text)
+    if ok:
         print("[企业微信] 发送成功")
+        return True
+    print(f"[企业微信] 发送失败：{reason}；完整响应：{resp_text[:800]!r}", file=sys.stderr)
+    return False
 
 
 def main() -> None:
@@ -160,7 +164,8 @@ def main() -> None:
         send_to_feishu(feishu_webhook, text)
 
     if wechat_webhook:
-        send_to_wechat(wechat_webhook, text)
+        if not send_to_wechat(wechat_webhook, text):
+            sys.exit(1)
 
 
 def _is_table_divider(line: str) -> bool:

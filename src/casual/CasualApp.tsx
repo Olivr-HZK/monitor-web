@@ -6,7 +6,7 @@ import CasualHomePage from './CasualHomePage';
 import CasualRankingPage from '../pages/CasualRankingPage';
 import ReportDetailPage from '../pages/ReportDetailPage';
 import StoreDetailPage from '../pages/StoreDetailPage';
-import AiChatWidget from '../components/AiChatWidget';
+import { DeferredAiChatWidget } from '../components/DeferredAiChatWidget';
 import { CasualViewProvider } from './CasualViewContext';
 
 function CasualApp() {
@@ -28,7 +28,7 @@ function CasualApp() {
     <AiPageProvider>
       <CasualViewProvider>
         <div className="flex min-h-screen w-full">
-          <AiChatWidget />
+          <DeferredAiChatWidget />
           <div className="flex min-h-screen min-w-0 flex-1 flex-col">
             <Routes>
               <Route path="/" element={<CasualHomePage />} />

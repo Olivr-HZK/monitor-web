@@ -197,21 +197,68 @@ def _prepare_icon_for_upload(image_bytes: bytes, filename: str, *, side_px: int 
     return image_bytes, filename
 
 
+# 与真实浏览器接近：部分商店 CDN（Apple mzstatic、Google Play 图床等）会拒绝简单/机器人 UA，
+# 浏览器能直接 <img> 加载，但 Python urllib 用旧 UA 会 403/empty。
+_CHROME_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
+def _download_headers_for_icon_url(url: str) -> dict[str, str]:
+    u = (url or "").lower()
+    h: dict[str, str] = {
+        "User-Agent": _CHROME_UA,
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+    if "mzstatic.com" in u or "itunes.apple.com" in u:
+        h["Referer"] = "https://apps.apple.com/"
+    elif any(
+        x in u
+        for x in (
+            "googleusercontent.com",
+            "ggpht.com",
+            "gstatic.com",
+            "google.com",
+            "play-lh",
+        )
+    ):
+        h["Referer"] = "https://play.google.com/"
+    elif "sensortower" in u:
+        h["Referer"] = "https://app.sensortower-china.com/"
+    return h
+
+
 def _download_image(url: str) -> tuple[bytes, str] | None:
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; FeishuCardBot/1.0)"},
-        method="GET",
-    )
+    headers = _download_headers_for_icon_url(url)
+    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
             ct = resp.headers.get("Content-Type")
-    except (urllib.error.URLError, OSError):
+    except urllib.error.HTTPError as e:
+        _log_icon_download_fail(url, f"HTTP {e.code} {e.reason}")
+        return None
+    except urllib.error.URLError as e:
+        _log_icon_download_fail(url, str(e.reason if hasattr(e, "reason") else e))
+        return None
+    except OSError as e:
+        _log_icon_download_fail(url, str(e))
         return None
     if len(data) == 0 or len(data) > 10 * 1024 * 1024:
+        _log_icon_download_fail(url, "空内容或超过 10MB")
         return None
     return data, _guess_filename(ct, url)
+
+
+def _log_icon_download_fail(url: str, reason: str) -> None:
+    n = getattr(_log_icon_download_fail, "_n", 0)
+    if n >= 8:
+        return
+    _log_icon_download_fail._n = n + 1
+    u_show = (url or "")[:140] + ("…" if len(url or "") > 140 else "")
+    print(f"[飞书] 图标下载失败: {reason} | {u_show}", file=sys.stderr)
 
 
 def _upload_image_multipart(token: str, image_bytes: bytes, filename: str) -> str | None:
@@ -268,6 +315,16 @@ def feishu_icon_http_url_to_image_key(
         return None
     token = _feishu_tenant_access_token()
     if not token:
+        if not getattr(feishu_icon_http_url_to_image_key, "_warned_no_icon_token", False):
+            aid = (os.environ.get("FEISHU_APP_ID") or "").strip()
+            sec = (os.environ.get("FEISHU_APP_SECRET") or "").strip()
+            if not aid or not sec:
+                print(
+                    "[飞书] 未配置 FEISHU_APP_ID / FEISHU_APP_SECRET，无法把商店图标上传为 image_key，"
+                    "ST 列式卡片将只有文字（可放在项目根 .env 或 backend/.env）。",
+                    file=sys.stderr,
+                )
+            feishu_icon_http_url_to_image_key._warned_no_icon_token = True
         return None
     return _url_to_image_key(token, u, cache, upload_side_px=upload_side_px)
 

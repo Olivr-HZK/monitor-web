@@ -1,0 +1,23 @@
+# 监测链统一 cron 片段（粘贴到 crontab：crontab -e）
+# 说明：与 LaunchAgent 二选一，勿重复跑同一脚本。迁移后请卸载 com.wechat.minigame.weekly_scrape。
+# 路径以本机用户 ggbond、目录 ~/lyb 为例，换机器请全文替换 /Users/ggbond/lyb。
+
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+
+# --- 每天 7:30：竞品日爬 ---
+30 7 * * * cd /Users/ggbond/lyb/Olivr-competitor-monitor && /bin/bash run-daily-scraper.sh >> /Users/ggbond/lyb/Olivr-competitor-monitor/logs/cron-daily-scraper.log 2>&1
+
+# --- 每周一 7:30：微信/抖音小游戏周榜（原 LaunchAgent，现改 cron，与 plist 二选一）---
+30 7 * * 1 cd /Users/ggbond/lyb/wechat-mini-game-ranking-post && /bin/bash ./scripts/weekly_scrape_and_import.sh >> /Users/ggbond/lyb/wechat-mini-game-ranking-post/logs/weekly_scrape_import.log 2>&1
+
+# --- 每周一 7:30：SensorTower 周工作流 ---
+30 7 * * 1 /bin/bash /Users/ggbond/lyb/sensortower-/scripts/cron_run_weekly.sh
+
+# --- 每周一 7:40：竞品周报时间段工作流 ---
+40 7 * * 1 cd /Users/ggbond/lyb/Olivr-competitor-monitor && /bin/bash run-weekly-period-workflow.sh >> /Users/ggbond/lyb/Olivr-competitor-monitor/logs/cron.log 2>&1
+
+# --- 每天 8:30：SensorTower 我方产品日更（US 免费榜 daily）---
+30 8 * * * cd /Users/ggbond/lyb/sensortower- && /opt/homebrew/bin/node /Users/ggbond/lyb/sensortower-/scripts/us_free_appid_weekly_rank_changes.js --daily --no-competitors >> /Users/ggbond/lyb/sensortower-/logs/us_free_daily.log 2>&1
+
+# --- 每周一 8:00：monitor-web 备份 → 拷三库 → 部署 → 推送 ---
+0 8 * * 1 /bin/bash -c 'cd /Users/ggbond/lyb/monitor-web && ./scripts/sync_dbs_and_deploy.sh >> logs/sync_dbs_cron.log 2>&1'

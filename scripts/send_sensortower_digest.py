@@ -360,7 +360,7 @@ def build_markdown(db_path: Path) -> str:
   # 底部：引导访问站点查看更多详情
   lines.append("---")
   lines.append("")
-  lines.append("更多榜单详情和玩法拆解，请访问：[游戏监测网站](https://sites.google.com/castbox.fm/overwatch2/home?authuser=1)（密码：guru666）")
+  lines.append("更多榜单详情和玩法拆解，请访问：[游戏监测网站](https://sites.google.com/castbox.fm/overwatch2/home?authuser=1)（用户名：admin，密码：guru666）")
   lines.append("")
 
   return "\n".join(lines).strip()
@@ -413,7 +413,8 @@ def main() -> None:
     send_to_feishu(feishu_webhook, text)
 
   if wechat_webhook:
-    send_to_wechat(wechat_webhook, text)
+    if not send_to_wechat(wechat_webhook, text):
+      sys.exit(1)
 
 
 if __name__ == "__main__":

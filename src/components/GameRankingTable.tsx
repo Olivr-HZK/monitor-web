@@ -47,7 +47,8 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
         (it.listType && it.listType.toLowerCase().includes(q))
     );
   }, [items, weekFilter, hasWeekRange, searchTerm, rankingType, platformFilter]);
-  /** 排名变化展示：数据库带 ↑/↓ 则原样显示；否则按数字或「上升/下降」文案显示为 ↑/↓（没箭头时按上升算） */
+  /** 排名变化展示：数据库带 ↑/↓ 则原样显示；否则按数字或「上升/下降」文案显示为 ↑/↓（没箭头时按上升算）
+   * 配色与国内行情习惯一致：上升/↑ 用红，下降/↓ 用绿（非「涨跌好坏」语义）。 */
   const getRankChangeDisplay = (change: string) => {
     const raw = (change || '').toString().trim();
     if (!raw || raw === '--') {
@@ -67,14 +68,14 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
     }
     if (raw.includes('↓')) {
       return (
-        <span className="flex items-center text-red-500 font-semibold">
+        <span className="flex items-center text-green-600 font-semibold">
           {raw}
         </span>
       );
     }
     if (raw.includes('↑')) {
       return (
-        <span className="flex items-center text-green-500 font-semibold">
+        <span className="flex items-center text-red-500 font-semibold">
           {raw}
         </span>
       );
@@ -84,7 +85,7 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
       const n = parseInt(num, 10);
       const abs = (Number.isNaN(n) ? raw : Math.abs(n)).toString();
       return (
-        <span className="flex items-center text-red-500 font-semibold">
+        <span className="flex items-center text-green-600 font-semibold">
           {'↓ '}{abs === '' ? raw : abs}
         </span>
       );
@@ -94,7 +95,7 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
       const n = parseInt(num, 10);
       const val = (Number.isNaN(n) || n === 0) ? (num || raw) : String(Math.abs(n));
       return (
-        <span className="flex items-center text-green-500 font-semibold">
+        <span className="flex items-center text-red-500 font-semibold">
           {'↑ '}{val}
         </span>
       );
@@ -104,13 +105,13 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
       const abs = Math.abs(num).toString();
       const isDown = num < 0;
       return (
-        <span className={`flex items-center font-semibold ${isDown ? 'text-red-500' : 'text-green-500'}`}>
+        <span className={`flex items-center font-semibold ${isDown ? 'text-green-600' : 'text-red-500'}`}>
           {isDown ? '↓ ' : '↑ '}{abs}
         </span>
       );
     }
     return (
-      <span className="flex items-center text-green-500 font-semibold">
+      <span className="flex items-center text-red-500 font-semibold">
         {'↑ '}{raw}
       </span>
     );
@@ -170,7 +171,7 @@ const GameRankingTable = ({ items, rankingType, platformFilter, onGameNameClick 
               <th className="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">游戏类型</th>
               <th className="text-center py-4 px-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-green-500" aria-hidden>↑</span>
+                  <span className="text-red-500" aria-hidden>↑</span>
                   排名变化
                 </span>
               </th>

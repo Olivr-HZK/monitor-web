@@ -230,7 +230,7 @@ def build_digest_md(date_str: str, items: list[dict], top_n: int = 10) -> str:
         )
 
     lines.append("")
-    lines.append("> 以上为 AI 工具竞品当日表现摘要，完整明细与历史趋势请在监测汇总平台查看（密码：guru666）。")
+    lines.append("> 以上为 AI 工具竞品当日表现摘要，完整明细与历史趋势请在监测汇总平台查看（用户名：admin，密码：guru666）。")
     return "\n".join(lines)
 
 
@@ -321,16 +321,19 @@ def main() -> int:
 
     if wecom_url:
         if send_to_wechat is not None:
-            send_to_wechat(wecom_url, md)  # type: ignore[arg-type]
+            if not send_to_wechat(wecom_url, md):  # type: ignore[arg-type]
+                return 1
         else:
             from send_ai_competitor_digest import post_json as _post_json  # type: ignore
+            from wecom_webhook import wecom_webhook_succeeded  # type: ignore
 
             payload = {"msgtype": "markdown", "markdown": {"content": md}}
             status, resp = _post_json(wecom_url, payload)  # type: ignore[arg-type]
-            if status != 200:
-                print(f"[企业微信] 发送失败 status={status} resp={resp}", file=sys.stderr)
-            else:
-                print("[企业微信] 发送成功")
+            ok, reason = wecom_webhook_succeeded(status, resp)
+            if not ok:
+                print(f"[企业微信] 发送失败：{reason}；完整响应：{resp[:800]!r}", file=sys.stderr)
+                return 1
+            print("[企业微信] 发送成功")
 
     return 0
 

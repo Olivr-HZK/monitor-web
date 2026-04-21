@@ -29,38 +29,24 @@ import sqlite3
 import sys
 
 from feishu_markdown_images import prepare_feishu_card_markdown
+from webhook_url import normalize_webhook_url
+from wecom_webhook import wecom_webhook_succeeded
 import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-
 PLATFORM_LINK = "https://sites.google.com/castbox.fm/overwatch2/home?authuser=1"
 
 
 def _load_env(repo_root: Path) -> None:
-    env_path = repo_root / ".env"
-    if env_path.exists() and load_dotenv is not None:
-        load_dotenv(env_path)
-    elif env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k, v = k.strip(), v.strip()
-            if v.startswith('"') and v.endswith('"'):
-                v = v[1:-1]
-            elif v.startswith("'") and v.endswith("'"):
-                v = v[1:-1]
-            os.environ.setdefault(k, v)
+    from repo_dotenv import load_repo_env
+
+    load_repo_env(repo_root)
 
 
 def _post_json(url: str, payload: dict) -> tuple[int, str]:
+    url = normalize_webhook_url(url)
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -265,7 +251,7 @@ def build_digest_md(items: list[dict], week_label: str = "") -> str:
         else:
             lines.append(f"{i}. **{company}** {period} {score_str}")
     lines.append("")
-    lines.append(f"> 👉 查看竞品周报详情：[监测汇总平台]({PLATFORM_LINK})（密码：guru666）")
+    lines.append(f"> 👉 查看竞品周报详情：[监测汇总平台]({PLATFORM_LINK})（用户名：admin，密码：guru666）")
     return "\n".join(lines)
 
 
@@ -302,11 +288,11 @@ def send_feishu(webhook: str, title: str, md: str) -> bool:
     return False
 
 
-def send_wecom(webhook: str, md: str, max_bytes: int = 4096) -> None:
-    """企业微信 Markdown，超长截断。"""
+def send_wecom(webhook: str, md: str, max_bytes: int = 4096) -> bool:
+    """企业微信 Markdown，超长截断。返回 True 表示 errcode==0。"""
     data = md.encode("utf-8")
     if len(data) > max_bytes:
-        suffix = f"\n\n> 内容过长，详见 [监测汇总平台]({PLATFORM_LINK}) 查看（密码：guru666）。"
+        suffix = f"\n\n> 内容过长，详见 [监测汇总平台]({PLATFORM_LINK}) 查看（用户名：admin，密码：guru666）。"
         keep = max_bytes - len(suffix.encode("utf-8"))
         if keep > 0:
             chunk = data[:keep]
@@ -315,10 +301,12 @@ def send_wecom(webhook: str, md: str, max_bytes: int = 4096) -> None:
             md = chunk.decode("utf-8", errors="ignore") + suffix
     payload = {"msgtype": "markdown", "markdown": {"content": md}}
     status, resp = _post_json(webhook, payload)
-    if status != 200:
-        print(f"[企业微信] 发送失败 status={status} resp={resp}", file=sys.stderr)
-    else:
+    ok, reason = wecom_webhook_succeeded(status, resp)
+    if ok:
         print("[企业微信] 发送成功")
+        return True
+    print(f"[企业微信] 发送失败：{reason}；完整响应：{resp[:800]!r}", file=sys.stderr)
+    return False
 
 
 def main() -> int:
@@ -382,7 +370,8 @@ def main() -> int:
         if not send_feishu(feishu_url, title, md):
             return 1
     if wecom_url:
-        send_wecom(wecom_url, md)
+        if not send_wecom(wecom_url, md):
+            return 1
     return 0
 
 

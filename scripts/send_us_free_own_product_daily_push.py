@@ -19,12 +19,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-
 from feishu_markdown_images import prepare_feishu_card_markdown
+from webhook_url import normalize_webhook_url
+from wecom_webhook import wecom_webhook_succeeded
 
 DETAIL_LINK = "https://sites.google.com/castbox.fm/overwatch2/home?authuser=1"
 SENSORTOWER_OVERVIEW_BASE = "https://app.sensortower-china.com"
@@ -37,21 +34,9 @@ def _st_overview_url(app_id: str) -> str:
 
 
 def _load_env(repo_root: Path) -> None:
-    env_path = repo_root / ".env"
-    if env_path.exists() and load_dotenv is not None:
-        load_dotenv(env_path)
-    elif env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k, v = k.strip(), v.strip()
-            if v.startswith('"') and v.endswith('"'):
-                v = v[1:-1]
-            elif v.startswith("'") and v.endswith("'"):
-                v = v[1:-1]
-            os.environ.setdefault(k, v)
+    from repo_dotenv import load_repo_env
+
+    load_repo_env(repo_root)
 
 
 def _clean_url(value: str | None) -> str | None:
@@ -64,6 +49,7 @@ def _clean_url(value: str | None) -> str | None:
 
 
 def _post_json(url: str, payload: dict) -> tuple[int, str]:
+    url = normalize_webhook_url(url)
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -213,7 +199,7 @@ def build_compact_markdown(
         f"📍 美国 US · 免费榜（iOS/Android）\n\n"
         f"统计口径 · 仅统计各维度入围前 500 名的本公司产品。\n\n"
         f"日环比 · {date_from} → {date_to}\n\n"
-        f"详情：[游戏监测网站]({DETAIL_LINK})（密码：guru666）\n\n"
+        f"详情：[游戏监测网站]({DETAIL_LINK})（用户名：admin，密码：guru666）\n\n"
     )
 
     if not up_rows and not down_rows:
@@ -237,7 +223,7 @@ def _truncate_for_wecom(md: str, max_bytes: int = WECOM_MARKDOWN_MAX_BYTES) -> s
     data = md.encode("utf-8")
     if len(data) <= max_bytes:
         return md
-    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK})（密码：guru666）。"
+    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK})（用户名：admin，密码：guru666）。"
     suffix_bytes = suffix.encode("utf-8")
     keep = max_bytes - len(suffix_bytes)
     if keep <= 0:
@@ -280,17 +266,19 @@ def send_feishu_card(webhook: str, title: str, body: str) -> bool:
     return False
 
 
-def send_wecom_markdown(webhook: str, md_content: str) -> None:
+def send_wecom_markdown(webhook: str, md_content: str) -> bool:
     content = _truncate_for_wecom(md_content)
     payload = {
         "msgtype": "markdown",
         "markdown": {"content": content},
     }
     status, resp = _post_json(webhook, payload)
-    if status != 200:
-        print(f"[企业微信] 发送失败 status={status} resp={resp}", file=sys.stderr)
-    else:
+    ok, reason = wecom_webhook_succeeded(status, resp)
+    if ok:
         print("[企业微信] 发送成功")
+        return True
+    print(f"[企业微信] 发送失败：{reason}；完整响应：{resp[:800]!r}", file=sys.stderr)
+    return False
 
 
 def push_message(title: str, body: str) -> None:
@@ -306,7 +294,8 @@ def push_message(title: str, body: str) -> None:
         if not send_feishu_card(feishu, title, body):
             raise SystemExit(1)
     if wecom:
-        send_wecom_markdown(wecom, body)
+        if not send_wecom_markdown(wecom, body):
+            raise SystemExit(1)
 
 
 def main() -> int:

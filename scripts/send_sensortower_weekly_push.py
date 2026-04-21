@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# 兼容 cron 使用 macOS 自带 Python 3.9：延迟解析类型注解（PEP 563），避免 str|None 等在 3.10 才生效。
+from __future__ import annotations
+
 """
 SensorTower 榜单周报推送（单文件自包含，不依赖本目录其他脚本）。
 
@@ -8,9 +11,10 @@ SensorTower 榜单周报推送（单文件自包含，不依赖本目录其他�
   python3 scripts/send_sensortower_weekly_push.py
   python3 scripts/send_sensortower_weekly_push.py --date 2026-04-06 --dry-run
 
-飞书 ST 周报默认使用 column_set（小图在左、文案在右，需 FEISHU_APP_ID/SECRET 上传 icon）。
-  设 FEISHU_ST_USE_COLUMN_CARD=0 可改回整段 markdown 卡片。
-列式图标清晰度：FEISHU_ST_COLUMN_IMG_MODE 默认 small（与上传约 40px 对齐）；可设 medium / large 或 FEISHU_ST_COLUMN_ICON_PX=80。
+飞书 ST 周报：
+  - 默认整卡 Markdown（行内图标）：与「群机器人 Webhook」兼容性最好，图标经 prepare_feishu_card_markdown 换 image_key。
+  - 若需左图右文 column_set，设 FEISHU_ST_USE_COLUMN_CARD=1（部分 Webhook/客户端对 column_set 内 img 展示不稳定，易出现在网页有图、推送无图）。
+列式时：FEISHU_ST_COLUMN_IMG_MODE 默认 small；可设 medium/large 或 FEISHU_ST_COLUMN_ICON_PX。
 """
 import json
 import os
@@ -22,12 +26,9 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-
 from feishu_markdown_images import feishu_icon_http_url_to_image_key, prepare_feishu_card_markdown
+from webhook_url import normalize_webhook_url
+from wecom_webhook import wecom_webhook_succeeded
 
 DETAIL_LINK = "https://sites.google.com/castbox.fm/overwatch2/home?authuser=1"
 SENSORTOWER_OVERVIEW_BASE = "https://app.sensortower-china.com"
@@ -77,23 +78,10 @@ def _sensortower_overview_url(app_id: str, country: str, project_id: str | None 
 
 
 def _load_env(repo_root: Path) -> None:
-    """从项目根目录加载 .env。"""
-    env_path = repo_root / ".env"
-    if env_path.exists() and load_dotenv is not None:
-        load_dotenv(env_path)
-    elif env_path.exists():
-        # 无 python-dotenv 时简单解析
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k, v = k.strip(), v.strip()
-            if v.startswith('"') and v.endswith('"'):
-                v = v[1:-1]
-            elif v.startswith("'") and v.endswith("'"):
-                v = v[1:-1]
-            os.environ.setdefault(k, v)
+    """从项目根目录与 backend/.env 加载环境变量（见 repo_dotenv）。"""
+    from repo_dotenv import load_repo_env
+
+    load_repo_env(repo_root)
 
 
 def _weekly_report_url(st_date: str) -> str:
@@ -321,6 +309,7 @@ def _get_store_changes_from_weekly_metadata(
         if not summaries:
             continue
         result.append({
+            "app_id": app_id,
             "name": app_name or app_id,
             "store_url": store_url,
             "summaries": summaries,
@@ -330,8 +319,8 @@ def _get_store_changes_from_weekly_metadata(
 
 
 def feishu_st_use_column_card() -> bool:
-    """SensorTower 飞书是否用 column_set（左图右文）。FEISHU_ST_USE_COLUMN_CARD 默认 1；设为 0/false 则整段 markdown。"""
-    v = (os.environ.get("FEISHU_ST_USE_COLUMN_CARD") or "1").strip().lower()
+    """是否用 column_set（左图右文）。未设置时默认关闭（0），整卡 Markdown+行内图，适合群机器人 Webhook；设 1 开启列式。"""
+    v = (os.environ.get("FEISHU_ST_USE_COLUMN_CARD") or "0").strip().lower()
     return v not in ("0", "false", "no", "off")
 
 
@@ -448,11 +437,13 @@ def _build_sensortower_only_push(
     st_conn: sqlite3.Connection,
     max_items_per_section: int = 5,
     target_rank_date: str | None = None,
-) -> tuple[str, str, list | None]:
+) -> tuple[str, str, list | None, str]:
     """仅 SensorTower：总标题 + 一、新进 Top50；二、排名飙升 Top10；三、商店页更新。游戏名用 rank_changes.store_url 做链接。
     target_rank_date：若指定（如 2026-02-02），只生成该 rank_date_current 的周报；否则取最新一周。
-    第三项为飞书列式卡片段（FEISHU_ST_USE_COLUMN_CARD=1 时）：('md', 文本块) 与 ('row', icon_https, 右列无内联图的 Markdown 行)。"""
+    第三项为飞书列式卡片段（FEISHU_ST_USE_COLUMN_CARD=1 时）：('md', 文本块) 与 ('row', icon_https, 右列无内联图的 Markdown 行)。
+    第四项为企业微信专用正文：无应用行内图标、无装饰 emoji 链接文案（与飞书 md 可能不同）。"""
     lines: list[str] = []
+    lines_wecom: list[str] = []
     st_date = ""
     rank_date_last = ""
 
@@ -475,24 +466,52 @@ def _build_sensortower_only_push(
         rank_date_last = ""
 
     if not st_date:
-        return "", "", None
+        return "", "", None, ""
 
     use_col = feishu_st_use_column_card()
     segments: list = []
     seg_text: list[str] = []
+    # JOIN app_metadata.os 与 rank_changes.platform 不完全一致时 icon 常为空；按 app_id 回退任一条有 icon_url 的记录
+    _icon_resolve_cache: dict[str, str] = {}
+
+    def icon_for_row(app_id: str, primary: str | None) -> str:
+        pid = (app_id or "").strip()
+        p = (primary or "").strip()
+        if p.lower().startswith(("http://", "https://")):
+            return p
+        if not pid:
+            return ""
+        if pid in _icon_resolve_cache:
+            return _icon_resolve_cache[pid]
+        out = ""
+        try:
+            cur_ic = st_conn.cursor()
+            cur_ic.execute(
+                "SELECT icon_url FROM app_metadata WHERE app_id = ? AND TRIM(COALESCE(icon_url, '')) != '' LIMIT 1",
+                (pid,),
+            )
+            row_ic = cur_ic.fetchone()
+            if row_ic and (row_ic[0] or "").strip():
+                out = str(row_ic[0]).strip()
+        except sqlite3.OperationalError:
+            pass
+        _icon_resolve_cache[pid] = out
+        return out
 
     def flush_md() -> None:
         if seg_text:
             segments.append(("md", "\n".join(seg_text)))
             seg_text.clear()
 
-    def append_line(line: str) -> None:
+    def append_line(line: str, line_wecom: str | None = None) -> None:
         lines.append(line)
+        lines_wecom.append(line if line_wecom is None else line_wecom)
         if use_col:
             seg_text.append(line)
 
     def append_game_row(icon_url: str | None, rhs_no_icon: str, full_line: str) -> None:
         lines.append(full_line)
+        lines_wecom.append(rhs_no_icon)
         if not use_col:
             return
         u = (icon_url or "").strip()
@@ -515,7 +534,7 @@ def _build_sensortower_only_push(
             """
             SELECT r.app_id, COALESCE(m.name, r.app_name, r.app_id) AS display_name, r.store_url, r.country, r.current_rank, m.icon_url
             FROM rank_changes r
-            LEFT JOIN app_metadata m ON m.app_id = r.app_id AND m.os = LOWER(r.platform)
+            LEFT JOIN app_metadata m ON m.app_id = r.app_id AND LOWER(TRIM(COALESCE(m.os, ''))) = LOWER(TRIM(COALESCE(r.platform, '')))
             WHERE r.rank_date_current = ? AND r.change_type = '🆕 新进榜单' AND r.current_rank <= 50
             ORDER BY r.current_rank ASC, r.country, r.platform
             """,
@@ -578,14 +597,15 @@ def _build_sensortower_only_push(
             else:
                 rank_str = ""
             st_url = _sensortower_overview_url(app_id, entry.get("country", ""), st_project_id)
-            icon_p = _markdown_icon_prefix(entry.get("icon_url"))
-            icon_u = entry.get("icon_url")
+            icon_u = icon_for_row(app_id, entry.get("icon_url"))
+            icon_p = _markdown_icon_prefix(icon_u or None)
+            st_link = f" [SensorTower]({st_url})" if st_url else ""
             if store_url:
                 full = f"- {rank_str}{icon_p}[{text}]({store_url})" + (f" [📊 SensorTower]({st_url})" if st_url else "")
-                rhs = f"- {rank_str}[{text}]({store_url})" + (f" [📊 SensorTower]({st_url})" if st_url else "")
+                rhs = f"- {rank_str}[{text}]({store_url})" + st_link
             else:
                 full = f"- {rank_str}{icon_p}{text}" + (f" [📊 SensorTower]({st_url})" if st_url else "")
-                rhs = f"- {rank_str}{text}" + (f" [📊 SensorTower]({st_url})" if st_url else "")
+                rhs = f"- {rank_str}{text}" + st_link
             append_game_row(icon_u, rhs, full)
         if new_count > max_items_per_section:
             append_line("- ……")
@@ -601,7 +621,7 @@ def _build_sensortower_only_push(
                 """
                 SELECT r.app_id, r.change, COALESCE(m.name, r.app_name, r.app_id) AS display_name, r.store_url, r.country, r.current_rank, m.icon_url
                 FROM rank_changes r
-                LEFT JOIN app_metadata m ON m.app_id = r.app_id AND m.os = LOWER(r.platform)
+                LEFT JOIN app_metadata m ON m.app_id = r.app_id AND LOWER(TRIM(COALESCE(m.os, ''))) = LOWER(TRIM(COALESCE(r.platform, '')))
                 WHERE r.rank_date_current = ? AND r.change_type = '🚀 排名飙升'
                 ORDER BY r.current_rank ASC
                 """,
@@ -666,14 +686,15 @@ def _build_sensortower_only_push(
                     rank_str = ""
                 st_url = _sensortower_overview_url(x.get("app_id", ""), x.get("country", ""), st_project_id)
                 text = f"{name}（{change_str}）"
-                icon_p = _markdown_icon_prefix(x.get("icon_url"))
-                icon_u = x.get("icon_url")
+                icon_u = icon_for_row(str(x.get("app_id") or ""), x.get("icon_url"))
+                icon_p = _markdown_icon_prefix(icon_u or None)
+                st_link = f" [SensorTower]({st_url})" if st_url else ""
                 if store_url:
                     full = f"- {rank_str}{icon_p}[{text}]({store_url})" + (f" [📊 SensorTower]({st_url})" if st_url else "")
-                    rhs = f"- {rank_str}[{text}]({store_url})" + (f" [📊 SensorTower]({st_url})" if st_url else "")
+                    rhs = f"- {rank_str}[{text}]({store_url})" + st_link
                 else:
                     full = f"- {rank_str}{icon_p}{text}" + (f" [📊 SensorTower]({st_url})" if st_url else "")
-                    rhs = f"- {rank_str}{text}" + (f" [📊 SensorTower]({st_url})" if st_url else "")
+                    rhs = f"- {rank_str}{text}" + st_link
                 append_game_row(icon_u, rhs, full)
             if len(surge_list) > max_items_per_section:
                 append_line("- ……")
@@ -707,8 +728,9 @@ def _build_sensortower_only_push(
             name = item.get("name") or "—"
             store_url = item.get("store_url") or ""
             brief = "、".join(item.get("summaries") or [])
-            icon_p = _markdown_icon_prefix(item.get("icon_url"))
-            icon_u = item.get("icon_url")
+            _aid = (item.get("app_id") or "").strip()
+            icon_u = icon_for_row(_aid, item.get("icon_url"))
+            icon_p = _markdown_icon_prefix(icon_u or None)
             if store_url:
                 line = f"- {icon_p}[{name}]({store_url})"
                 rhs = f"- [{name}]({store_url})"
@@ -768,7 +790,7 @@ def _build_sensortower_only_push(
                 try:
                     cur_ic = st_conn.cursor()
                     cur_ic.execute(
-                        "SELECT icon_url FROM app_metadata WHERE app_id = ? AND LOWER(os) = ? LIMIT 1",
+                        "SELECT icon_url FROM app_metadata WHERE app_id = ? AND LOWER(TRIM(COALESCE(os, ''))) = LOWER(TRIM(?)) LIMIT 1",
                         (aid, os_key),
                     )
                     row_ic = cur_ic.fetchone()
@@ -776,7 +798,8 @@ def _build_sensortower_only_push(
                         icon_url_rm = str(row_ic[0]).strip()
                 except sqlite3.OperationalError:
                     pass
-            icon_p = _markdown_icon_prefix(icon_url_rm)
+            icon_url_rm = icon_for_row(aid, icon_url_rm or None)
+            icon_p = _markdown_icon_prefix(icon_url_rm or None)
             if store_url:
                 line = f"- {icon_p}[{name}]({store_url})（{country} | {chart_label} | {platform}"
                 rhs = f"- [{name}]({store_url})（{country} | {chart_label} | {platform}"
@@ -788,7 +811,7 @@ def _build_sensortower_only_push(
                 rhs += f"；{reason}"
             line += "）"
             rhs += "）"
-            append_game_row(icon_url_rm or None, rhs, line)
+            append_game_row(icon_url_rm if icon_url_rm else None, rhs, line)
         if len(removed_items) > max_items_per_section:
             append_line(f"- …… 共 {len(removed_items)} 款，详见平台")
     else:
@@ -798,10 +821,13 @@ def _build_sensortower_only_push(
     append_line("---")
     append_line("")
     weekly_url = _weekly_report_url(st_date)
-    append_line(f"> 👉 查看当周完整周报：[游戏监测网站]({weekly_url})（密码：guru666）")
+    append_line(
+        f"> 👉 查看当周完整周报：[游戏监测网站]({weekly_url})（用户名：admin，密码：guru666）",
+        f"> 查看当周完整周报：[游戏监测网站]({weekly_url})（用户名：admin，密码：guru666）",
+    )
     if use_col:
         flush_md()
-    return "\n".join(lines), st_date, segments if use_col else None
+    return "\n".join(lines), st_date, segments if use_col else None, "\n".join(lines_wecom)
 
 def _clean_url(value: str | None) -> str | None:
     if not value:
@@ -812,6 +838,7 @@ def _clean_url(value: str | None) -> str | None:
     return v if v else None
 
 def _post_json(url: str, payload: dict) -> tuple[int, str]:
+    url = normalize_webhook_url(url)
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -889,7 +916,7 @@ def _truncate_for_wecom(md: str, max_bytes: int = WECOM_MARKDOWN_MAX_BYTES) -> s
     data = md.encode("utf-8")
     if len(data) <= max_bytes:
         return md
-    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
+    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK}) 查看（用户名：admin，密码：guru666）。"
     suffix_bytes = suffix.encode("utf-8")
     keep = max_bytes - len(suffix_bytes)
     if keep <= 0:
@@ -900,18 +927,20 @@ def _truncate_for_wecom(md: str, max_bytes: int = WECOM_MARKDOWN_MAX_BYTES) -> s
     return chunk.decode("utf-8", errors="ignore") + suffix
 
 
-def send_wecom_markdown(webhook: str, md_content: str) -> None:
-    """企业微信：发一条 Markdown 消息（单条不超过 4096 字节）。"""
+def send_wecom_markdown(webhook: str, md_content: str) -> bool:
+    """企业微信：发一条 Markdown 消息（单条不超过 4096 字节）。返回 True 表示 errcode==0。"""
     content = _truncate_for_wecom(md_content)
     payload = {
         "msgtype": "markdown",
         "markdown": {"content": content},
     }
     status, resp = _post_json(webhook, payload)
-    if status != 200:
-        print(f"[企业微信] 发送失败 status={status} resp={resp}", file=sys.stderr)
-    else:
+    ok, reason = wecom_webhook_succeeded(status, resp)
+    if ok:
         print("[企业微信] 发送成功")
+        return True
+    print(f"[企业微信] 发送失败：{reason}；完整响应：{resp[:800]!r}", file=sys.stderr)
+    return False
 
 
 def _split_sensortower_for_wecom(md: str) -> list[str]:
@@ -922,7 +951,7 @@ def _split_sensortower_for_wecom(md: str) -> list[str]:
         return [md]
     before, after3 = md.split(sep3, 1)
     part1 = before.rstrip()
-    footer = f"\n\n---\n\n> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（密码：guru666）"
+    footer = f"\n\n---\n\n> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（用户名：admin，密码：guru666）"
     part1 = part1 + footer
     out = []
     for block in (part1,):
@@ -962,7 +991,7 @@ def push_game_weekly_message(
     feishu_segments: list | None = None,
 ) -> None:
     """根据标题与内容发送到已配置的飞书/企微（SensorTower 标题会拆多条企微）。feishu_only=True 时只发飞书。
-    feishu_segments 非空时飞书走 column_set 列式卡片；body_feishu 仍供企微使用。"""
+    feishu_segments 非空时飞书走 column_set 列式卡片；body_wecom 非空时企微用其正文（无行内应用图），否则回退 body_feishu。"""
     feishu = _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
     wecom = None if feishu_only else (
         _clean_url(os.environ.get("WECOM_WEBHOOK_URL_REAL")) or _clean_url(os.environ.get("WECOM_WEBHOOK_URL"))
@@ -987,9 +1016,11 @@ def push_game_weekly_message(
     if wecom:
         if title.startswith("SensorTower 周报"):
             for part in _split_sensortower_for_wecom(body_w):
-                send_wecom_markdown(wecom, part)
+                if not send_wecom_markdown(wecom, part):
+                    raise SystemExit(1)
         else:
-            send_wecom_markdown(wecom, body_w)
+            if not send_wecom_markdown(wecom, body_w):
+                raise SystemExit(1)
 
 def main() -> int:
     import argparse
@@ -1008,7 +1039,7 @@ def main() -> int:
     target_rank_date = args.date.strip()[:10] if args.date else None
     conn = sqlite3.connect(str(db_path))
     try:
-        md, st_date, feishu_seg = _build_sensortower_only_push(
+        md, st_date, feishu_seg, md_wecom = _build_sensortower_only_push(
             conn, max_items_per_section=5, target_rank_date=target_rank_date
         )
     finally:
@@ -1026,7 +1057,9 @@ def main() -> int:
         if feishu_seg:
             print(f"\n（飞书将用 column_set，共 {len(feishu_seg)} 个片段：md / row）", file=sys.stderr)
         return 0
-    push_game_weekly_message(title, md, None, feishu_only=args.feishu_only, feishu_segments=feishu_seg)
+    push_game_weekly_message(
+        title, md, md_wecom, feishu_only=args.feishu_only, feishu_segments=feishu_seg
+    )
     return 0
 
 if __name__ == "__main__":

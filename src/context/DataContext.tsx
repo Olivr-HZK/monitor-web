@@ -156,7 +156,7 @@ const buildStoreChangeMonitorItems = (changes: SensorTowerStoreChangeItem[]) => 
 };
 
 export const DataProvider = ({ children }: { children: React.ReactNode }) => {
-  const { authMode, user, getDataUrl } = useAuth();
+  const { authMode, user, loading: authLoading, getDataUrl } = useAuth();
   const [wechatDouyinRankings, setWechatDouyinRankings] = useState<GameRanking[]>([]);
   const [wechatDouyinRankingsByWeek, setWechatDouyinRankingsByWeek] = useState<WechatDouyinRankingsByWeek[]>([]);
   const [_sensorTowerRankings, setSensorTowerRankings] = useState<GameRanking[]>([]);
@@ -172,7 +172,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [weeklyReports, setWeeklyReports] = useState<MonitorItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  const shouldLoadData = authMode === 'static' || user;
+  // 鉴权完成前勿拉数据：否则 authMode 仍为初始 static，会误用静态 .db 路径（deploy:api 下 404）
+  const shouldLoadData = !authLoading && (authMode === 'static' || user);
   // 静态模式（托管页）也必须用 getDataUrl，否则相对路径在 base=/monitor-web/ 下会解析错误导致 404
   const useFullDataUrls = authMode === 'static' || (authMode === 'backend' && user);
 
@@ -350,7 +351,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     loadData();
-  }, [shouldLoadData, authMode, user, getDataUrl]);
+  }, [shouldLoadData, authLoading, authMode, user, getDataUrl]);
 
   const sensortowerStoreCardItems = useMemo(() => {
     return sensorTowerStoreCards.map((card) => {

@@ -32,12 +32,9 @@ from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-
 from feishu_markdown_images import prepare_feishu_card_markdown
+from webhook_url import normalize_webhook_url
+from wecom_webhook import wecom_webhook_succeeded
 
 from send_sensortower_weekly_push import _build_sensortower_only_push, send_feishu_card_with_segments
 
@@ -89,23 +86,9 @@ def _sensortower_overview_url(app_id: str, country: str, project_id: str | None 
 
 
 def _load_env(repo_root: Path) -> None:
-    """从项目根目录加载 .env。"""
-    env_path = repo_root / ".env"
-    if env_path.exists() and load_dotenv is not None:
-        load_dotenv(env_path)
-    elif env_path.exists():
-        # 无 python-dotenv 时简单解析
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k, v = k.strip(), v.strip()
-            if v.startswith('"') and v.endswith('"'):
-                v = v[1:-1]
-            elif v.startswith("'") and v.endswith("'"):
-                v = v[1:-1]
-            os.environ.setdefault(k, v)
+    from repo_dotenv import load_repo_env
+
+    load_repo_env(repo_root)
 
 def _clean_url(value: str | None) -> str | None:
     if not value:
@@ -575,7 +558,7 @@ def _build_wechat_douyin_push(
 
     lines.append("---")
     lines.append("")
-    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（密码：guru666）")
+    lines.append(f"> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（用户名：admin，密码：guru666）")
     return "\n".join(lines), week_range
 
 
@@ -609,6 +592,7 @@ def build_minigame_weekly_report_doc(
 
 # ---------- 发送 ----------
 def _post_json(url: str, payload: dict) -> tuple[int, str]:
+    url = normalize_webhook_url(url)
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -686,7 +670,7 @@ def _truncate_for_wecom(md: str, max_bytes: int = WECOM_MARKDOWN_MAX_BYTES) -> s
     data = md.encode("utf-8")
     if len(data) <= max_bytes:
         return md
-    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
+    suffix = f"\n\n> 内容过长，详见 [游戏监测网站]({DETAIL_LINK}) 查看（用户名：admin，密码：guru666）。"
     suffix_bytes = suffix.encode("utf-8")
     keep = max_bytes - len(suffix_bytes)
     if keep <= 0:
@@ -697,18 +681,20 @@ def _truncate_for_wecom(md: str, max_bytes: int = WECOM_MARKDOWN_MAX_BYTES) -> s
     return chunk.decode("utf-8", errors="ignore") + suffix
 
 
-def send_wecom_markdown(webhook: str, md_content: str) -> None:
-    """企业微信：发一条 Markdown 消息（单条不超过 4096 字节）。"""
+def send_wecom_markdown(webhook: str, md_content: str) -> bool:
+    """企业微信：发一条 Markdown 消息（单条不超过 4096 字节）。返回 True 表示 errcode==0。"""
     content = _truncate_for_wecom(md_content)
     payload = {
         "msgtype": "markdown",
         "markdown": {"content": content},
     }
     status, resp = _post_json(webhook, payload)
-    if status != 200:
-        print(f"[企业微信] 发送失败 status={status} resp={resp}", file=sys.stderr)
-    else:
+    ok, reason = wecom_webhook_succeeded(status, resp)
+    if ok:
         print("[企业微信] 发送成功")
+        return True
+    print(f"[企业微信] 发送失败：{reason}；完整响应：{resp[:800]!r}", file=sys.stderr)
+    return False
 
 
 def _split_sensortower_for_wecom(md: str) -> list[str]:
@@ -719,7 +705,7 @@ def _split_sensortower_for_wecom(md: str) -> list[str]:
         return [md]
     before, after3 = md.split(sep3, 1)
     part1 = before.rstrip()
-    footer = f"\n\n---\n\n> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（密码：guru666）"
+    footer = f"\n\n---\n\n> 👉 查看当周完整周报：[游戏监测网站]({DETAIL_LINK})（用户名：admin，密码：guru666）"
     part1 = part1 + footer
     out = []
     for block in (part1,):
@@ -777,9 +763,11 @@ def push_game_weekly_message(
     if wecom:
         if title.startswith("SensorTower 周报"):
             for part in _split_sensortower_for_wecom(body_w):
-                send_wecom_markdown(wecom, part)
+                if not send_wecom_markdown(wecom, part):
+                    raise SystemExit(1)
         else:
-            send_wecom_markdown(wecom, body_w)
+            if not send_wecom_markdown(wecom, body_w):
+                raise SystemExit(1)
 
 
 
@@ -907,7 +895,7 @@ def build_hot_trend_daily_md(
         + "\n"
     )
     title = f"热点日报每日汇总 {date_str}"
-    summary_md = f"# {title}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
+    summary_md = f"# {title}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看（用户名：admin，密码：guru666）。"
     return summary_md, summary_md
 
 
@@ -964,7 +952,7 @@ def build_ai_daily_from_json(json_path: Path) -> tuple[str, str] | None:
         topic_list += "\n……"
     content = f"## 摘要\n{overview_summary}\n\n## 本日话题\n{topic_list}\n"
     title_str = f"AI热点日报（{date_full or short_date}）"
-    body = f"# {title_str}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看（密码：guru666）。"
+    body = f"# {title_str}\n\n{content}\n\n> 详情进入 [游戏监测网站]({DETAIL_LINK}) 查看（用户名：admin，密码：guru666）。"
     return title_str, body
 
 
@@ -1118,11 +1106,11 @@ def main() -> int:
         conn_st = sqlite3.connect(str(st_db))
         try:
             target_rank_date = report_date_iso if args.date else None
-            md, st_date, feishu_seg = _build_sensortower_only_push(
+            md, st_date, feishu_seg, md_wecom = _build_sensortower_only_push(
                 conn_st, max_items_per_section=5, target_rank_date=target_rank_date
             )
             if md and st_date:
-                messages.append((f"SensorTower 周报-{st_date or '最新'}", md, None, feishu_seg))
+                messages.append((f"SensorTower 周报-{st_date or '最新'}", md, md_wecom, feishu_seg))
             elif args.date and not st_date:
                 print(f"[跳过] 游戏检测：未找到 {report_date_iso} 对应周报数据（rank_changes 中无该 rank_date_current）", file=sys.stderr)
         finally:

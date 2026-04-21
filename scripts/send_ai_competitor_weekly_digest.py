@@ -455,16 +455,19 @@ def main() -> int:
 
     if wecom_url:
         if send_to_wechat is not None:
-            send_to_wechat(wecom_url, md)  # type: ignore[arg-type]
+            if not send_to_wechat(wecom_url, md):  # type: ignore[arg-type]
+                return 1
         else:
             from send_ai_competitor_digest import post_json as _post_json  # type: ignore
+            from wecom_webhook import wecom_webhook_succeeded  # type: ignore
 
             payload_md = {"msgtype": "markdown", "markdown": {"content": md}}
             status, resp = _post_json(wecom_url, payload_md)  # type: ignore[arg-type]
-            if status != 200:
-                print(f"[企业微信] 发送失败 status={status} resp={resp}", file=sys.stderr)
-            else:
-                print("[企业微信] 发送成功")
+            ok, reason = wecom_webhook_succeeded(status, resp)
+            if not ok:
+                print(f"[企业微信] 发送失败：{reason}；完整响应：{resp[:800]!r}", file=sys.stderr)
+                return 1
+            print("[企业微信] 发送成功")
 
     return 0
 

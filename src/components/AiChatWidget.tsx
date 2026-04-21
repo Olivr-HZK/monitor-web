@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAiPageContext } from '../context/AiPageContext';
-import { getApiUrl, parseApiErrorBody } from '../utils/api';
+import { getApiUrl, parseApiErrorBody, withApiAuth } from '../utils/api';
 import { ChatMarkdown } from './ChatMarkdown';
 
 const STORAGE_KEY_V3 = 'ai-chat-sessions-v3';
@@ -340,19 +340,21 @@ const AiChatWidget = () => {
       };
 
       const streamChat = async (): Promise<{ answer: string; intentMeta?: AiIntentMeta }> => {
-        const resp = await fetch(getApiUrl('/api/ai/chat/stream'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          signal,
-          body: JSON.stringify({
-            message: text,
-            history: historyBefore.map((m) => ({ role: m.role, content: m.content })),
-            pageContext,
-          }),
-        });
+        const resp = await fetch(
+          getApiUrl('/api/ai/chat/stream'),
+          withApiAuth({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal,
+            body: JSON.stringify({
+              message: text,
+              history: historyBefore.map((m) => ({ role: m.role, content: m.content })),
+              pageContext,
+            }),
+          })
+        );
         if (resp.status === 401) throw new Error('UNAUTHORIZED');
         if (!resp.ok) {
           const raw = await resp.text();
@@ -451,19 +453,21 @@ const AiChatWidget = () => {
       };
 
       const fallbackChat = async (): Promise<{ answer: string; intentMeta?: AiIntentMeta }> => {
-        const resp = await fetch(getApiUrl('/api/ai/chat'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          signal,
-          body: JSON.stringify({
-            message: text,
-            history: historyBefore.map((m) => ({ role: m.role, content: m.content })),
-            pageContext,
-          }),
-        });
+        const resp = await fetch(
+          getApiUrl('/api/ai/chat'),
+          withApiAuth({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal,
+            body: JSON.stringify({
+              message: text,
+              history: historyBefore.map((m) => ({ role: m.role, content: m.content })),
+              pageContext,
+            }),
+          })
+        );
         if (resp.status === 401) throw new Error('UNAUTHORIZED');
         const rawText = await resp.text();
         let data: unknown = null;
@@ -598,17 +602,19 @@ const AiChatWidget = () => {
           const path = location.pathname;
           const sess = sid;
           queueMicrotask(() => {
-            void fetch(getApiUrl('/api/ai/feedback'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                messageId: mid,
-                rating: r,
-                sessionId: sess,
-                pathname: path,
-              }),
-            }).catch(() => {
+            void fetch(
+              getApiUrl('/api/ai/feedback'),
+              withApiAuth({
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  messageId: mid,
+                  rating: r,
+                  sessionId: sess,
+                  pathname: path,
+                }),
+              })
+            ).catch(() => {
               /* 离线或 CORS 时仍保留本地记录 */
             });
           });

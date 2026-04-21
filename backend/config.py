@@ -34,7 +34,8 @@ LOGIN_PASSWORD_HASH = _str(os.environ.get("LOGIN_PASSWORD_HASH"))
 CORS_ORIGIN = _str(os.environ.get("CORS_ORIGIN"), "*")
 CORS_ORIGINS = _csv(os.environ.get("CORS_ORIGIN"), ["*"])
 
-# 登录 Cookie：前端与 API 不同站点（如 GitHub Pages → api.xxx）时须 COOKIE_SAMESITE=none + COOKIE_SECURE=true，否则跨站 fetch 不会带上 token，/api/data 全 401
+# 登录 Cookie：前端与 API 不同站点（如 GitHub Pages → api.xxx）时须 COOKIE_SAMESITE=none + COOKIE_SECURE=true，否则跨站 fetch 不会带上 token，/api/data 全 401。
+# Safari 对第三方 Cookie 更严格：默认 lax 时跨站 credentialed fetch 常不带 Cookie；若必须用「账号密码 + /api/data」，务必 none + 精确 CORS_ORIGIN（勿 *）。
 _raw_cookie_samesite = _str(os.environ.get("COOKIE_SAMESITE"), "lax").lower()
 if _raw_cookie_samesite not in ("lax", "strict", "none"):
     _raw_cookie_samesite = "lax"

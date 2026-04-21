@@ -9,7 +9,7 @@ import AiRankingPage from './pages/AiRankingPage';
 import ReportDetailPage from './pages/ReportDetailPage';
 import StoreDetailPage from './pages/StoreDetailPage';
 import GameplayDetailPage from './pages/GameplayDetailPage';
-import AiChatWidget from './components/AiChatWidget';
+import { DeferredAiChatWidget } from './components/DeferredAiChatWidget';
 
 function App() {
   const { authMode, user, loading: authLoading, staticPasswordRequired } = useAuth();
@@ -29,7 +29,7 @@ function App() {
   return (
     <AiPageProvider>
       <div className="flex min-h-screen w-full">
-        <AiChatWidget />
+        <DeferredAiChatWidget />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Routes>
             <Route path="/" element={<HomePage />} />

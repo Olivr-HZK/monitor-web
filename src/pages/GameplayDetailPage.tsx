@@ -4,7 +4,7 @@ import { useAiPageContext } from '../context/AiPageContext';
 import { useAuth } from '../context/AuthContext';
 import { loadGameplayByGameName } from '../data/reportsLoader';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, withApiAuth } from '../utils/api';
 import { useNavigateBack } from '../utils/navigation';
 
 const GameplayDetailPage = () => {
@@ -13,7 +13,7 @@ const GameplayDetailPage = () => {
   const goBack = useNavigateBack(
     source === 'sensortower' ? '/rankings/casual/sensortower' : '/rankings/casual/wechat_douyin'
   );
-  const { authMode, user, getDataUrl } = useAuth();
+  const { authMode, user, loading: authLoading, getDataUrl } = useAuth();
   const gameName = encodedName ? decodeURIComponent(encodedName) : '';
 
   const [content, setContent] = useState<string | null>(null);
@@ -40,6 +40,7 @@ const GameplayDetailPage = () => {
       setLoading(false);
       return;
     }
+    if (authLoading) return;
     let cancelled = false;
     setLoading(true);
     loadGameplayByGameName(getDataUrlFn, gameName)
@@ -54,22 +55,24 @@ const GameplayDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [gameName, getDataUrlFn]);
+  }, [gameName, getDataUrlFn, authLoading]);
 
   const handleRequestGameplay = async () => {
     setRequesting(true);
     setApiUnavailable(false);
     try {
-      const res = await fetch(getApiUrl('/api/feedback/gameplay-request'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          gameName,
-          source: source || 'wechat_douyin',
-          remark: '',
-        }),
-      });
+      const res = await fetch(
+        getApiUrl('/api/feedback/gameplay-request'),
+        withApiAuth({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gameName,
+            source: source || 'wechat_douyin',
+            remark: '',
+          }),
+        })
+      );
       if (res.ok) {
         setRequestSent(true);
       } else {

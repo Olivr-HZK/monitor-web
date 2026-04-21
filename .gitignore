@@ -22,6 +22,8 @@ data/
 dist-ssr
 *.local
 public/*.db
+# 本地数据库快照（cron / 同步前备份）
+backups/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

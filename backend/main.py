@@ -189,10 +189,12 @@ async def login(body: LoginBody, request: Request):
     if password != admin_pwd:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     token = create_token(username)
-    resp = JSONResponse(content={"user": username})
+    # token 同时放入 JSON，便于 GitHub Pages 等跨站场景下 Safari 无法带 Cookie 时用 Authorization 头鉴权
+    resp = JSONResponse(content={"user": username, "token": token})
     resp.set_cookie(
         "token",
         token,
+        path="/",
         httponly=True,
         max_age=7 * 24 * 3600,
         samesite=COOKIE_SAMESITE,  # type: ignore[arg-type]

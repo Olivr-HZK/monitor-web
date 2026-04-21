@@ -3,8 +3,13 @@
  * 静态模式访问密码：优先从 public/auth-config.json 的 staticPasswordHash 读取，否则用构建时 VITE_STATIC_PASSWORD_HASH
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getApiBase, getApiUrl } from '../utils/api';
-import { resetOurProductDatabaseCache } from '../data/ourProductDailyLoader';
+import {
+  getApiBase,
+  getApiUrl,
+  setStoredApiToken,
+  withApiAuth,
+} from '../utils/api';
+import { resetOurProductDatabaseCache } from '../data/ourProductAnalyticsLoader';
 
 const STATIC_AUTH_KEY = 'static-auth';
 const AUTH_CONFIG_URL = 'auth-config.json';
@@ -60,12 +65,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** 静态模式下的访问密码哈希（来自 auth-config.json 或构建时 env） */
   const [staticHash, setStaticHash] = useState('');
 
-  // 静态模式（无后端 / 托管页）：直接请求静态资源路径；后端模式用可配置的 API 基地址
+  /**
+   * 数据文件 URL：纯静态站走同域 public 资源；已配置 VITE_API_BASE_URL 时走 /api/data（带 Cookie）。
+   * 注意：authMode 初始为 static，若此处在「未配置后端」时也按 static 拼路径，会在 deploy:api（无 .db）时首屏误请求
+   * /monitor-web/*.db 导致 404；已配置后端且未 VITE_FORCE_STATIC_AUTH 时须直接走 API。
+   */
   const getDataUrl = useCallback((filename: string) => {
+    const forceStatic =
+      import.meta.env.VITE_FORCE_STATIC_AUTH === '1' ||
+      import.meta.env.VITE_FORCE_STATIC_AUTH === 'true';
+    const configuredBackend = Boolean(getApiBase().trim());
     const base = typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL
       ? import.meta.env.BASE_URL.replace(/\/$/, '')
       : '';
-    if (authMode === 'static') {
+    if (authMode === 'static' && (forceStatic || !configuredBackend)) {
       const path = filename.split('/').map(encodeURIComponent).join('/');
       return base ? `${base}/${path}` : `/${path}`;
     }
@@ -74,10 +87,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     setLoading(true);
+    /**
+     * Gh Pages 等静态站若仍配置了 VITE_API_BASE_URL，会走后端登录 + /api/data，跨域 Cookie 在 Safari 上常被拦（SameSite 默认 lax）。
+     * 设 VITE_FORCE_STATIC_AUTH=1 则强制「访问密码 + 同域静态 .db」，不请求 /api/me；VITE_API_BASE_URL 仍可给 AI 等接口用。
+     */
+    const forceStaticAuth =
+      import.meta.env.VITE_FORCE_STATIC_AUTH === '1' ||
+      import.meta.env.VITE_FORCE_STATIC_AUTH === 'true';
+    if (forceStaticAuth) {
+      setAuthMode('static');
+      const hash = await resolveStaticHash();
+      setStaticHash(hash);
+      if (hash) {
+        const stored = sessionStorage.getItem(STATIC_AUTH_KEY);
+        setUser(stored === hash ? '用户' : null);
+      } else {
+        setUser('用户');
+      }
+      setLoading(false);
+      return;
+    }
     /** 已配置 VITE_API_BASE_URL 时，始终走后端登录页，不因网络/CORS 失败而退回「访问密码」静态门 */
     const configuredBackend = Boolean(getApiBase().trim());
     try {
-      const res = await fetch(getApiUrl('/api/me'), { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/me'), withApiAuth());
       // 只有在 /api/me 正常响应（200 或 401）时，才认为「有后端」
       // 其它状态（404/5xx 等）：未配置远程后端时退回静态；已配置则仍保持后端模式以便显示用户名+密码
       if (!(res.ok || res.status === 401)) {
@@ -100,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setAuthMode('backend');
       if (res.status === 401) {
+        setStoredApiToken(null);
         setUser(null);
         return;
       }
@@ -144,6 +178,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ok: false, error: data.error || '登录失败' };
         }
         resetOurProductDatabaseCache();
+        if (typeof data.token === 'string' && data.token.trim()) {
+          setStoredApiToken(data.token.trim());
+        }
         setUser(data.user ?? username);
         return { ok: true };
       } catch (e) {
@@ -189,8 +226,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      await fetch(getApiUrl('/api/logout'), { method: 'POST', credentials: 'include' });
+      await fetch(getApiUrl('/api/logout'), withApiAuth({ method: 'POST' }));
     } finally {
+      setStoredApiToken(null);
       setUser(null);
     }
   }, [authMode, staticHash]);

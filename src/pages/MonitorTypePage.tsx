@@ -33,6 +33,7 @@ const MonitorTypePage = () => {
     dataLoading,
     monitorItems,
     weeklyReports,
+    ourProductRankAnalytics,
   } = useData();
   const { setPageMeta } = useAiPageContext();
 
@@ -347,6 +348,7 @@ const MonitorTypePage = () => {
                   selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
                   selectedCasualSourceSection={selectedCasualSourceSection}
                   selectedCasualOurProductSub={selectedCasualOurProductSub}
+                  ourProductRankAnalytics={ourProductRankAnalytics}
                   pageTitle={getCasualGamePageTitle()}
                   onNavigateMonitorType={goMonitorType}
                   onItemClick={handleReportClick}

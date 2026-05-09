@@ -58,10 +58,13 @@ SENSORTOWER_DB="$GURU_ROOT/sensortower-/data/sensortower_top100.db"
 COMPETITOR_DB="$GURU_ROOT/Olivr-competitor-monitor/db/competitor_data.db"
 COMPETITOR_DB_ALT="${COMPETITOR_DB_ALT:-}"
 WECHAT_DB="$GURU_ROOT/wechat-mini-game-ranking-post/data/wechatdouyin.db"
+OUR_PRODUCT_DB="${OUR_PRODUCT_DB:-$GURU_ROOT/sensortower/data/us free app id.db}"
+OUR_PRODUCT_DB_ALT="${OUR_PRODUCT_DB_ALT:-$GURU_ROOT/sensortower/data/us_free_appid_weekly.db}"
 
 TARGET_SENSORTOWER="$PUBLIC_DIR/sensortower_top100.db"
 TARGET_COMPETITOR="$PUBLIC_DIR/competitor_data.db"
 TARGET_WECHAT="$PUBLIC_DIR/wechatdouyin.db"
+TARGET_OUR_PRODUCT="$PUBLIC_DIR/us_free_appid_weekly.db"
 
 get_cutoff_epoch() {
   local today
@@ -93,10 +96,15 @@ wait_until_sources_ready() {
     if [[ ! -f "$competitor_file" && -n "${COMPETITOR_DB_ALT:-}" ]]; then
       competitor_file="$COMPETITOR_DB_ALT"
     fi
+    local our_product_file="$OUR_PRODUCT_DB"
+    if [[ ! -f "$our_product_file" && -n "${OUR_PRODUCT_DB_ALT:-}" ]]; then
+      our_product_file="$OUR_PRODUCT_DB_ALT"
+    fi
 
     if is_fresh "$SENSORTOWER_DB" "$cutoff_epoch" \
        && is_fresh "$competitor_file" "$cutoff_epoch" \
-       && is_fresh "$WECHAT_DB" "$cutoff_epoch"; then
+       && is_fresh "$WECHAT_DB" "$cutoff_epoch" \
+       && is_fresh "$our_product_file" "$cutoff_epoch"; then
       log "源库均已就绪"
       return 0
     fi
@@ -147,6 +155,16 @@ if [[ -f "$WECHAT_DB" ]]; then
   log "已同步 wechat-mini-game: $WECHAT_DB -> $TARGET_WECHAT"
 else
   log_err "未找到 wechat 数据库: $WECHAT_DB，跳过"
+fi
+
+if [[ -f "$OUR_PRODUCT_DB" ]]; then
+  cp -f "$OUR_PRODUCT_DB" "$TARGET_OUR_PRODUCT"
+  log "已同步我方产品: $OUR_PRODUCT_DB -> $TARGET_OUR_PRODUCT"
+elif [[ -n "${OUR_PRODUCT_DB_ALT:-}" && -f "$OUR_PRODUCT_DB_ALT" ]]; then
+  cp -f "$OUR_PRODUCT_DB_ALT" "$TARGET_OUR_PRODUCT"
+  log "已同步我方产品: $OUR_PRODUCT_DB_ALT -> $TARGET_OUR_PRODUCT"
+else
+  log_err "未找到我方产品数据库: $OUR_PRODUCT_DB / $OUR_PRODUCT_DB_ALT，跳过"
 fi
 
 # --- 3) 部署 ---

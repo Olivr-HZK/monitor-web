@@ -13,7 +13,7 @@ const CasualHomePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { dataLoading, monitorItems, weeklyReports } = useData();
+  const { dataLoading, monitorItems, weeklyReports, ourProductRankAnalytics } = useData();
 
   const {
     selectedType,
@@ -209,6 +209,7 @@ const CasualHomePage = () => {
                   selectedCasualGameCompetitorSub={selectedCasualGameCompetitorSub ?? undefined}
                   selectedCasualSourceSection={selectedCasualSourceSection}
                   selectedCasualOurProductSub={selectedCasualOurProductSub}
+                  ourProductRankAnalytics={ourProductRankAnalytics}
                   pageTitle={getCasualGamePageTitle()}
                   onItemClick={handleReportClick}
                 />
@@ -276,4 +277,3 @@ const CasualHomePage = () => {
 };
 
 export default CasualHomePage;
-

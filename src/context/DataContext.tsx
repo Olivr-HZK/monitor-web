@@ -22,6 +22,14 @@ import { loadReportsData, resetGameplayDatabaseCache } from '../data/reportsLoad
 import { loadWeeklyReportsFromDatabase } from '../data/weeklyReportLoader';
 import { loadAllDailyReports } from '../data/dailyReportLoader';
 import { loadReportDocuments } from '../data/reportDocumentsLoader';
+import {
+  loadOurProductDailyItems,
+  resetOurProductDatabaseCache,
+} from '../data/ourProductDailyLoader';
+import {
+  loadOurProductRankAnalytics,
+  type OurProductRankAnalytics,
+} from '../data/ourProductAnalyticsLoader';
 import type {
   GameRanking,
   MonitorItem,
@@ -53,6 +61,7 @@ interface DataContextValue {
   sensortowerStoreCardItems: MonitorItem[];
   storeChangeMonitorItems: MonitorItem[];
   storeChangeItemMap: Map<string, MonitorItem>;
+  ourProductRankAnalytics: OurProductRankAnalytics | null;
   findMonitorItem: (id: string) => MonitorItem | undefined;
   findStoreCard: (id: string) => SensorTowerStoreCard | undefined;
 }
@@ -168,6 +177,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [aiCreativeLibraryNewItems, setAiCreativeLibraryNewItems] = useState<AiCreativeLibraryItem[]>([]);
   const [aiCreativeLibraryHotItems, setAiCreativeLibraryHotItems] = useState<AiCreativeLibraryItem[]>([]);
   const [aiCreativeLibrarySurgeItems, setAiCreativeLibrarySurgeItems] = useState<AiCreativeLibraryItem[]>([]);
+  const [ourProductRankAnalytics, setOurProductRankAnalytics] = useState<OurProductRankAnalytics | null>(null);
   const [monitorItems, setMonitorItems] = useState<MonitorItem[]>([]);
   const [weeklyReports, setWeeklyReports] = useState<MonitorItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -183,6 +193,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
       // 避免 sql.js 模块级缓存锁死：曾 401/静态 404 后永久 null，改走 API 也不重拉
       resetSensorTowerDatabaseCache();
       resetGameplayDatabaseCache();
+      resetOurProductDatabaseCache();
 
       // 超时保护：避免大文件/慢网络导致永远停在「数据加载中」
       const timeoutMs = 28000;
@@ -222,6 +233,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           sensorTowerStoreChanges,
           sensorTowerRemovedGames,
           sensorTowerTop5Overview,
+          ourProductDailyItems,
+          ourProductAnalytics,
         ] = await Promise.all([
           loadUsGameRankingsFromCSVs(csvConfig).catch((error) => {
             console.error('Failed to load game rankings from CSVs:', error);
@@ -277,6 +290,14 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
             console.error('Failed to load SensorTower top5 overview:', error);
             return [];
           }),
+          loadOurProductDailyItems(getDataUrlFn).catch((error) => {
+            console.error('Failed to load own product daily items:', error);
+            return [];
+          }),
+          loadOurProductRankAnalytics(getDataUrlFn).catch((error) => {
+            console.error('Failed to load own product rank analytics:', error);
+            return null;
+          }),
         ]);
 
         const wechatDouyin = reportsData.wechatDouyinRankings ?? [];
@@ -299,6 +320,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         setAiCreativeLibraryNewItems(aiCreativeLibrary.newItems ?? []);
         setAiCreativeLibraryHotItems(aiCreativeLibrary.hotItems ?? []);
         setAiCreativeLibrarySurgeItems(aiCreativeLibrary.surgeItems ?? []);
+        setOurProductRankAnalytics(ourProductAnalytics ?? null);
 
         setWeeklyReports(weeklyReportsFromDb);
 
@@ -315,6 +337,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           ...(reportsData.newPlayItems ?? []),
           ...sensorTowerWeeklyItems,
           ...sensorTowerStoreChangeItems,
+          ...(ourProductDailyItems ?? []),
         ];
 
         const competitorSocialItems: MonitorItem[] = [];
@@ -415,6 +438,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
       sensortowerStoreCardItems,
       storeChangeMonitorItems,
       storeChangeItemMap,
+      ourProductRankAnalytics,
       findMonitorItem,
       findStoreCard,
     }),
@@ -435,6 +459,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
       sensortowerStoreCardItems,
       storeChangeMonitorItems,
       storeChangeItemMap,
+      ourProductRankAnalytics,
     ]
   );
 

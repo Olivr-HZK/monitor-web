@@ -8,7 +8,8 @@ import type {
   AiProductSubCategory,
 } from '../types';
 import MonitorCard from './MonitorCard';
-import OurProductDevelopingPlaceholder from './OurProductDevelopingPlaceholder';
+import OurProductTraceView from './OurProductTraceView';
+import type { OurProductRankAnalytics } from '../data/ourProductAnalyticsLoader';
 
 /** 与侧栏结构对齐：监测类型 → 数据块（SensorTower 或 微信/抖音，或竞品）→ 子项 */
 function getCasualGameHeading(
@@ -79,8 +80,9 @@ interface MonitorListProps {
   headerAction?: React.ReactNode;
   /** 休闲游戏监测：当前数据块（微信/抖音 与 SensorTower 隔离，只显示对应来源的项） */
   selectedCasualSourceSection?: 'wechat_douyin' | 'sensortower';
-  /** 我方产品：US 免费榜日总结 / 按产品追溯（均为占位） */
+  /** 我方产品：US 免费榜日总结 / 按产品追溯 */
   selectedCasualOurProductSub?: CasualGameOurProductSub | null;
+  ourProductRankAnalytics?: OurProductRankAnalytics | null;
   /** 列表页切换顶层监测类型（如从社媒视图跳到 AI 热点）；有则「分类」下拉会触发路由跳转 */
   onNavigateMonitorType?: (type: MonitorType) => void;
   onItemClick?: (item: MonitorItem) => void;
@@ -100,6 +102,7 @@ const MonitorList = ({
   headerAction,
   selectedCasualSourceSection,
   selectedCasualOurProductSub,
+  ourProductRankAnalytics,
   onNavigateMonitorType,
   onItemClick
 }: MonitorListProps) => {
@@ -147,7 +150,7 @@ const MonitorList = ({
   const isWeeklySummaryView =
     selectedType === '休闲游戏监测' && selectedCasualGameCategory === '周报简要';
 
-  /** 我方产品：侧栏两项均为占位，不展示卡片列表 */
+  /** 我方产品：日总结显示真实卡片，按产品追溯显示真实榜单曲线 */
   const isOurProductView =
     selectedType === '休闲游戏监测' && selectedCasualGameCategory === '我方产品';
   const ourProductSub = selectedCasualOurProductSub ?? '日总结';
@@ -200,7 +203,7 @@ const MonitorList = ({
     if (selectedType === '休闲游戏监测') {
       filtered = filtered.filter((item) => item.type === '休闲游戏监测');
       if (selectedCasualGameCategory === '我方产品') {
-        filtered = [];
+        filtered = filtered.filter((item) => item.casualGameSource === 'our_product');
       } else {
         if (selectedCasualSourceSection === 'sensortower') {
           filtered = filtered.filter((item) => item.casualGameSource === 'sensortower');
@@ -638,11 +641,29 @@ const MonitorList = ({
           共找到 <span className="font-semibold text-slate-900">{filteredAndSortedItems.length}</span> 条监测数据
         </div>
       )}
-      {/* 我方产品：侧栏两项均为占位 */}
+      {/* 我方产品：真实数据视图 */}
       {isOurProductView ? (
-        <div className="space-y-0">
-          <OurProductDevelopingPlaceholder sub={ourProductSub} />
-        </div>
+        ourProductSub === '按产品追溯' ? (
+          ourProductRankAnalytics ? (
+            <OurProductTraceView data={ourProductRankAnalytics} />
+          ) : (
+            <div className="border-2 border-dashed border-slate-300 bg-white px-6 py-14 text-center text-slate-500">
+              暂无我方产品排名数据，请确认 us_free_appid_weekly.db 已同步。
+            </div>
+          )
+        ) : (
+          <div className="space-y-0">
+            {filteredAndSortedItems.length > 0 ? (
+              filteredAndSortedItems.map((item) => (
+                <MonitorCard key={item.id} item={item} onClick={onItemClick} />
+              ))
+            ) : (
+              <div className="border-2 border-dashed border-slate-300 bg-white px-6 py-14 text-center text-slate-500">
+                暂无日总结数据，请确认 us_free_appid_weekly.db 已同步。
+              </div>
+            )}
+          </div>
+        )
       ) : (
         <div className="space-y-0">
           {filteredAndSortedItems.length > 0 ? (

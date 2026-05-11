@@ -22,32 +22,32 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b-2 border-ink bg-surface/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-line bg-surface/95 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => onTypeSelect?.('全部')}>
             <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center bg-ink text-surface transition-transform group-hover:-rotate-3"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-panel text-ink shadow-brutal-sm transition-colors group-hover:border-ink/30"
               aria-hidden
             >
-              <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14M8 19v-8m4 8v-5m4 5v-3" strokeLinecap="square" />
+              <svg className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14M8 19v-8m4 8v-5m4 5v-3" strokeLinecap="round" />
               </svg>
             </div>
-            <span className="text-xl font-display font-bold tracking-tight text-ink uppercase">监测汇总<span className="text-accent">.</span></span>
+            <span className="text-[15px] font-semibold tracking-tight text-ink">监测汇总</span>
           </div>
 
           {/* Navigation */}
-          <nav className="hidden md:flex items-center space-x-2">
+          <nav className="hidden md:flex items-center rounded-xl border border-line bg-panel/80 p-1 shadow-brutal-sm">
             {navItems.map((item) => (
               <button
                 key={item.label}
                 onClick={() => onTypeSelect?.(item.type as MonitorType | '全部')}
-                className={`px-4 py-1.5 text-sm font-bold transition-all border-2 rounded-none ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   item.active
-                    ? 'text-surface bg-ink border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
-                    : 'text-inkLight border-transparent hover:text-ink hover:border-ink/20'
+                    ? 'bg-ink text-white shadow-brutal-sm'
+                    : 'text-inkLight hover:bg-surfaceHover hover:text-ink'
                 }`}
               >
                 {item.label}
@@ -60,17 +60,17 @@ const Header = ({ selectedType, onTypeSelect, user, onLogout }: HeaderProps) => 
             {/* User / Logout */}
             {user && onLogout ? (
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-inkLight font-display">{user}</span>
+                <span className="max-w-28 truncate text-sm font-medium text-inkLight">{user}</span>
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="px-3 py-1 text-xs font-bold uppercase tracking-wider text-ink border-2 border-ink hover:bg-ink hover:text-surface transition-colors"
+                  className="rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-inkLight transition-colors hover:border-ink/20 hover:bg-surfaceHover hover:text-ink"
                 >
                   退出
                 </button>
               </div>
             ) : (
-              <span className="px-4 py-2 text-sm font-bold text-inkLight">未登录</span>
+              <span className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted">未登录</span>
             )}
           </div>
         </div>

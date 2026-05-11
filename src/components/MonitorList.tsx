@@ -345,29 +345,32 @@ const MonitorList = ({
         )
       : null;
 
+  const controlClass =
+    'rounded-lg border border-line bg-panel px-3 py-2 text-sm text-inkLight shadow-brutal-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/15';
+
   return (
     <div className="flex-1">
       {/* Title + optional action */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="mb-5 flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           {casualHeading ? (
             <div className="space-y-2">
-              <nav className="text-xs sm:text-sm text-slate-500" aria-label="当前位置">
+              <nav className="text-xs text-muted sm:text-sm" aria-label="当前位置">
                 <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                   {casualHeading.crumbs.map((part, i) => (
                     <li key={`${i}-${part}`} className="flex items-center gap-1.5">
                       {i > 0 && (
-                        <span className="text-slate-300 select-none" aria-hidden>
+                        <span className="select-none text-line" aria-hidden>
                           /
                         </span>
                       )}
                       <span
                         className={
                           i === 0
-                            ? 'text-slate-400'
+                            ? 'text-muted'
                             : i === casualHeading.crumbs.length - 1
-                              ? 'font-medium text-slate-600'
-                              : 'text-slate-500'
+                              ? 'font-medium text-inkLight'
+                              : 'text-muted'
                         }
                       >
                         {part}
@@ -376,12 +379,12 @@ const MonitorList = ({
                   ))}
                 </ol>
               </nav>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
                 {casualHeading.headline}
               </h1>
             </div>
           ) : (
-            <h1 className="text-3xl font-bold text-slate-900">{pageTitle ?? '监测汇总'}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-ink">{pageTitle ?? '监测汇总'}</h1>
           )}
         </div>
         {headerAction}
@@ -390,14 +393,14 @@ const MonitorList = ({
       {/* Filters：周报简要（含 SensorTower 周报）只保留日期筛选；微信/抖音周报仅时间；其他场景显示完整筛选 */}
       {!isOurProductView && (
       <div className="mb-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-start gap-4">
+        <div className="flex flex-wrap items-center justify-start gap-3">
           {isWeeklySummaryView ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 whitespace-nowrap">日期</span>
+              <span className="whitespace-nowrap text-sm text-muted">日期</span>
               <select
                 value={weeklySummaryDate}
                 onChange={(e) => setWeeklySummaryDate(e.target.value === 'all' ? 'all' : e.target.value)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={controlClass}
               >
                 <option value="all">全部</option>
                 {weeklySummaryDateOptions.map((d) => (
@@ -410,11 +413,11 @@ const MonitorList = ({
           ) : isStoreChangeView ? (
             <>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-600 whitespace-nowrap">日期</span>
+                <span className="whitespace-nowrap text-sm text-muted">日期</span>
                 <select
                   value={storeChangeDate}
                   onChange={(e) => setStoreChangeDate(e.target.value === 'all' ? 'all' : e.target.value)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={controlClass}
                 >
                   <option value="all">全部</option>
                   {storeChangeDateOptions.map((d) => (
@@ -425,23 +428,23 @@ const MonitorList = ({
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-600 whitespace-nowrap">游戏名</span>
+                <span className="whitespace-nowrap text-sm text-muted">游戏名</span>
                 <input
                   type="text"
                   value={storeChangeSearch}
                   onChange={(e) => setStoreChangeSearch(e.target.value)}
                   placeholder="搜索游戏名..."
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-40"
+                  className={`${controlClass} w-40`}
                 />
               </div>
             </>
           ) : isWechatDouyinWeeklyBrief ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 whitespace-nowrap">时间</span>
+              <span className="whitespace-nowrap text-sm text-muted">时间</span>
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={controlClass}
               >
                 <option value="过去1周内">过去1周内</option>
                 <option value="过去1个月内">过去1个月内</option>
@@ -453,11 +456,11 @@ const MonitorList = ({
             <>
               {!isStoreChangeView && isCompetitorSocialView && onNavigateMonitorType && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-slate-600 whitespace-nowrap">切换模块</span>
+                  <span className="whitespace-nowrap text-sm text-muted">切换模块</span>
                   <select
                     value={selectedType === '竞品社媒监控' ? '休闲游戏监测' : selectedType}
                     onChange={(e) => onNavigateMonitorType(e.target.value as MonitorType)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     {monitorTypes.map((type) => (
                       <option key={type} value={type}>
@@ -472,11 +475,11 @@ const MonitorList = ({
                 selectedCasualGameCategory === '竞品' &&
                 selectedCasualGameCompetitorSub === '社媒更新' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600 whitespace-nowrap">按公司筛选</span>
+                  <span className="whitespace-nowrap text-sm text-muted">按公司筛选</span>
                   <select
                     value={selectedCompanyName ?? ''}
                     onChange={(e) => onCompanySelect?.(e.target.value || null)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     <option value="">全部公司</option>
                     {companies.map((name) => (
@@ -491,11 +494,11 @@ const MonitorList = ({
                     selectedCasualGameCategory === '新玩法' ||
                     selectedCasualGameCategory === '玩法拆解')) && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600 whitespace-nowrap">按平台筛选</span>
+                  <span className="whitespace-nowrap text-sm text-muted">按平台筛选</span>
                   <select
                     value={platformFilter}
                     onChange={(e) => setPlatformFilter(e.target.value as GamePlatformKey | '全部')}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     <option value="全部">全部</option>
                     <option value="微信">微信</option>
@@ -507,11 +510,11 @@ const MonitorList = ({
               )}
               {!isStoreChangeView && !isCompetitorSocialView && selectedType === 'ai热点监测' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600 whitespace-nowrap">按平台筛选</span>
+                  <span className="whitespace-nowrap text-sm text-muted">按平台筛选</span>
                   <select
                     value={aiPlatformFilter}
                     onChange={(e) => setAiPlatformFilter(e.target.value)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     <option value="全部">全部</option>
                     <option value="微信">微信</option>
@@ -521,11 +524,11 @@ const MonitorList = ({
               )}
               {!isStoreChangeView && !isCompetitorSocialView && selectedType === '热点趋势监测' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600 whitespace-nowrap">按平台筛选</span>
+                  <span className="whitespace-nowrap text-sm text-muted">按平台筛选</span>
                   <select
                     value={hotTrendPlatformFilter}
                     onChange={(e) => setHotTrendPlatformFilter(e.target.value)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     <option value="全部">全部</option>
                     {hotTrendPlatformOptions.map((platform) => (
@@ -538,7 +541,7 @@ const MonitorList = ({
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={controlClass}
                 >
                   <option value="过去1周内">过去1周内</option>
                   <option value="过去1个月内">过去1个月内</option>
@@ -562,7 +565,7 @@ const MonitorList = ({
                         setInternalSelectedType(newType);
                       }
                     }}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     <option value="全部">全部分类</option>
                     {monitorTypes.map((type) => (
@@ -573,7 +576,7 @@ const MonitorList = ({
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={controlClass}
                   >
                     <option value="默认排序">默认排序</option>
                     <option value="最新发布">最新发布</option>
@@ -586,7 +589,7 @@ const MonitorList = ({
                   <button
                     type="button"
                     onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                    className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+                    className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted transition-colors hover:bg-surfaceHover hover:text-ink"
                   >
                     <svg
                       className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
@@ -609,11 +612,11 @@ const MonitorList = ({
         </div>
 
         {showAdvancedFilters && !isWechatDouyinWeeklyBrief && !isWeeklySummaryView && !isStoreChangeView && !isOurProductView && (
-          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="rounded-xl border border-line bg-panel p-4 shadow-brutal-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">情感分析</label>
-                <select className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-inkLight">情感分析</label>
+                <select className={`w-full ${controlClass}`}>
                   <option>全部</option>
                   <option>正面</option>
                   <option>中性</option>
@@ -621,8 +624,8 @@ const MonitorList = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">趋势方向</label>
-                <select className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-inkLight">趋势方向</label>
+                <select className={`w-full ${controlClass}`}>
                   <option>全部</option>
                   <option>上升</option>
                   <option>稳定</option>
@@ -637,8 +640,8 @@ const MonitorList = ({
 
       {/* Results Count */}
       {!isOurProductView && (
-        <div className="mb-4 text-sm text-slate-600">
-          共找到 <span className="font-semibold text-slate-900">{filteredAndSortedItems.length}</span> 条监测数据
+        <div className="mb-3 text-sm text-muted">
+          共找到 <span className="font-semibold text-ink">{filteredAndSortedItems.length}</span> 条监测数据
         </div>
       )}
       {/* 我方产品：真实数据视图 */}
@@ -647,7 +650,7 @@ const MonitorList = ({
           ourProductRankAnalytics ? (
             <OurProductTraceView data={ourProductRankAnalytics} />
           ) : (
-            <div className="border-2 border-dashed border-slate-300 bg-white px-6 py-14 text-center text-slate-500">
+            <div className="rounded-2xl border border-dashed border-line bg-panel px-6 py-14 text-center text-muted">
               暂无我方产品排名数据，请确认 us_free_appid_weekly.db 已同步。
             </div>
           )
@@ -658,7 +661,7 @@ const MonitorList = ({
                 <MonitorCard key={item.id} item={item} onClick={onItemClick} />
               ))
             ) : (
-              <div className="border-2 border-dashed border-slate-300 bg-white px-6 py-14 text-center text-slate-500">
+              <div className="rounded-2xl border border-dashed border-line bg-panel px-6 py-14 text-center text-muted">
                 暂无日总结数据，请确认 us_free_appid_weekly.db 已同步。
               </div>
             )}
@@ -671,7 +674,7 @@ const MonitorList = ({
               <MonitorCard key={item.id} item={item} onClick={onItemClick} />
             ))
           ) : (
-            <div className="py-12 text-center text-slate-500">
+            <div className="rounded-2xl border border-dashed border-line bg-panel py-12 text-center text-muted">
               <p>暂无监测数据</p>
             </div>
           )}

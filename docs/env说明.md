@@ -44,6 +44,32 @@
 
 **说明**：经 **Cloudflare Tunnel** 访问的 `https://api.xxx` 仍是同一套 FastAPI，**不单独再建一份 env**；只要在跑 `uvicorn` 的机器上维护好 **`backend/.env`** 即可。
 
+### 飞书对话助手（可选）
+
+若要让用户直接在飞书里和监测助手对话，后端需额外配置：
+
+```env
+FEISHU_BOT_ENABLED=true
+# 建议使用独立飞书自建应用（App ID 形如 cli_...），不要复用推送应用
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
+FEISHU_VERIFICATION_TOKEN=xxx
+# MVP 建议先在飞书后台关闭事件加密；如填写此项，后端会尝试校验事件签名
+FEISHU_ENCRYPT_KEY=
+
+# 测试期可选白名单；都不填则不限制飞书用户/群
+FEISHU_ALLOWED_OPEN_IDS=
+FEISHU_ALLOWED_CHAT_IDS=
+
+# 默认 true：先回复“正在查询”，再回复最终答案
+FEISHU_ASSISTANT_SEND_THINKING=true
+ASSISTANT_MAX_HISTORY_TURNS=10
+```
+
+飞书后台事件订阅地址填：`https://你的后端域名/api/feishu/events`，订阅事件：`im.message.receive_v1`。
+
+如果根目录 `.env` 已经配置过其它飞书应用，且本次不想复用，请务必在 `backend/.env` 中显式填写新应用的 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`；`backend/.env` 会覆盖根目录 `.env`。
+
 ---
 
 ## 脚本（根目录 `.env`）

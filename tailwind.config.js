@@ -11,17 +11,20 @@ export default {
         display: ['"Outfit"', 'sans-serif'],
       },
       colors: {
-        surface: '#F4F4F2',
-        surfaceHover: '#EBEBE8',
-        ink: '#111110',
-        inkLight: '#4A4A46',
-        accent: '#FF4500', // vibrant orange
-        accentBlue: '#0055FF', // electric blue
+        surface: '#F7F7F4',
+        surfaceHover: '#EFEFEC',
+        panel: '#FFFFFF',
+        line: '#DEDED8',
+        ink: '#1D1D1B',
+        inkLight: '#666660',
+        muted: '#8B8B84',
+        accent: '#2563EB',
+        accentBlue: '#2563EB',
       },
       boxShadow: {
-        'brutal': '4px 4px 0px 0px rgba(17,17,16,1)',
-        'brutal-sm': '2px 2px 0px 0px rgba(17,17,16,1)',
-        'brutal-hover': '6px 6px 0px 0px rgba(17,17,16,1)',
+        'brutal': '0 16px 40px -28px rgba(29,29,27,0.55)',
+        'brutal-sm': '0 10px 24px -20px rgba(29,29,27,0.45)',
+        'brutal-hover': '0 20px 44px -30px rgba(29,29,27,0.55)',
       },
       animation: {
         'fade-in-up': 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',

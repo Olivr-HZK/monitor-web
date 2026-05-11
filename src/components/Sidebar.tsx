@@ -94,40 +94,48 @@ const Sidebar = ({
   const getTypeIcon = (type: MonitorType | '全部') => {
     switch (type) {
       case 'ai热点监测':
-        return '🤖';
+        return 'AI';
       case '热点趋势监测':
-        return '📈';
+        return 'TR';
       case '竞品社媒监控':
-        return '📱';
+        return 'SM';
       case '休闲游戏监测':
-        return '🎮';
+        return 'GM';
       case 'AI产品监测':
-        return '✨';
+        return 'PD';
       default:
-        return '📊';
+        return 'MN';
     }
   };
 
+  const typeButtonClass = (active: boolean) =>
+    `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+      active ? 'bg-ink text-white shadow-brutal-sm' : 'text-inkLight hover:bg-surfaceHover hover:text-ink'
+    }`;
+
+  const subButtonClass = (active: boolean) =>
+    `w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+      active ? 'bg-surfaceHover text-ink ring-1 ring-line' : 'text-inkLight hover:bg-surfaceHover hover:text-ink'
+    }`;
+
+  const groupLabelClass = 'mt-2 flex items-center gap-2 text-[11px] font-medium text-muted';
+
   return (
     <aside className="w-64 flex-shrink-0">
-      <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-y-contain border-2 border-ink bg-white p-4 shadow-brutal-sm [scrollbar-gutter:stable]">
-        <h2 className="text-sm font-display font-bold uppercase tracking-widest text-inkLight mb-4 border-b-2 border-ink/10 pb-2">监测源</h2>
+      <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-y-contain rounded-2xl border border-line bg-panel p-3 shadow-brutal-sm [scrollbar-gutter:stable]">
+        <h2 className="mb-3 border-b border-line px-1 pb-2 text-xs font-medium text-muted">监测源</h2>
 
         {/* All option */}
         {showAllTypeButton && (
           <div className="mb-4">
             <button
               onClick={() => onTypeSelect?.('全部')}
-              className={`w-full flex items-center gap-3 px-3 py-2 font-bold transition-all border-2 ${
-                selectedType === '全部'
-                  ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
-                  : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-              }`}
+              className={typeButtonClass(selectedType === '全部')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="square" strokeLinejoin="miter" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
-              <span className="uppercase tracking-widest text-xs">全部</span>
+              <span>全部</span>
             </button>
           </div>
         )}
@@ -152,31 +160,29 @@ const Sidebar = ({
             // 另外保留「竞品监测」块（社媒监控 / UA素材）
             if (type === '休闲游戏监测') {
               const casualSourceSections: { id: 'wechat_douyin' | 'sensortower'; label: string; icon: string }[] = [
-                { id: 'sensortower', label: 'SensorTower 榜单', icon: '📊' },
-                { id: 'wechat_douyin', label: '微信 / 抖音小游戏', icon: '💬' },
+                { id: 'sensortower', label: 'SensorTower 榜单', icon: 'ST' },
+                { id: 'wechat_douyin', label: '微信 / 抖音小游戏', icon: 'WD' },
               ];
               const baseCasualSubItems: { key: CasualGameMainCategory; label: string; icon: string }[] = [
-                { key: '周报简要', label: '周报简要', icon: '📋' },
+                { key: '周报简要', label: '周报简要', icon: 'WR' },
               ];
               const sensortowerOnlySubItems: { key: CasualGameMainCategory; label: string; icon: string }[] = [
-                { key: '商店页变化', label: '商店页变化', icon: '🧾' },
+                { key: '商店页变化', label: '商店页变化', icon: 'SC' },
               ];
               const competitorSubItems: { key: CasualGameCompetitorSub; label: string; icon: string }[] = [
-                { key: '社媒更新', label: '社媒监控', icon: '📱' },
-                { key: 'UA素材', label: 'UA素材', icon: '🎬' },
+                { key: '社媒更新', label: '社媒监控', icon: 'SM' },
+                { key: 'UA素材', label: 'UA素材', icon: 'UA' },
               ];
               return (
                 <div key={type} className="space-y-2">
                   <button
                     onClick={() => onTypeSelect?.(type)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
+                    className={typeButtonClass(
                       selectedType === type || (type === '休闲游戏监测' && selectedType === '竞品社媒监控')
-                        ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
-                        : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                    }`}
+                    )}
                   >
-                    <span className="text-lg grayscale">{getTypeIcon(type)}</span>
-                    <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
+                    <span className="text-base">{getTypeIcon(type)}</span>
+                    <span className="truncate">{getTypeLabel(type)}</span>
                   </button>
 
                   {(selectedType === type || (type === '休闲游戏监测' && selectedType === '竞品社媒监控')) && (
@@ -184,13 +190,13 @@ const Sidebar = ({
                       {/* 微信 / 抖音 & SensorTower 两个大块 */}
                       {casualSourceSections.map((section) => (
                         <div key={section.id} className="space-y-1">
-                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-inkLight mt-2">
-                            <span className="w-5 h-5 border-2 border-ink/20 flex items-center justify-center flex-shrink-0 grayscale">
+                          <div className={groupLabelClass}>
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-line bg-surface text-xs">
                               {section.icon}
                             </span>
                             <span>{section.label}</span>
                           </div>
-                          <div className="ml-2 pl-2 border-l-2 border-ink/10 space-y-1">
+                          <div className="ml-2 space-y-1 border-l border-line pl-2">
                             {[
                               ...baseCasualSubItems,
                               ...(section.id === 'sensortower' ? sensortowerOnlySubItems : []),
@@ -202,18 +208,16 @@ const Sidebar = ({
                                 <button
                                   key={key}
                                   type="button"
-                                  className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
-                                    isSelected ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm' : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                                  }`}
+                                  className={subButtonClass(isSelected)}
                                   onClick={() => {
                                     setActiveCasualSourceSection(section.id);
                                     onCasualGameCategorySelect?.(key);
                                   }}
                                 >
-                                  <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
+                                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-xs">
                                     {icon}
                                   </span>
-                                  <span className="flex-1 truncate text-xs uppercase tracking-wider">{label}</span>
+                                  <span className="flex-1 truncate">{label}</span>
                                 </button>
                               );
                             })}
@@ -222,14 +226,14 @@ const Sidebar = ({
                       ))}
 
                       {/* 竞品监测块：社媒监控 / UA素材 */}
-                      <div className="space-y-1 pt-3 border-t-2 border-ink/10 mt-2">
-                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-inkLight">
-                          <span className="w-5 h-5 border-2 border-ink/20 flex items-center justify-center flex-shrink-0 grayscale">
-                            📊
+                      <div className="mt-2 space-y-1 border-t border-line pt-3">
+                        <div className={groupLabelClass}>
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-line bg-surface text-[10px]">
+                            CP
                           </span>
                           <span>竞品监测</span>
                         </div>
-                        <div className="ml-2 pl-2 border-l-2 border-ink/10 space-y-1">
+                        <div className="ml-2 space-y-1 border-l border-line pl-2">
                           {competitorSubItems.map(({ key: subKey, label: subLabel, icon: subIcon }) => {
                             const isSubSelected =
                               selectedCasualGameCategory === '竞品' && selectedCasualGameCompetitorSub === subKey;
@@ -237,18 +241,16 @@ const Sidebar = ({
                               <button
                                 key={subKey}
                                 type="button"
-                                className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
-                                  isSubSelected ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm' : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                                }`}
+                                className={subButtonClass(isSubSelected)}
                                 onClick={() => {
                                   onCasualGameCategorySelect?.('竞品');
                                   onCasualGameCompetitorSubSelect?.(subKey);
                                 }}
                               >
-                                <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
+                                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-xs">
                                   {subIcon}
                                 </span>
-                                <span className="flex-1 truncate text-xs uppercase tracking-wider">{subLabel}</span>
+                                <span className="flex-1 truncate">{subLabel}</span>
                               </button>
                             );
                           })}
@@ -258,19 +260,19 @@ const Sidebar = ({
                       {/* 我方产品检测：占位待开发 */}
                       <div
                         id="sidebar-casual-own-product"
-                        className="space-y-1 pt-3 border-t-2 border-ink/10 mt-2"
+                        className="mt-2 space-y-1 border-t border-line pt-3"
                       >
-                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-inkLight">
-                          <span className="w-5 h-5 border-2 border-ink/20 flex items-center justify-center flex-shrink-0 grayscale">
-                            🏠
+                        <div className={groupLabelClass}>
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-line bg-surface text-[10px]">
+                            OP
                           </span>
                           <span>我方产品检测</span>
                         </div>
-                        <div className="ml-2 pl-2 border-l-2 border-ink/10 mt-1 space-y-1">
+                        <div className="ml-2 mt-1 space-y-1 border-l border-line pl-2">
                           {(
                             [
-                              { key: '日总结' as const, label: 'US 免费榜日总结', icon: '📌' },
-                              { key: '按产品追溯' as const, label: '按产品追溯', icon: '📈' },
+                              { key: '日总结' as const, label: 'US 免费榜日总结', icon: 'US' },
+                              { key: '按产品追溯' as const, label: '按产品追溯', icon: 'RT' },
                             ] as const
                           ).map(({ key, label, icon }) => {
                             const activeSub = selectedCasualOurProductSub ?? '日总结';
@@ -280,20 +282,16 @@ const Sidebar = ({
                               <button
                                 key={key}
                                 type="button"
-                                className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
-                                  isSubSelected
-                                    ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm'
-                                    : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                                }`}
+                                className={subButtonClass(isSubSelected)}
                                 onClick={() => {
                                   onCasualGameCategorySelect?.('我方产品');
                                   onCasualOurProductSubSelect?.(key);
                                 }}
                               >
-                                <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
+                                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-xs">
                                   {icon}
                                 </span>
-                                <span className="flex-1 truncate text-xs uppercase tracking-wider">{label}</span>
+                                <span className="flex-1 truncate">{label}</span>
                               </button>
                             );
                           })}
@@ -308,9 +306,9 @@ const Sidebar = ({
             // AI产品监测：产品周报 / UA素材 / 新产品速览
             if (type === 'AI产品监测') {
               const allAiSubs: { key: AiProductSubCategory; label: string; icon: string }[] = [
-                { key: '产品周报', label: '产品周报', icon: '📋' },
-                { key: 'UA素材', label: 'UA素材', icon: '🎬' },
-                { key: '新产品速览', label: '新产品速览', icon: '🆕' },
+                { key: '产品周报', label: '产品周报', icon: 'WR' },
+                { key: 'UA素材', label: 'UA素材', icon: 'UA' },
+                { key: '新产品速览', label: '新产品速览', icon: 'NP' },
               ];
               const aiSubItems = aiProductVisibleSubs
                 ? allAiSubs.filter((item) => aiProductVisibleSubs.includes(item.key))
@@ -319,14 +317,10 @@ const Sidebar = ({
                 <div key={type} className="space-y-2">
                   <button
                     onClick={() => onTypeSelect?.(type)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
-                      selectedType === type
-                        ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
-                        : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                    }`}
+                    className={typeButtonClass(selectedType === type)}
                   >
-                    <span className="text-lg grayscale">{getTypeIcon(type)}</span>
-                    <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
+                    <span className="text-base">{getTypeIcon(type)}</span>
+                    <span className="truncate">{getTypeLabel(type)}</span>
                   </button>
 
                   {selectedType === type && (
@@ -337,15 +331,13 @@ const Sidebar = ({
                           <button
                             key={key}
                             type="button"
-                            className={`w-full flex items-center gap-2 p-1.5 font-bold transition-all border-2 text-left ${
-                              isSelected ? 'bg-ink text-surface border-ink translate-x-[-2px] translate-y-[-2px] shadow-brutal-sm' : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                            }`}
+                            className={subButtonClass(isSelected)}
                             onClick={() => onAiProductSubSelect?.(key)}
                           >
-                            <span className="w-5 h-5 border-2 border-transparent flex items-center justify-center text-xs flex-shrink-0 grayscale">
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-xs">
                               {icon}
                             </span>
-                            <span className="flex-1 truncate text-xs uppercase tracking-wider">{label}</span>
+                            <span className="flex-1 truncate">{label}</span>
                           </button>
                         );
                       })}
@@ -360,14 +352,10 @@ const Sidebar = ({
               <div key={type} className="space-y-2">
                 <button
                   onClick={() => onTypeSelect?.(type)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 font-bold transition-all border-2 ${
-                    selectedType === type
-                      ? 'bg-ink text-surface border-ink shadow-brutal-sm translate-x-[-2px] translate-y-[-2px]'
-                      : 'text-inkLight border-transparent hover:border-ink/20 hover:text-ink'
-                  }`}
+                  className={typeButtonClass(selectedType === type)}
                 >
-                  <span className="text-lg grayscale">{getTypeIcon(type)}</span>
-                  <span className="uppercase tracking-widest text-xs">{getTypeLabel(type)}</span>
+                  <span className="text-base">{getTypeIcon(type)}</span>
+                  <span className="truncate">{getTypeLabel(type)}</span>
                 </button>
 
                 {selectedType === type && (
@@ -375,17 +363,17 @@ const Sidebar = ({
                     {groupSources.map((source) => (
                       <div
                         key={source.id}
-                        className="flex items-start gap-3 p-2 border-2 border-transparent hover:border-ink/20 hover:bg-surface transition-all cursor-pointer"
+                        className="flex cursor-pointer items-start gap-3 rounded-lg p-2 transition-colors hover:bg-surfaceHover"
                       >
-                        <div className="flex-shrink-0 w-6 h-6 border-2 border-ink/10 flex items-center justify-center text-xs grayscale">
+                        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-line bg-surface text-xs">
                           {source.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-ink uppercase tracking-wider truncate">{source.name}</p>
+                          <p className="truncate text-xs font-medium text-ink">{source.name}</p>
                           {source.platform && (
-                            <p className="text-[10px] font-bold text-inkLight mt-0.5 uppercase tracking-widest">{source.platform}</p>
+                            <p className="mt-0.5 text-[10px] font-medium text-muted">{source.platform}</p>
                           )}
-                          <p className="text-[10px] font-bold text-inkLight mt-0.5">{source.count} 条</p>
+                          <p className="mt-0.5 text-[10px] font-medium text-muted">{source.count} 条</p>
                         </div>
                       </div>
                     ))}

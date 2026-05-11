@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -22,6 +22,15 @@ def _extract_message_text(message: dict[str, Any]) -> str:
     return ""
 
 
+# 工具名称到中文友好提示的映射
+_TOOL_DISPLAY_NAMES: dict[str, str] = {
+    "query_and_chart": "正在查询数据并生成图表…",
+    "query_sqlite": "正在查询数据库…",
+    "render_chart": "正在生成图表…",
+    "web_search": "正在联网搜索…",
+}
+
+
 async def run_openrouter_agent_chat(
     messages: list[dict[str, Any]],
     *,
@@ -30,11 +39,13 @@ async def run_openrouter_agent_chat(
     api_key: str,
     dispatcher: AgentToolDispatcher,
     extra_headers: dict[str, str] | None = None,
-    max_tool_rounds: int = 10,
+    max_tool_rounds: int = 15,
+    on_tool_call: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> str:
     """
     多轮 tools 循环，直到模型返回无 tool_calls 的文本。
     base_url 应含 /v1 前缀，如 https://openrouter.ai/api/v1
+    on_tool_call: 可选回调，每次工具调用时触发，参数为 (tool_name, args)
     """
     base = base_url.rstrip("/")
     tools = openai_style_tools_schema(dispatcher.enable_db_tool, dispatcher.enable_web_search_tool)
@@ -101,6 +112,13 @@ async def run_openrouter_agent_chat(
                         args = raw_args
                     else:
                         args = {}
+
+                    if on_tool_call:
+                        try:
+                            on_tool_call(name, args)
+                        except Exception:
+                            pass
+
                     try:
                         result = await dispatcher.dispatch(name, args)
                         content = json.dumps(result, ensure_ascii=False)

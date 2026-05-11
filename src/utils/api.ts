@@ -21,9 +21,12 @@ export function setStoredApiToken(token: string | null): void {
   }
 }
 
-/** 已配置独立 API 根地址时，为请求附加 Bearer（与 Cookie 二选一或并存，后端均认可） */
+/**
+ * 附加 Bearer。登录 JSON 中的 token 存于 sessionStorage。
+ * 本地 Vite 同域代理时 VITE_API_BASE_URL 为空，若仅「远程基址才带 Bearer」则只靠 Cookie；
+ * 经代理时 Set-Cookie 偶发未带上，/api/data 会全 401。只要有 JWT 就带 Authorization（后端认 Cookie 与 Bearer）。
+ */
 export function apiAuthHeaders(): Record<string, string> {
-  if (!getApiBase().trim()) return {};
   const t = getStoredApiToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 }

@@ -4,8 +4,10 @@
 """
 from datetime import datetime
 from pathlib import Path
+import asyncio
 import json
 import os
+import time
 import urllib.parse
 from typing import Any
 
@@ -15,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -26,7 +28,6 @@ from config import (
     CORS_ORIGINS,
     COOKIE_SAMESITE,
     COOKIE_SECURE,
-    JWT_SECRET,
     LOGIN_USERNAME,
     LOGIN_PASSWORD_HASH,
     PUBLIC_DIR,
@@ -36,19 +37,21 @@ from config import (
     FEISHU_APP_SECRET,
     FEISHU_MEDIA_PUBLIC,
     FEISHU_WEBHOOK_URL,
+    FEISHU_BOT_ENABLED,
+    FEISHU_VERIFICATION_TOKEN,
+    FEISHU_ENCRYPT_KEY,
+    FEISHU_ALLOWED_OPEN_IDS,
+    FEISHU_ALLOWED_CHAT_IDS,
+    FEISHU_BOT_MENTION_NAMES,
+    FEISHU_ASSISTANT_SEND_THINKING,
     WECOM_WEBHOOK_URL,
     OPENAI_API_KEY,
-    OPENAI_BASE_URL,
     OPENAI_MODEL,
     AI_PROVIDER,
-    CODEX_APP_SERVER_BIN,
-    CODEX_MODEL,
-    CODEX_WORKDIR,
-    CODEX_TURN_TIMEOUT_SEC,
     CODEX_ENABLE_DB_TOOL,
     CODEX_ENABLE_WEB_SEARCH_TOOL,
     TAVILY_API_KEY,
-    OPENROUTER_HTTP_REFERER,
+    ASSISTANT_MAX_HISTORY_TURNS,
 )
 from auth import (
     create_token,
@@ -58,55 +61,27 @@ from auth import (
     require_user_for_ai,
 )
 from ai_tools import AgentToolDispatcher
-from codex_app_server import CodexAppServerSession, CodexProtocolError
-from knowledge_loader import load_agent_knowledge_text
-from openrouter_agent import run_openrouter_agent_chat
+from assistant_service import (
+    build_messages_for_request as assistant_build_messages_for_request,
+    get_agent_knowledge,
+    run_monitor_assistant,
+    stream_openai_text_chunks as assistant_stream_openai_text_chunks,
+    tool_display_name,
+)
+from codex_app_server import CodexProtocolError
+from feishu_bot import (
+    AssistantSessionStore,
+    FeishuBotClient,
+    FeishuEventError,
+    build_assistant_context,
+    handle_url_verification,
+    is_allowed as is_feishu_event_allowed,
+    parse_message_event,
+    verify_feishu_signature,
+)
 
 app = FastAPI(title="监测汇总 API")
 CORS_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-_agent_knowledge_cache: str | None = None
-
-
-def _get_agent_knowledge() -> str:
-    global _agent_knowledge_cache
-    if _agent_knowledge_cache is None:
-        _agent_knowledge_cache = load_agent_knowledge_text()
-    return _agent_knowledge_cache
-
-
-def _format_page_context(ctx: dict[str, Any] | None) -> str:
-    if not ctx or not isinstance(ctx, dict):
-        return ""
-    lines: list[str] = []
-    for key in sorted(ctx.keys()):
-        val = ctx[key]
-        if val is None or val == "":
-            continue
-        lines.append(f"- {key}: {val}")
-    if not lines:
-        return ""
-    header = (
-        "【页面上下文】（仅表示用户当前浏览位置，便于结合语境；"
-        "不限制你只能使用某一数据库。若用户问题涉及其他榜单、其他监测类型或需交叉核对，"
-        "应使用 query_sqlite 按需查询 public/ 根目录下任意相关的 .db 文件名，可多次调用不同 db。）\n"
-    )
-    return header + "\n".join(lines)
-
-
-def _public_db_catalog_for_prompt() -> str:
-    """列出 public 根目录下 .db，避免模型误以为只能查当前页面对应库。"""
-    try:
-        names = sorted(p.name for p in PUBLIC_DIR.glob("*.db") if p.is_file())
-    except OSError:
-        return ""
-    if not names:
-        return ""
-    return (
-        "\n\n【可用的 SQLite 文件名（query_sqlite 的 db 只填文件名）】\n"
-        + ", ".join(names)
-    )
 
 
 def _sse_event(event: str, data: dict) -> str:
@@ -125,6 +100,83 @@ IS_DEV_NO_PASSWORD = not LOGIN_PASSWORD_HASH
 GAMEPLAY_REQUESTS_FILE = DATA_DIR / "gameplay_requests.json"
 USERS_FILE = DATA_DIR / "users.json"
 _feishu_token_cache: dict = {"token": "", "expire_at": 0}
+_feishu_bot_client = FeishuBotClient(FEISHU_APP_ID, FEISHU_APP_SECRET)
+_assistant_session_store = AssistantSessionStore(DATA_DIR / "assistant_sessions.db")
+
+
+class InMemoryRateLimiter:
+    def __init__(self, max_events: int, window_sec: int) -> None:
+        self.max_events = max_events
+        self.window_sec = window_sec
+        self._events: dict[str, list[float]] = {}
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        clean_after = now - self.window_sec
+        bucket = [ts for ts in self._events.get(key, []) if ts >= clean_after]
+        if len(bucket) >= self.max_events:
+            self._events[key] = bucket
+            return False
+        bucket.append(now)
+        self._events[key] = bucket
+        return True
+
+
+_ai_rate_limiter = InMemoryRateLimiter(max_events=12, window_sec=60)
+_feishu_rate_limiter = InMemoryRateLimiter(max_events=8, window_sec=60)
+
+
+def _client_rate_key(request: Request, prefix: str) -> str:
+    token_user = ""
+    token = get_token_from_request(request)
+    if token:
+        try:
+            from auth import verify_token
+            token_user = verify_token(token) or ""
+        except Exception:
+            token_user = ""
+    host = request.client.host if request.client else "unknown"
+    return f"{prefix}:{token_user or host}"
+
+
+def _append_assistant_audit(payload: dict[str, Any]) -> None:
+    try:
+        _ensure_data_dir()
+        safe = dict(payload)
+        if isinstance(safe.get("question"), str):
+            safe["question"] = safe["question"][:500]
+        if isinstance(safe.get("error"), str):
+            safe["error"] = safe["error"][:1000]
+        safe["at"] = datetime.utcnow().isoformat() + "Z"
+        path = DATA_DIR / "assistant_audit.jsonl"
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(safe, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print("[assistant-audit]", e)
+
+
+def _assistant_audit_stats(limit: int = 200) -> dict[str, Any]:
+    path = DATA_DIR / "assistant_audit.jsonl"
+    if not path.exists():
+        return {"recentRuns": 0, "recentErrors": 0, "lastRunAt": ""}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()[-limit:]
+    except OSError:
+        return {"recentRuns": 0, "recentErrors": 0, "lastRunAt": ""}
+    runs = 0
+    errors = 0
+    last_at = ""
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        runs += 1
+        if item.get("status") == "error":
+            errors += 1
+        if isinstance(item.get("at"), str):
+            last_at = item["at"]
+    return {"recentRuns": runs, "recentErrors": errors, "lastRunAt": last_at}
 
 
 def _ensure_data_dir():
@@ -181,13 +233,22 @@ async def login(body: LoginBody, request: Request):
     password = (body.password or "").strip()
     if not username or not password:
         raise HTTPException(status_code=400, detail="请填写用户名和密码")
-    # 仅支持单一管理员账号 LOGIN_USERNAME / 管理员明文密码（本地和小团队内网使用足够）
+    # 仅支持单一管理员账号 LOGIN_USERNAME；生产必须使用 LOGIN_PASSWORD_HASH。
     if username != LOGIN_USERNAME:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    # 优先从环境变量 ADMIN_PASSWORD 读取；未设置时默认 guru666
-    admin_pwd = os.environ.get("ADMIN_PASSWORD", "guru666")
-    if password != admin_pwd:
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    if LOGIN_PASSWORD_HASH:
+        try:
+            ok = pbkdf2_sha256.verify(password, LOGIN_PASSWORD_HASH)
+        except Exception:
+            ok = False
+        if not ok:
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
+    else:
+        admin_pwd = os.environ.get("ADMIN_PASSWORD", "").strip()
+        if not admin_pwd:
+            raise HTTPException(status_code=500, detail="登录服务未配置密码哈希，请联系管理员")
+        if password != admin_pwd:
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
     token = create_token(username)
     # token 同时放入 JSON，便于 GitHub Pages 等跨站场景下 Safari 无法带 Cookie 时用 Authorization 头鉴权
     resp = JSONResponse(content={"user": username, "token": token})
@@ -220,6 +281,40 @@ async def debug_cors():
     return {
         "cors_origins": CORS_ORIGINS,
         "allow_credentials": CORS_ALLOW_CREDENTIALS,
+    }
+
+
+@app.get("/api/ai/health")
+async def ai_health(request: Request):
+    await require_user_for_ai(request)
+    dispatcher = AgentToolDispatcher(
+        PUBLIC_DIR,
+        TAVILY_API_KEY,
+        CODEX_ENABLE_DB_TOOL,
+        CODEX_ENABLE_WEB_SEARCH_TOOL,
+    )
+    db_names = AgentToolDispatcher.list_db_names()
+    latest_db_mtime = None
+    for db_name in db_names:
+        try:
+            mtime = (PUBLIC_DIR / db_name).stat().st_mtime
+        except OSError:
+            continue
+        latest_db_mtime = max(latest_db_mtime or 0, mtime)
+    audit = _assistant_audit_stats()
+    return {
+        "ok": bool(OPENAI_API_KEY),
+        "provider": AI_PROVIDER,
+        "model": OPENAI_MODEL if OPENAI_API_KEY else "",
+        "openaiConfigured": bool(OPENAI_API_KEY),
+        "dbToolEnabled": dispatcher.enable_db_tool,
+        "webSearchEnabled": dispatcher.enable_web_search_tool,
+        "databaseCount": len(db_names),
+        "latestDatabaseUpdatedAt": datetime.fromtimestamp(latest_db_mtime).isoformat() if latest_db_mtime else "",
+        "knowledgeChars": len(get_agent_knowledge()),
+        "feishuBotEnabled": FEISHU_BOT_ENABLED,
+        "maxHistoryTurns": ASSISTANT_MAX_HISTORY_TURNS,
+        "audit": audit,
     }
 
 
@@ -417,246 +512,135 @@ class AIChatBody(BaseModel):
     pageContext: dict[str, Any] | None = None
 
 
-def _build_system_content() -> str:
-    base = (
-        "你是「监测汇总」内部平台的智能助手，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。"
-        "用简洁中文回答；若问题超出本平台范围，也可做一般性说明。"
-        "\n\n【数据工具】使用 query_sqlite 时，db 参数可为 public 目录下任意已存在的 .db 文件名；"
-        "用户当前所在页面（页面上下文）只帮助理解提问背景，不要求你只查「与当前页面对应」的那一个库。"
-        "若问题涉及微信/抖音榜、SensorTower、竞品、AI 产品等多源数据，应分别查询对应库或多次调用，直到能回答为止。"
-    )
-    knowledge = _get_agent_knowledge()
-    if knowledge:
-        base += "\n\n【平台知识库（供回答时参考）】\n" + knowledge
-    base += _public_db_catalog_for_prompt()
-    return base
-
-
-def _build_openai_messages_for_request(
-    user_text: str,
-    history: list[dict] | None,
-    page_context: dict[str, Any] | None,
-) -> list[dict[str, str]]:
-    messages: list[dict[str, str]] = [{"role": "system", "content": _build_system_content()}]
-    for item in history or []:
-        if not item or not isinstance(item.get("role"), str) or not isinstance(item.get("content"), str):
-            continue
-        role = item["role"] if item["role"] in ("assistant", "system") else "user"
-        messages.append({"role": role, "content": item["content"]})
-    page_block = _format_page_context(page_context)
-    user_content = f"{page_block}\n\n{user_text}" if page_block else user_text
-    messages.append({"role": "user", "content": user_content})
-    return messages
-
-
-def _compose_codex_user_message(user_text: str, page_context: dict[str, Any] | None) -> str:
-    knowledge = _get_agent_knowledge()
-    parts: list[str] = []
-    if knowledge:
-        parts.append("【平台知识库（供回答时参考）】\n" + knowledge)
-    parts.append(
-        "【数据工具说明】query_sqlite 的 db 可为 public 根目录下任意 .db 文件名；"
-        "当前页面仅作语境参考，不限制只查某一库；跨榜单或跨监测类型时请分别查询对应库。"
-        + _public_db_catalog_for_prompt()
-    )
-    page_block = _format_page_context(page_context)
-    if page_block:
-        parts.append(page_block)
-    parts.append(user_text)
-    return "\n\n".join(parts)
-
-
-def _build_codex_subprocess_env() -> dict[str, str]:
-    env = {
-        "OPENAI_API_KEY": OPENAI_API_KEY,
-        "OPENAI_BASE_URL": OPENAI_BASE_URL,
-    }
-    for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy"):
-        value = os.environ.get(key)
-        if value:
-            env[key] = value
-    return env
-
-
-def _openrouter_extra_headers() -> dict[str, str]:
-    h: dict[str, str] = {}
-    if OPENROUTER_HTTP_REFERER.strip():
-        h["HTTP-Referer"] = OPENROUTER_HTTP_REFERER.strip()
-    return h
-
-
-async def _chat_via_openrouter(
-    user_text: str,
-    history: list[dict] | None,
-    page_context: dict[str, Any] | None,
-) -> str:
-    messages: list[dict[str, Any]] = [dict(m) for m in _build_openai_messages_for_request(user_text, history, page_context)]
-    dispatcher = AgentToolDispatcher(
-        PUBLIC_DIR,
-        TAVILY_API_KEY,
-        CODEX_ENABLE_DB_TOOL,
-        CODEX_ENABLE_WEB_SEARCH_TOOL,
-    )
-    try:
-        return await run_openrouter_agent_chat(
-            messages,
-            model=OPENAI_MODEL,
-            base_url=OPENAI_BASE_URL,
-            api_key=OPENAI_API_KEY,
-            dispatcher=dispatcher,
-            extra_headers=_openrouter_extra_headers() or None,
-        )
-    except ValueError as e:
-        print("[ai-openrouter]", e)
-        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
-
-
-async def _chat_via_openai(
-    user_text: str,
-    history: list[dict] | None,
-    page_context: dict[str, Any] | None,
-) -> str:
-    messages = _build_openai_messages_for_request(user_text, history, page_context)
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.post(
-            f"{OPENAI_BASE_URL}/chat/completions",
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": OPENAI_MODEL, "messages": messages},
-        )
-    if r.status_code != 200:
-        print("[ai-chat] upstream", r.status_code, r.text[:500])
-        raise HTTPException(status_code=502, detail="调用大模型失败，请稍后重试。")
-    data = r.json()
-    content = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-    if not content and data.get("choices"):
-        content = (data["choices"][0].get("delta") or {}).get("content") or ""
-    if not content:
-        raise HTTPException(status_code=500, detail="大模型返回为空，请稍后重试。")
-    return content
-
-
-async def _chat_via_codex(
-    user_text: str,
-    history: list[dict] | None,
-    page_context: dict[str, Any] | None,
-) -> str:
-    workdir = Path(CODEX_WORKDIR).expanduser() if CODEX_WORKDIR else PROJECT_ROOT
-    print(
-        "[ai-codex-config]",
-        {
-            "AI_PROVIDER": AI_PROVIDER,
-            "CODEX_MODEL": CODEX_MODEL,
-            "OPENAI_BASE_URL": OPENAI_BASE_URL,
-            "OPENAI_API_KEY_prefix": f"{OPENAI_API_KEY[:10]}..." if OPENAI_API_KEY else "",
-            "CODEX_APP_SERVER_BIN": CODEX_APP_SERVER_BIN,
-            "CODEX_WORKDIR": str(workdir),
-        },
-    )
-    print("[ai-step1-codex] start", f"model={CODEX_MODEL}", f"workdir={workdir}")
-    print(
-        "[codex-subprocess-env]",
-        {
-            "OPENAI_BASE_URL": OPENAI_BASE_URL,
-            "OPENAI_API_KEY_prefix": f"{OPENAI_API_KEY[:10]}..." if OPENAI_API_KEY else "",
-            "MODEL": CODEX_MODEL,
-            "CWD": str(workdir),
-            "HTTP_PROXY": bool(os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")),
-            "HTTPS_PROXY": bool(os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")),
-            "ALL_PROXY": bool(os.environ.get("ALL_PROXY") or os.environ.get("all_proxy")),
-        },
-    )
-    async with CodexAppServerSession(
-        bin_name=CODEX_APP_SERVER_BIN,
-        model=CODEX_MODEL,
-        project_root=PROJECT_ROOT,
-        public_dir=PUBLIC_DIR,
-        workdir=workdir,
-        turn_timeout_sec=CODEX_TURN_TIMEOUT_SEC,
-        enable_db_tool=CODEX_ENABLE_DB_TOOL,
-        enable_web_search_tool=CODEX_ENABLE_WEB_SEARCH_TOOL,
-        tavily_api_key=TAVILY_API_KEY,
-        subprocess_env=_build_codex_subprocess_env(),
-    ) as session:
-        combined = _compose_codex_user_message(user_text, page_context)
-        return await session.run_chat(combined, history)
-
-
-async def _stream_openai_text_chunks(messages: list[dict[str, str]]):
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        async with client.stream(
-            "POST",
-            f"{OPENAI_BASE_URL}/chat/completions",
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": OPENAI_MODEL, "messages": messages, "stream": True},
-        ) as r:
-            if r.status_code != 200:
-                body = await r.aread()
-                err_text = body.decode("utf-8", errors="replace")[:2000]
-                raise ValueError(f"调用大模型失败（{r.status_code}），请稍后重试。{err_text[:500]}")
-            async for line in r.aiter_lines():
-                if not line:
-                    continue
-                if not line.startswith("data:"):
-                    continue
-                payload = line[5:].strip()
-                if payload == "[DONE]":
-                    break
-                try:
-                    data = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
-                choices = data.get("choices") or []
-                if not choices:
-                    continue
-                delta = (choices[0].get("delta") or {}).get("content")
-                if isinstance(delta, str) and delta:
-                    yield delta
-
-
 @app.post("/api/ai/chat/stream")
 async def ai_chat_stream(body: AIChatBody, request: Request):
-    await require_user_for_ai(request)
+    user = await require_user_for_ai(request)
     text = (body.message or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="缺少提问内容")
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
+    if not _ai_rate_limiter.allow(_client_rate_key(request, "ai")):
+        raise HTTPException(status_code=429, detail="提问太频繁了，请稍后再试。")
 
+    started = time.monotonic()
     print("[ai-chat-stream] chars=", len(text))
 
     async def event_generator():
         try:
             if AI_PROVIDER == "codex":
-                answer = await _chat_via_codex(text, body.history, body.pageContext)
+                result = await run_monitor_assistant(text, body.history, body.pageContext, channel="web")
+                answer = result.answer
                 step = 256
                 for i in range(0, len(answer), step):
                     yield _sse_event("delta", {"delta": answer[i : i + step]})
                 if not answer.strip():
                     yield _sse_event("error", {"error": "大模型返回为空，请稍后重试。"})
                     return
+                _append_assistant_audit({
+                    "channel": "web_stream",
+                    "provider": AI_PROVIDER,
+                    "user": user or "",
+                    "status": "done",
+                    "question": text,
+                    "answerChars": len(answer),
+                    "selectedDbs": result.selected_dbs,
+                    "toolCallCount": len(result.tool_calls),
+                    "elapsedMs": int((time.monotonic() - started) * 1000),
+                })
                 yield _sse_event("done", {"answer": answer})
                 return
 
             if AI_PROVIDER == "openrouter":
-                answer = await _chat_via_openrouter(text, body.history, body.pageContext)
-                step = 256
-                for i in range(0, len(answer), step):
-                    yield _sse_event("delta", {"delta": answer[i : i + step]})
-                if not answer.strip():
-                    yield _sse_event("error", {"error": "大模型返回为空，请稍后重试。"})
-                    return
-                yield _sse_event("done", {"answer": answer})
-                return
+                import asyncio
 
-            messages = _build_openai_messages_for_request(text, body.history, body.pageContext)
+                sse_queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+                async def _run_openrouter():
+                    try:
+                        def on_tool_call(name: str, args: dict[str, Any]) -> None:
+                            display = tool_display_name(name)
+                            sse_queue.put_nowait({"event": "thinking", "data": {"tool": name, "display": display}})
+
+                        result = await run_monitor_assistant(
+                            text,
+                            body.history,
+                            body.pageContext,
+                            channel="web",
+                            on_tool_call=on_tool_call,
+                        )
+                        answer = result.answer
+                        step = 256
+                        for i in range(0, len(answer), step):
+                            sse_queue.put_nowait({"event": "delta", "data": {"delta": answer[i : i + step]}})
+                        if not answer.strip():
+                            sse_queue.put_nowait({"event": "error", "data": {"error": "大模型返回为空，请稍后重试。"}})
+                        else:
+                            for cp in result.charts:
+                                sse_queue.put_nowait({"event": "chart", "data": {"chart": cp}})
+                            sse_queue.put_nowait({
+                                "event": "done",
+                                "data": {
+                                    "answer": answer,
+                                    "selectedDbs": result.selected_dbs,
+                                    "toolCalls": result.tool_calls,
+                                },
+                            })
+                            _append_assistant_audit({
+                                "channel": "web_stream",
+                                "provider": AI_PROVIDER,
+                                "user": user or "",
+                                "status": "done",
+                                "question": text,
+                                "answerChars": len(answer),
+                                "selectedDbs": result.selected_dbs,
+                                "toolCallCount": len(result.tool_calls),
+                                "elapsedMs": int((time.monotonic() - started) * 1000),
+                            })
+                    except Exception as e:
+                        _append_assistant_audit({
+                            "channel": "web_stream",
+                            "provider": AI_PROVIDER,
+                            "user": user or "",
+                            "status": "error",
+                            "question": text,
+                            "error": str(e),
+                            "elapsedMs": int((time.monotonic() - started) * 1000),
+                        })
+                        sse_queue.put_nowait({"event": "error", "data": {"error": str(e)[:500]}})
+                    finally:
+                        sse_queue.put_nowait(None)
+
+                asyncio.create_task(_run_openrouter())
+
+                while True:
+                    item = await sse_queue.get()
+                    if item is None:
+                        return
+                    yield _sse_event(item["event"], item["data"])
+                    if item["event"] in ("done", "error"):
+                        return
+
+            messages, selected_dbs = assistant_build_messages_for_request(text, body.history, body.pageContext, channel="web")
             full = ""
-            async for chunk in _stream_openai_text_chunks(messages):
+            async for chunk in assistant_stream_openai_text_chunks(messages):
                 full += chunk
                 yield _sse_event("delta", {"delta": chunk})
             if not full.strip():
                 yield _sse_event("error", {"error": "大模型返回为空，请稍后重试。"})
                 return
-            yield _sse_event("done", {"answer": full})
+            _append_assistant_audit({
+                "channel": "web_stream",
+                "provider": AI_PROVIDER,
+                "user": user or "",
+                "status": "done",
+                "question": text,
+                "answerChars": len(full),
+                "selectedDbs": selected_dbs,
+                "toolCallCount": 0,
+                "elapsedMs": int((time.monotonic() - started) * 1000),
+            })
+            yield _sse_event("done", {"answer": full, "selectedDbs": selected_dbs})
         except CodexProtocolError as e:
             print("[ai-chat-stream-codex]", e)
             yield _sse_event("error", {"error": f"Codex 协议错误: {e}"})
@@ -679,38 +663,246 @@ async def ai_chat_stream(body: AIChatBody, request: Request):
 
 @app.post("/api/ai/chat")
 async def ai_chat(body: AIChatBody, request: Request):
-    await require_user_for_ai(request)  # 生产时要求登录，开发时可选
+    user = await require_user_for_ai(request)  # 生产时要求登录，开发时可选
     text = (body.message or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="缺少提问内容")
     print("[ai-chat]", f"chars={len(text)}", f"provider={AI_PROVIDER}")
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
+    if not _ai_rate_limiter.allow(_client_rate_key(request, "ai")):
+        raise HTTPException(status_code=429, detail="提问太频繁了，请稍后再试。")
+    started = time.monotonic()
     try:
-        if AI_PROVIDER == "codex":
-            try:
-                answer = await _chat_via_codex(text, body.history, body.pageContext)
-                print("[ai-step1-codex] success", f"chars={len(answer)}")
-                return {"answer": answer}
-            except CodexProtocolError as e:
-                print("[ai-step1-codex] failed", e)
-                raise HTTPException(status_code=502, detail=f"Codex 协议错误: {e}")
-
-        if AI_PROVIDER == "openrouter":
-            print("[ai-openrouter] start", f"model={OPENAI_MODEL}", f"base={OPENAI_BASE_URL}")
-            answer = await _chat_via_openrouter(text, body.history, body.pageContext)
-            print("[ai-openrouter] success", f"chars={len(answer)}")
-            return {"answer": answer}
-
-        print("[ai-step2-responses] start", f"model={OPENAI_MODEL}")
-        answer = await _chat_via_openai(text, body.history, body.pageContext)
-        print("[ai-step2-responses] success", f"chars={len(answer)}")
-        return {"answer": answer}
+        result = await run_monitor_assistant(text, body.history, body.pageContext, channel="web")
+        print("[ai-chat] success", f"chars={len(result.answer)}", f"dbs={','.join(result.selected_dbs[:4])}")
+        _append_assistant_audit({
+            "channel": "web",
+            "provider": AI_PROVIDER,
+            "user": user or "",
+            "status": "done",
+            "question": text,
+            "answerChars": len(result.answer),
+            "selectedDbs": result.selected_dbs,
+            "toolCallCount": len(result.tool_calls),
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        payload: dict[str, Any] = {
+            "answer": result.answer,
+            "selectedDbs": result.selected_dbs,
+        }
+        if result.charts:
+            payload["charts"] = result.charts
+        if result.tool_calls:
+            payload["toolCalls"] = result.tool_calls
+        return payload
+    except CodexProtocolError as e:
+        print("[ai-chat-codex]", e)
+        _append_assistant_audit({
+            "channel": "web",
+            "provider": AI_PROVIDER,
+            "user": user or "",
+            "status": "error",
+            "question": text,
+            "error": str(e),
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        raise HTTPException(status_code=502, detail=f"Codex 协议错误: {e}")
+    except ValueError as e:
+        print("[ai-chat-upstream]", e)
+        _append_assistant_audit({
+            "channel": "web",
+            "provider": AI_PROVIDER,
+            "user": user or "",
+            "status": "error",
+            "question": text,
+            "error": str(e),
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        raise HTTPException(status_code=502, detail=str(e)[:1000])
     except HTTPException:
         raise
     except Exception as e:
         print("[ai-chat]", e)
+        _append_assistant_audit({
+            "channel": "web",
+            "provider": AI_PROVIDER,
+            "user": user or "",
+            "status": "error",
+            "question": text,
+            "error": str(e),
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
         raise HTTPException(status_code=500, detail="AI 对话服务异常，请稍后重试。")
+
+
+# ---------- 飞书监测助手 ----------
+async def _run_monitor_assistant_for_feishu(
+    text: str,
+    history: list[dict] | None,
+    context: dict[str, Any] | None,
+) -> str:
+    result = await run_monitor_assistant(text, history, context, channel=str((context or {}).get("channel") or "feishu"))
+    return result.answer
+
+
+async def _process_feishu_message_event(event) -> None:
+    user_key = event.sender_open_id or event.sender_union_id
+    session_key = event.session_key
+    started = time.monotonic()
+    try:
+        if not _feishu_rate_limiter.allow(user_key or session_key):
+            await _feishu_bot_client.reply_text(
+                event.message_id,
+                "当前提问有点密集，我先保护一下模型和数据查询服务。请稍等一分钟再继续。",
+                uuid_prefix=f"{event.event_id}:rate-limit",
+            )
+            _assistant_session_store.mark_event_done(event.event_id, "rate_limited")
+            return
+
+        if not is_feishu_event_allowed(event, FEISHU_ALLOWED_OPEN_IDS, FEISHU_ALLOWED_CHAT_IDS):
+            await _feishu_bot_client.reply_text(
+                event.message_id,
+                "你暂时没有使用监测助手的权限，请联系管理员加入飞书助手白名单。",
+                uuid_prefix=f"{event.event_id}:denied",
+            )
+            _assistant_session_store.mark_event_done(event.event_id, "denied")
+            return
+
+        normalized_command = event.text.strip().lower()
+        if normalized_command in {"清空上下文", "重新开始", "重置会话", "/reset", "reset"}:
+            removed = _assistant_session_store.clear_session(session_key)
+            await _feishu_bot_client.reply_text(
+                event.message_id,
+                f"已清空当前会话上下文（{removed} 条历史）。接下来我会从新问题开始回答。",
+                uuid_prefix=f"{event.event_id}:reset",
+            )
+            _assistant_session_store.mark_event_done(event.event_id, "reset")
+            return
+
+        history = _assistant_session_store.load_history(session_key, ASSISTANT_MAX_HISTORY_TURNS)
+        _assistant_session_store.append_message(
+            session_key,
+            "user",
+            event.text,
+            channel=event.channel,
+            user_key=user_key,
+        )
+
+        if FEISHU_ASSISTANT_SEND_THINKING:
+            await _feishu_bot_client.reply_text(
+                event.message_id,
+                "收到，我在查询监测数据并整理答案。",
+                uuid_prefix=f"{event.event_id}:thinking",
+            )
+
+        context = build_assistant_context(event)
+        prompt = (
+            "你正在飞书里回答用户。请用适合飞书阅读的中文回复：先给结论，再给关键依据；"
+            "默认控制在 800 字以内，列表不超过 10 条；不要暴露数据库名、表名、SQL、内部路径或密钥。"
+            "\n\n用户问题："
+            + event.text
+        )
+        answer = await _run_monitor_assistant_for_feishu(prompt, history, context)
+        answer = (answer or "").strip() or "我这边没有生成可用回答，请换个问法再试一次。"
+        _append_assistant_audit({
+            "channel": event.channel,
+            "provider": AI_PROVIDER,
+            "user": user_key,
+            "sessionKey": session_key,
+            "status": "done",
+            "question": event.text,
+            "answerChars": len(answer),
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        _assistant_session_store.append_message(
+            session_key,
+            "assistant",
+            answer,
+            channel=event.channel,
+            user_key=user_key,
+        )
+        await _feishu_bot_client.reply_text(
+            event.message_id,
+            answer,
+            uuid_prefix=f"{event.event_id}:answer",
+        )
+        _assistant_session_store.mark_event_done(event.event_id, "done")
+    except Exception as e:
+        err = str(e)[:1000]
+        print("[feishu-assistant]", err)
+        _append_assistant_audit({
+            "channel": getattr(event, "channel", "feishu"),
+            "provider": AI_PROVIDER,
+            "user": user_key,
+            "sessionKey": session_key,
+            "status": "error",
+            "question": getattr(event, "text", ""),
+            "error": err,
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        _assistant_session_store.mark_event_done(event.event_id, "error", err)
+        try:
+            await _feishu_bot_client.reply_text(
+                event.message_id,
+                "监测助手这次处理失败了，请稍后重试；如果连续失败，请联系管理员查看后端日志。",
+                uuid_prefix=f"{event.event_id}:error",
+            )
+        except Exception as notify_error:
+            print("[feishu-assistant-notify]", notify_error)
+
+
+@app.post("/api/feishu/events")
+async def feishu_events(request: Request):
+    """飞书自建应用机器人事件订阅入口。"""
+    if not FEISHU_BOT_ENABLED:
+        return {"ok": True, "ignored": "feishu bot disabled"}
+
+    raw = await request.body()
+    if FEISHU_ENCRYPT_KEY and not verify_feishu_signature(request.headers, raw, FEISHU_ENCRYPT_KEY):
+        raise HTTPException(status_code=401, detail="飞书事件签名校验失败")
+
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="飞书事件不是合法 JSON") from None
+
+    try:
+        verification = handle_url_verification(payload, FEISHU_VERIFICATION_TOKEN)
+        if verification is not None:
+            print("[feishu-events] url_verification ok")
+            return verification
+
+        event = parse_message_event(payload, FEISHU_VERIFICATION_TOKEN, FEISHU_BOT_MENTION_NAMES)
+        if event is None:
+            header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
+            print("[feishu-events] ignored unsupported", {
+                "type": payload.get("type"),
+                "event_type": header.get("event_type") or payload.get("event_type"),
+            })
+            return {"ok": True, "ignored": "unsupported event"}
+        if event.requires_mention_but_missing:
+            print("[feishu-events] ignored group without mention", {
+                "event_id": event.event_id,
+                "chat_id": event.chat_id,
+                "text": event.text[:80],
+            })
+            return {"ok": True, "ignored": "group message without bot mention"}
+
+        if not _assistant_session_store.mark_event_received(event.event_id):
+            print("[feishu-events] ignored duplicate", {"event_id": event.event_id})
+            return {"ok": True, "ignored": "duplicate event"}
+
+        print("[feishu-events] accepted", {
+            "event_id": event.event_id,
+            "channel": event.channel,
+            "chat_type": event.chat_type,
+            "text": event.text[:80],
+        })
+        asyncio.create_task(_process_feishu_message_event(event))
+        return {"ok": True}
+    except FeishuEventError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ---------- 受保护数据文件 ----------

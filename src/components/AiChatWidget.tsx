@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAiPageContext } from '../context/AiPageContext';
 import { getApiUrl, parseApiErrorBody, withApiAuth } from '../utils/api';
 import { ChatMarkdown } from './ChatMarkdown';
+import { ChartBlock, type ChartPayload } from './ChartBlock';
 
 const STORAGE_KEY_V3 = 'ai-chat-sessions-v3';
 const STORAGE_KEY_V2 = 'ai-chat-sessions-v2';
@@ -33,6 +34,11 @@ export type AiIntentMeta = {
   steps?: string[];
 };
 
+type ToolCallTrace = {
+  name: string;
+  args?: Record<string, unknown>;
+};
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -40,6 +46,14 @@ interface ChatMessage {
   intentMeta?: AiIntentMeta;
   /** 用户对助手本条回复的评价 */
   feedback?: 'up' | 'down';
+  /** 图表数据（由 render_chart 工具生成） */
+  charts?: ChartPayload[];
+  /** 工具调用中间状态提示，如「正在查询数据…」 */
+  thinkingHint?: string;
+  /** 本次回答后端选中的站内数据源 */
+  selectedDbs?: string[];
+  /** 本次回答实际触发的工具调用轨迹 */
+  toolCalls?: ToolCallTrace[];
 }
 
 interface ChatSession {
@@ -61,6 +75,24 @@ const MODE_LABEL: Record<string, string> = {
 type StreamEvent = {
   event: string;
   data: Record<string, unknown> | null;
+};
+
+type AiHealth = {
+  ok: boolean;
+  provider: string;
+  model: string;
+  openaiConfigured: boolean;
+  dbToolEnabled: boolean;
+  webSearchEnabled: boolean;
+  databaseCount: number;
+  latestDatabaseUpdatedAt: string;
+  feishuBotEnabled: boolean;
+  maxHistoryTurns: number;
+  audit?: {
+    recentRuns: number;
+    recentErrors: number;
+    lastRunAt: string;
+  };
 };
 
 function newId() {
@@ -112,13 +144,55 @@ function saveSessionsToStorage(activeId: string, sessions: ChatSession[]) {
   }
 }
 
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  return out.length ? out : undefined;
+}
+
+function asToolCalls(value: unknown): ToolCallTrace[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value
+    .map((item): ToolCallTrace | null => {
+      if (!item || typeof item !== 'object') return null;
+      const rec = item as Record<string, unknown>;
+      const name = typeof rec.name === 'string' ? rec.name : '';
+      if (!name) return null;
+      const args = rec.args && typeof rec.args === 'object' ? (rec.args as Record<string, unknown>) : undefined;
+      return args ? { name, args } : { name };
+    })
+    .filter((item): item is ToolCallTrace => Boolean(item));
+  return out.length ? out : undefined;
+}
+
+function shortDbName(name: string) {
+  return name.replace(/\.db$/i, '').replace(/_/g, ' ');
+}
+
+function formatHealthTime(value: string) {
+  if (!value) return '暂无数据时间';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function toolLabel(name: string) {
+  const map: Record<string, string> = {
+    query_and_chart: '查库并生成图表',
+    query_sqlite: '查询站内数据',
+    render_chart: '生成图表',
+    web_search: '联网搜索',
+  };
+  return map[name] || name;
+}
+
 /** 快捷提问：点击即发送 */
 const QUICK_PROMPTS: { label: string; text: string }[] = [
   { label: '解释本页数据', text: '结合我当前所在的页面，帮我说明这里展示的数据是什么意思、该怎么读。' },
   { label: '本周休闲游戏看点', text: '从监测数据角度，这周休闲游戏有哪些值得关注的动向或产品？' },
+  { label: '最近排名变化', text: '最近几周休闲游戏榜单有哪些产品的排名变化比较明显？' },
   { label: '周报/趋势摘要', text: '根据站内能看到的近期内容，帮我用几条要点总结主要趋势。' },
   { label: '怎么在站里查榜单', text: '我想自己查微信或抖音小游戏排行榜，应该从哪个入口进、大致怎么操作？' },
-  { label: 'SensorTower 相关', text: '本站里 SensorTower 榜单和商店页变化主要能看什么？适合我做什么判断？' },
 ];
 
 const AiChatWidget = () => {
@@ -148,15 +222,22 @@ const AiChatWidget = () => {
     return loaded ? loaded.activeId : '';
   });
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
-  const messages = activeSession?.messages ?? [];
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.id === activeSessionId) ?? sessions[0],
+    [sessions, activeSessionId]
+  );
+  const messages = useMemo(() => activeSession?.messages ?? [], [activeSession]);
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  const [health, setHealth] = useState<AiHealth | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const composingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -193,6 +274,64 @@ const AiChatWidget = () => {
     el.scrollTop = el.scrollHeight;
   }, [messages, sidebarCollapsed]);
 
+  const refreshHealth = useCallback(() => {
+    let alive = true;
+    const ac = new AbortController();
+    void fetch(
+      getApiUrl('/api/ai/health'),
+      withApiAuth({
+        method: 'GET',
+        signal: ac.signal,
+      })
+    )
+      .then(async (resp) => {
+        if (!resp.ok) throw new Error(resp.status === 401 ? 'UNAUTHORIZED' : `HTTP ${resp.status}`);
+        return (await resp.json()) as AiHealth;
+      })
+      .then((payload) => {
+        if (!alive) return;
+        setHealth(payload);
+        setHealthError(null);
+      })
+      .catch((err) => {
+        if (!alive || (err instanceof Error && err.name === 'AbortError')) return;
+        setHealth(null);
+        setHealthError(err instanceof Error && err.message === 'UNAUTHORIZED' ? '登录后显示状态' : '状态不可用');
+      });
+    return () => {
+      alive = false;
+      ac.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sidebarCollapsed) return;
+    return refreshHealth();
+  }, [sidebarCollapsed, refreshHealth]);
+
+  const copyText = useCallback(async (id: string, text: string) => {
+    const value = text.trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedMessageId(id);
+      window.setTimeout(() => {
+        setCopiedMessageId((cur) => (cur === id ? null : cur));
+      }, 1400);
+    } catch {
+      setError('复制失败，请手动选中文字复制。');
+    }
+  }, []);
+
+  const copyCurrentSession = useCallback(() => {
+    if (!messages.length) return;
+    const text = messages
+      .filter((m) => m.content.trim())
+      .map((m) => `${m.role === 'user' ? '用户' : '监测助手'}：\n${m.content.trim()}`)
+      .join('\n\n---\n\n');
+    void copyText(`session-${activeSession?.id || 'current'}`, text);
+  }, [activeSession?.id, copyText, messages]);
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     resizeRef.current = { startX: e.clientX, startW: sidebarWidth };
@@ -228,6 +367,35 @@ const AiChatWidget = () => {
     setSessions((prev) => [next, ...prev]);
     setActiveSessionId(id);
     setInput('');
+  };
+
+  const handleClearActiveSession = () => {
+    const sid = activeSessionId || sessions[0]?.id;
+    if (!sid) return;
+    handleStop();
+    setLoading(false);
+    setError(null);
+    setRenamingId(null);
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sid
+          ? { ...s, title: s.titleManual ? s.title : '新对话', messages: [], updatedAt: Date.now() }
+          : s
+      )
+    );
+    setInput('');
+  };
+
+  const handleReuseQuestion = (assistantMessageId: string) => {
+    const idx = messages.findIndex((m) => m.id === assistantMessageId);
+    if (idx <= 0) return;
+    const previousUser = [...messages.slice(0, idx)].reverse().find((m) => m.role === 'user');
+    if (!previousUser) return;
+    setInput(previousUser.content);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(previousUser.content.length, previousUser.content.length);
+    });
   };
 
   const handleSelectSession = (id: string) => {
@@ -339,7 +507,15 @@ const AiChatWidget = () => {
         );
       };
 
-      const streamChat = async (): Promise<{ answer: string; intentMeta?: AiIntentMeta }> => {
+      type SendResult = {
+        answer: string;
+        intentMeta?: AiIntentMeta;
+        charts?: ChartPayload[];
+        selectedDbs?: string[];
+        toolCalls?: ToolCallTrace[];
+      };
+
+      const streamChat = async (): Promise<SendResult> => {
         const resp = await fetch(
           getApiUrl('/api/ai/chat/stream'),
           withApiAuth({
@@ -374,6 +550,9 @@ const AiChatWidget = () => {
         let buffer = '';
         let answer = '';
         let intentMeta: AiIntentMeta | undefined;
+        const collectedCharts: ChartPayload[] = [];
+        let selectedDbs: string[] | undefined;
+        let toolCalls: ToolCallTrace[] | undefined;
 
         const applyIntent = (intent: AiIntentMeta) => {
           intentMeta = intent;
@@ -422,6 +601,39 @@ const AiChatWidget = () => {
                 if (raw && typeof raw === 'object') {
                   applyIntent(raw as AiIntentMeta);
                 }
+              } else if (evt.event === 'thinking') {
+                const display = evt.data?.display as string | undefined;
+                if (display) {
+                  setSessions((prev) =>
+                    prev.map((s) => {
+                      if (s.id !== sid) return s;
+                      return {
+                        ...s,
+                        messages: s.messages.map((m) =>
+                          m.id === assistantId ? { ...m, thinkingHint: display } : m
+                        ),
+                        updatedAt: Date.now(),
+                      };
+                    })
+                  );
+                }
+              } else if (evt.event === 'chart') {
+                const chartData = evt.data?.chart;
+                if (chartData && typeof chartData === 'object') {
+                  collectedCharts.push(chartData as ChartPayload);
+                  setSessions((prev) =>
+                    prev.map((s) => {
+                      if (s.id !== sid) return s;
+                      return {
+                        ...s,
+                        messages: s.messages.map((m) =>
+                          m.id === assistantId ? { ...m, charts: [...(m.charts || []), chartData as ChartPayload] } : m
+                        ),
+                        updatedAt: Date.now(),
+                      };
+                    })
+                  );
+                }
               } else if (evt.event === 'delta') {
                 const delta = typeof evt.data?.delta === 'string' ? evt.data.delta : '';
                 if (delta) {
@@ -430,11 +642,26 @@ const AiChatWidget = () => {
                 }
               } else if (evt.event === 'done') {
                 const finalAnswer = typeof evt.data?.answer === 'string' ? evt.data.answer : '';
+                selectedDbs = asStringArray(evt.data?.selectedDbs);
+                toolCalls = asToolCalls(evt.data?.toolCalls);
                 if (finalAnswer && !answer) {
                   answer = finalAnswer;
                   updateAssistant(finalAnswer);
                 }
-                return { answer: answer || finalAnswer, intentMeta };
+                setSessions((prev) =>
+                  prev.map((s) => {
+                    if (s.id !== sid) return s;
+                    return {
+                      ...s,
+                      messages: s.messages.map((m) =>
+                        m.id === assistantId
+                          ? { ...m, thinkingHint: undefined, selectedDbs, toolCalls }
+                          : m
+                      ),
+                    };
+                  })
+                );
+                return { answer: answer || finalAnswer, intentMeta, charts: collectedCharts, selectedDbs, toolCalls };
               } else if (evt.event === 'error') {
                 const msg = typeof evt.data?.error === 'string' ? evt.data.error : 'AI 流式接口异常';
                 throw new Error(msg || 'AI 流式接口异常');
@@ -449,10 +676,10 @@ const AiChatWidget = () => {
           }
         }
         if (!answer.trim()) throw new Error('EMPTY_STREAM_ANSWER');
-        return { answer, intentMeta };
+        return { answer, intentMeta, charts: collectedCharts };
       };
 
-      const fallbackChat = async (): Promise<{ answer: string; intentMeta?: AiIntentMeta }> => {
+      const fallbackChat = async (): Promise<SendResult> => {
         const resp = await fetch(
           getApiUrl('/api/ai/chat'),
           withApiAuth({
@@ -481,33 +708,55 @@ const AiChatWidget = () => {
             parseApiErrorBody(data) || rawText.slice(0, 400).trim() || `请求失败（HTTP ${resp.status}）`;
           throw new Error(msg);
         }
-        const payload = data as { answer?: string; meta?: { intent?: unknown } } | null;
+        const payload = data as {
+          answer?: string;
+          meta?: { intent?: unknown };
+          charts?: ChartPayload[];
+          selectedDbs?: unknown;
+          toolCalls?: unknown;
+        } | null;
         const answer = typeof payload?.answer === 'string' ? payload.answer.trim() : '';
         if (!answer) throw new Error('AI 返回内容为空，请稍后重试。');
         const rawIntent = payload?.meta?.intent;
         const intentMeta =
           rawIntent && typeof rawIntent === 'object' ? (rawIntent as AiIntentMeta) : undefined;
-        return { answer, intentMeta };
+        const charts = payload?.charts;
+        return {
+          answer,
+          intentMeta,
+          charts,
+          selectedDbs: asStringArray(payload?.selectedDbs),
+          toolCalls: asToolCalls(payload?.toolCalls),
+        };
       };
 
       const isAbort = (err: unknown) => err instanceof Error && err.name === 'AbortError';
 
       try {
-        let result: { answer: string; intentMeta?: AiIntentMeta };
+        let result: SendResult;
         try {
           result = await streamChat();
         } catch (first) {
           if (isAbort(first)) throw first;
           result = await fallbackChat();
         }
-        const { answer, intentMeta } = result;
+        const { answer, intentMeta, charts, selectedDbs, toolCalls } = result;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id !== sid) return s;
             return {
               ...s,
               messages: s.messages.map((m) =>
-                m.id === assistantId ? { ...m, content: answer, intentMeta: intentMeta ?? m.intentMeta } : m
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      content: answer,
+                      intentMeta: intentMeta ?? m.intentMeta,
+                      charts: charts ?? m.charts,
+                      selectedDbs: selectedDbs ?? m.selectedDbs,
+                      toolCalls: toolCalls ?? m.toolCalls,
+                    }
+                  : m
               ),
               updatedAt: Date.now(),
             };
@@ -639,6 +888,8 @@ const AiChatWidget = () => {
     () => [...sessions].sort((a, b) => b.updatedAt - a.updatedAt),
     [sessions]
   );
+  const currentUserTurns = messages.filter((m) => m.role === 'user').length;
+  const currentAssistantTurns = messages.filter((m) => m.role === 'assistant' && m.content.trim()).length;
 
   return (
     <aside
@@ -760,23 +1011,56 @@ const AiChatWidget = () => {
 
             {/* 右侧：对话区 */}
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="flex items-center justify-between gap-1 border-b border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center justify-between gap-1">
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm text-white">
                   🤖
                 </span>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-slate-900">监测助手</div>
-                  <div className="truncate text-[10px] text-slate-500">对话记录保存在本机浏览器</div>
+                  <div className="truncate text-[10px] text-slate-500">
+                    {health
+                      ? `${health.provider} · ${health.dbToolEnabled ? '站内数据可查' : '站内数据关闭'} · ${formatHealthTime(health.latestDatabaseUpdatedAt)}`
+                      : healthError || '正在读取状态'}
+                  </div>
                 </div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHealthError(null);
+                    refreshHealth();
+                  }}
+                  title="刷新助手状态"
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
+                >
+                  状态
+                </button>
+                <button
+                  type="button"
+                  onClick={copyCurrentSession}
+                  disabled={messages.length === 0}
+                  title="复制当前会话"
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {copiedMessageId === `session-${activeSession?.id || 'current'}` ? '已复制' : '复制'}
+                </button>
                 <button
                   type="button"
                   onClick={handleNewSession}
                   className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
                 >
                   新对话
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearActiveSession}
+                  disabled={messages.length === 0}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  清空
                 </button>
                 <button
                   type="button"
@@ -795,6 +1079,34 @@ const AiChatWidget = () => {
                   </svg>
                 </button>
               </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+              <span className={`rounded-full border px-2 py-0.5 ${
+                health?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'
+              }`}>
+                {health?.ok ? 'AI 已配置' : 'AI 状态待确认'}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">
+                {health ? `${health.databaseCount} 个数据源` : '数据源读取中'}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">
+                当前 {currentUserTurns}/{currentAssistantTurns} 轮
+              </span>
+              {health?.webSearchEnabled && (
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
+                  可联网核对
+                </span>
+              )}
+              {health?.audit && health.audit.recentRuns > 0 && (
+                <span className={`rounded-full border px-2 py-0.5 ${
+                  health.audit.recentErrors > 0
+                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                    : 'border-slate-200 bg-white text-slate-600'
+                }`}>
+                  近 {health.audit.recentRuns} 次 / 错误 {health.audit.recentErrors}
+                </span>
+              )}
+            </div>
             </div>
 
             <div
@@ -842,11 +1154,67 @@ const AiChatWidget = () => {
                     }`}
                   >
                     {streamPlain ? (
-                      <span className="text-[13px] leading-relaxed">{m.content}</span>
+                      <span className="text-[13px] leading-relaxed">
+                        {m.thinkingHint && !m.content ? (
+                          <span className="flex items-center gap-1.5 text-slate-400">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
+                            {m.thinkingHint}
+                          </span>
+                        ) : (
+                          m.content
+                        )}
+                      </span>
                     ) : m.role === 'user' ? (
                       <ChatMarkdown content={m.content} variant="user" />
                     ) : (
-                      <ChatMarkdown content={m.content} variant="assistant" />
+                      <>
+                        <ChatMarkdown content={m.content} variant="assistant" />
+                        {m.charts && m.charts.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {m.charts.map((chart, ci) => (
+                              <ChartBlock key={ci} chart={chart} />
+                            ))}
+                          </div>
+                        )}
+                        {((m.selectedDbs && m.selectedDbs.length > 0) || (m.toolCalls && m.toolCalls.length > 0)) && (
+                          <div className="mt-2 border-t border-slate-100 pt-2">
+                            {m.selectedDbs && m.selectedDbs.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] font-medium text-slate-500">数据源</span>
+                                {m.selectedDbs.slice(0, 5).map((db) => (
+                                  <span
+                                    key={db}
+                                    className="max-w-[12rem] truncate rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] text-cyan-800"
+                                    title={db}
+                                  >
+                                    {shortDbName(db)}
+                                  </span>
+                                ))}
+                                {m.selectedDbs.length > 5 && (
+                                  <span className="text-[10px] text-slate-400">+{m.selectedDbs.length - 5}</span>
+                                )}
+                              </div>
+                            )}
+                            {m.toolCalls && m.toolCalls.length > 0 && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] font-medium text-slate-500">工具</span>
+                                {m.toolCalls.slice(0, 4).map((call, ti) => (
+	                                  <span
+	                                    key={`${call.name}-${ti}`}
+	                                    className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600"
+	                                    title={toolLabel(call.name)}
+	                                  >
+                                    {toolLabel(call.name)}
+                                  </span>
+                                ))}
+                                {m.toolCalls.length > 4 && (
+                                  <span className="text-[10px] text-slate-400">+{m.toolCalls.length - 4}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                     {m.role === 'assistant' && m.intentMeta && (
                       <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 leading-snug space-y-0.5">
@@ -866,12 +1234,30 @@ const AiChatWidget = () => {
                         )}
                       </div>
                     )}
-                    {m.role === 'assistant' && !streamPlain && (m.content || '').trim() !== '' && (
-                      <div className="mt-2 flex items-center gap-0.5 border-t border-slate-100 pt-2">
-                        <span className="text-[10px] text-slate-400 mr-1">这条回答</span>
-                        <button
-                          type="button"
-                          onClick={() => handleFeedback(m.id, 'up')}
+	                    {m.role === 'assistant' && !streamPlain && (m.content || '').trim() !== '' && (
+	                      <div className="mt-2 flex items-center gap-0.5 border-t border-slate-100 pt-2">
+	                        <span className="text-[10px] text-slate-400 mr-1">这条回答</span>
+	                        <button
+	                          type="button"
+	                          onClick={() => void copyText(m.id, m.content)}
+	                          title="复制回答"
+	                          aria-label="复制回答"
+	                          className="inline-flex items-center gap-0.5 rounded-md border border-transparent px-1.5 py-0.5 text-[11px] text-slate-500 transition-colors hover:bg-slate-100"
+	                        >
+	                          {copiedMessageId === m.id ? '已复制' : '复制'}
+	                        </button>
+	                        <button
+	                          type="button"
+	                          onClick={() => handleReuseQuestion(m.id)}
+	                          title="把上一条问题放回输入框"
+	                          aria-label="改问法"
+	                          className="inline-flex items-center gap-0.5 rounded-md border border-transparent px-1.5 py-0.5 text-[11px] text-slate-500 transition-colors hover:bg-slate-100"
+	                        >
+	                          改问
+	                        </button>
+	                        <button
+	                          type="button"
+	                          onClick={() => handleFeedback(m.id, 'up')}
                           title="有用"
                           aria-label="点赞"
                           className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] transition-colors ${
@@ -934,6 +1320,7 @@ const AiChatWidget = () => {
               )}
               <div className="flex items-end gap-2">
                 <textarea
+                  ref={inputRef}
                   rows={2}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}

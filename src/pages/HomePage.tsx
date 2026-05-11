@@ -56,93 +56,87 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-surface text-ink font-sans">
       <Header selectedType="全部" onTypeSelect={handleTypeSelect} user={user} onLogout={logout} />
-      <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="space-y-12">
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="space-y-8">
           {/* Hero Section */}
-          <div className="relative overflow-hidden bg-white border-2 border-ink shadow-brutal p-8 md:p-12 opacity-0 animate-fade-in-up stagger-1">
-            <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between relative z-10">
-              <div className="space-y-6 max-w-2xl">
-                <div className="inline-flex items-center gap-2 border-2 border-ink bg-accent text-white px-3 py-1 text-xs font-bold uppercase tracking-widest">
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                  实时监测中心
+          <section className="relative overflow-hidden rounded-2xl border border-line bg-panel p-6 shadow-brutal opacity-0 animate-fade-in-up stagger-1 md:p-8">
+            <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+              <div className="max-w-2xl space-y-4">
+                <div className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-inkLight">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                  实时监测工作台
                 </div>
-                <h1 className="text-4xl md:text-6xl font-display font-extrabold tracking-tight text-ink uppercase leading-none">
-                  前沿 <br/> <span className="text-transparent" style={{ WebkitTextStroke: '2px #111110' }}>趋势看板</span>
+                <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-ink md:text-4xl">
+                  关键趋势，一屏进入。
                 </h1>
-                <p className="text-base md:text-lg text-inkLight font-medium">
+                <p className="max-w-xl text-sm leading-6 text-inkLight md:text-base">
                   聚合 AI 热点、趋势监测、休闲游戏与 AI 产品情报。快速进入对应监测，掌握每日关键变化。
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="border-2 border-ink bg-surface p-4">
-                  <div className="text-xs font-bold uppercase tracking-widest text-inkLight">监测类型</div>
-                  <div className="mt-1 text-3xl font-display font-bold text-ink">4</div>
+              <div className="grid w-full grid-cols-2 gap-3 text-sm md:w-[360px]">
+                <div className="rounded-xl border border-line bg-surface p-4">
+                  <div className="text-xs font-medium text-muted">监测类型</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums text-ink">4</div>
                 </div>
-                <div className="border-2 border-ink bg-surface p-4">
-                  <div className="text-xs font-bold uppercase tracking-widest text-inkLight">监测条目</div>
-                  <div className="mt-1 text-3xl font-display font-bold text-ink">
+                <div className="rounded-xl border border-line bg-surface p-4">
+                  <div className="text-xs font-medium text-muted">监测条目</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums text-ink">
                     {homeStats.totalItems.toLocaleString()}
                   </div>
                 </div>
-                <div className="border-2 border-ink bg-surface p-4">
-                  <div className="text-xs font-bold uppercase tracking-widest text-inkLight">周报数量</div>
-                  <div className="mt-1 text-3xl font-display font-bold text-ink">
+                <div className="rounded-xl border border-line bg-surface p-4">
+                  <div className="text-xs font-medium text-muted">周报数量</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums text-ink">
                     {homeStats.weeklyReports.toLocaleString()}
                   </div>
                 </div>
-                <div className="border-2 border-ink bg-surface p-4">
-                  <div className="text-xs font-bold uppercase tracking-widest text-inkLight">AI 素材榜</div>
-                  <div className="mt-1 text-3xl font-display font-bold text-ink">
+                <div className="rounded-xl border border-line bg-surface p-4">
+                  <div className="text-xs font-medium text-muted">AI 素材榜</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums text-ink">
                     {homeStats.aiProductRankings.toLocaleString()}
                   </div>
                 </div>
               </div>
             </div>
-            {/* Decorative background element */}
-            <div className="absolute -right-20 -bottom-20 opacity-5 pointer-events-none">
-              <svg width="400" height="400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L2 22h20L12 2zm0 4l7.5 15h-15L12 6z"/>
-              </svg>
-            </div>
-          </div>
+          </section>
 
           {/* Cards Grid */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
               {
                 type: 'ai热点监测' as const,
                 title: 'AI 热点',
-                eng: 'AI 热点',
+                eng: 'AI',
                 description: '跟踪 AI 领域热点事件、投融资与行业动态。',
                 value: homeStats.byType.ai热点监测,
-                icon: '🤖',
+                icon: 'AI',
                 delay: 'stagger-2',
               },
               {
                 type: '热点趋势监测' as const,
                 title: '趋势监测',
-                eng: '趋势监测',
+                eng: 'TR',
                 description: '追踪行业趋势、关键话题及传播走势。',
                 value: homeStats.byType.热点趋势监测,
-                icon: '📈',
+                icon: 'TR',
                 delay: 'stagger-3',
               },
               {
                 type: '休闲游戏监测' as const,
                 title: '休闲游戏',
-                eng: '休闲游戏',
+                eng: 'GM',
                 description: '聚焦排行榜、新游戏与玩法拆解，洞察竞品动向。',
                 value: homeStats.byType.休闲游戏监测,
-                icon: '🎮',
+                icon: 'GM',
                 delay: 'stagger-4',
               },
               {
                 type: 'AI产品监测' as const,
                 title: 'AI 产品',
-                eng: 'AI 产品',
+                eng: 'PD',
                 description: '汇总产品周报、UA 素材与素材库榜单。',
                 value: homeStats.byType.AI产品监测,
-                icon: '✨',
+                icon: 'PD',
                 delay: 'stagger-5',
               },
             ].map((card) => (
@@ -150,24 +144,26 @@ const HomePage = () => {
                 key={card.type}
                 type="button"
                 onClick={() => handleTypeSelect(card.type)}
-                className={`group relative flex flex-col justify-between bg-white border-2 border-ink p-6 text-left transition-all duration-300 hover:-translate-y-2 hover:-translate-x-2 hover:shadow-brutal-hover opacity-0 animate-fade-in-up ${card.delay}`}
+                className={`group relative flex min-h-56 flex-col justify-between rounded-2xl border border-line bg-panel p-5 text-left shadow-brutal-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-brutal opacity-0 animate-fade-in-up ${card.delay}`}
               >
-                <div className="w-full space-y-6">
-                  <div className="flex items-start justify-between border-b-2 border-ink/10 pb-4">
-                    <span className="text-3xl grayscale group-hover:grayscale-0 transition-all duration-300">{card.icon}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-inkLight group-hover:text-accent transition-colors">
-                      进入 →
+                <div className="w-full space-y-5">
+                  <div className="flex items-start justify-between">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-xs font-semibold text-ink">
+                      {card.icon}
+                    </span>
+                    <span className="text-xs font-medium text-muted transition-colors group-hover:text-accent">
+                      进入
                     </span>
                   </div>
                   <div>
-                    <div className="text-[10px] font-bold text-inkLight tracking-widest mb-1">{card.eng}</div>
-                    <h2 className="text-2xl font-display font-bold text-ink uppercase tracking-tight">{card.title}</h2>
-                    <p className="mt-3 text-sm text-inkLight font-medium leading-relaxed">{card.description}</p>
+                    <div className="mb-1 text-xs font-medium text-muted">{card.eng}</div>
+                    <h2 className="text-xl font-semibold tracking-tight text-ink">{card.title}</h2>
+                    <p className="mt-3 text-sm leading-6 text-inkLight">{card.description}</p>
                   </div>
                 </div>
-                <div className="w-full flex items-end justify-between pt-6 mt-6 border-t-2 border-ink/10">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-inkLight">当前条目</div>
-                  <div className="text-3xl font-display font-bold text-ink group-hover:text-accentBlue transition-colors">
+                <div className="mt-6 flex w-full items-end justify-between border-t border-line pt-4">
+                  <div className="text-xs font-medium text-muted">当前条目</div>
+                  <div className="text-2xl font-semibold tabular-nums text-ink transition-colors group-hover:text-accent">
                     {card.value.toLocaleString()}
                   </div>
                 </div>

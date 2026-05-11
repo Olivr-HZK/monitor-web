@@ -272,6 +272,31 @@ export interface AiCreativeLibraryPayload {
   surgeItems: AiCreativeLibraryItem[];
 }
 
+export interface AiUaGalleryItem {
+  id: string;
+  adKey: string;
+  product: string;
+  category: string;
+  appId?: string;
+  platform?: string;
+  creativeType: 'video' | 'image' | 'unknown';
+  videoDuration?: number;
+  title?: string;
+  body?: string;
+  videoUrl?: string;
+  imageUrl?: string;
+  previewImgUrl?: string;
+  bestHeat?: number;
+  bestImpression?: number;
+  bestAllExposureValue?: number;
+  firstTargetDate?: string;
+  lastTargetDate?: string;
+  appearanceCount?: number;
+  insightAnalysis?: string;
+  insightUaSuggestion?: string;
+  insightCoverStyle?: string;
+}
+
 /**
  * 统一日报文档格式
  * 用同一套字段描述所有日报（热点日报、AI日报、竞品周报等），便于列表展示与详情渲染

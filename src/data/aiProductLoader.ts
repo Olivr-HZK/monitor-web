@@ -9,6 +9,7 @@ import type {
   AiCreativeLibraryItem,
   AiCreativeLibraryKind,
   AiCreativeLibraryPayload,
+  AiUaGalleryItem,
   GameRanking,
   GameRankingItem,
   GameRankingType,
@@ -22,6 +23,7 @@ const REPORT_MD_FILENAME = 'ai产品/竞品动态报告_AI产品.md';
 const AI_SALES_CSV_FILENAME = 'ai产品/ai产品竞品下载量和收益.csv';
 const AI_UA_DAILY_REPORT_FILENAME = 'ai产品/ai_products_report_daily.md';
 const AI_PRODUCTS_UA_DB_FILENAME = 'ai_products_ua.db';
+const VIDEO_ENHANCER_DB_FILENAME = 'video_enhancer_pipeline.db';
 
 interface SqlJsDatabase {
   exec: (sql: string) => Array<{ columns: string[]; values: unknown[][] }>;
@@ -189,6 +191,21 @@ function escapeMdTableCell(value: string | undefined): string {
 
 async function openAiProductsUaDb(getDataUrl?: (filename: string) => string): Promise<SqlJsDatabase | null> {
   const dbUrl = getDataUrl ? getDataUrl(AI_PRODUCTS_UA_DB_FILENAME) : AI_PRODUCTS_UA_DB_FILENAME;
+  const sqlJsModule = await import('sql.js');
+  const initSqlJs = sqlJsModule.default;
+  const SQL = await initSqlJs({
+    locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
+  });
+
+  const response = await fetch(dbUrl, fetchInitForDataUrl(dbUrl));
+  if (!response.ok) return null;
+
+  const buffer = await response.arrayBuffer();
+  return new SQL.Database(new Uint8Array(buffer)) as SqlJsDatabase;
+}
+
+async function openVideoEnhancerDb(getDataUrl?: (filename: string) => string): Promise<SqlJsDatabase | null> {
+  const dbUrl = getDataUrl ? getDataUrl(VIDEO_ENHANCER_DB_FILENAME) : VIDEO_ENHANCER_DB_FILENAME;
   const sqlJsModule = await import('sql.js');
   const initSqlJs = sqlJsModule.default;
   const SQL = await initSqlJs({
@@ -856,5 +873,107 @@ export async function loadAiCreativeLibraryFromDb(
   } catch (error) {
     console.error('Error loading AI creative library from DB:', error);
     return { newItems: [], hotItems: [], surgeItems: [] };
+  }
+}
+
+export async function loadAiUaGalleryFromVideoEnhancerDb(
+  getDataUrl?: (filename: string) => string
+): Promise<AiUaGalleryItem[]> {
+  try {
+    const db = await openVideoEnhancerDb(getDataUrl);
+    if (!db) return [];
+
+    const queryResult = db.exec(`
+      SELECT
+        id,
+        ad_key,
+        product,
+        category,
+        appid,
+        platform,
+        creative_type,
+        video_duration,
+        title,
+        body,
+        video_url,
+        image_url,
+        preview_img_url,
+        best_heat,
+        best_impression,
+        best_all_exposure_value,
+        first_target_date,
+        last_target_date,
+        appearance_count,
+        insight_analysis,
+        insight_ua_suggestion,
+        insight_cover_style
+      FROM creative_library
+      WHERE COALESCE(is_canonical, 1) = 1
+      ORDER BY last_target_date DESC, best_heat DESC, best_all_exposure_value DESC
+    `);
+    db.close();
+
+    if (!queryResult.length || !queryResult[0].values.length) return [];
+
+    const columns = queryResult[0].columns;
+    const rows = queryResult[0].values;
+    const indexOf = (name: string) => columns.indexOf(name);
+
+    const idxId = indexOf('id');
+    const idxAdKey = indexOf('ad_key');
+    const idxProduct = indexOf('product');
+    const idxCategory = indexOf('category');
+    const idxAppId = indexOf('appid');
+    const idxPlatform = indexOf('platform');
+    const idxCreativeType = indexOf('creative_type');
+    const idxVideoDuration = indexOf('video_duration');
+    const idxTitle = indexOf('title');
+    const idxBody = indexOf('body');
+    const idxVideoUrl = indexOf('video_url');
+    const idxImageUrl = indexOf('image_url');
+    const idxPreviewImgUrl = indexOf('preview_img_url');
+    const idxBestHeat = indexOf('best_heat');
+    const idxBestImpression = indexOf('best_impression');
+    const idxBestAllExposure = indexOf('best_all_exposure_value');
+    const idxFirstTargetDate = indexOf('first_target_date');
+    const idxLastTargetDate = indexOf('last_target_date');
+    const idxAppearanceCount = indexOf('appearance_count');
+    const idxInsightAnalysis = indexOf('insight_analysis');
+    const idxInsightUaSuggestion = indexOf('insight_ua_suggestion');
+    const idxInsightCoverStyle = indexOf('insight_cover_style');
+
+    return rows.map((row) => {
+      const creativeTypeRaw = String(row[idxCreativeType] ?? '').trim().toLowerCase();
+      const creativeType: AiUaGalleryItem['creativeType'] =
+        creativeTypeRaw === 'video' || creativeTypeRaw === 'image' ? creativeTypeRaw : 'unknown';
+
+      return {
+        id: `video-enhancer-${String(row[idxId] ?? row[idxAdKey] ?? '')}`,
+        adKey: String(row[idxAdKey] ?? '').trim(),
+        product: String(row[idxProduct] ?? '').trim() || '未命名产品',
+        category: String(row[idxCategory] ?? '').trim() || '未分类',
+        appId: String(row[idxAppId] ?? '').trim() || undefined,
+        platform: String(row[idxPlatform] ?? '').trim() || undefined,
+        creativeType,
+        videoDuration: Number(row[idxVideoDuration] ?? 0) || undefined,
+        title: String(row[idxTitle] ?? '').trim() || undefined,
+        body: String(row[idxBody] ?? '').trim() || undefined,
+        videoUrl: String(row[idxVideoUrl] ?? '').trim() || undefined,
+        imageUrl: String(row[idxImageUrl] ?? '').trim() || undefined,
+        previewImgUrl: String(row[idxPreviewImgUrl] ?? '').trim() || undefined,
+        bestHeat: Number(row[idxBestHeat] ?? 0) || undefined,
+        bestImpression: Number(row[idxBestImpression] ?? 0) || undefined,
+        bestAllExposureValue: Number(row[idxBestAllExposure] ?? 0) || undefined,
+        firstTargetDate: String(row[idxFirstTargetDate] ?? '').trim() || undefined,
+        lastTargetDate: String(row[idxLastTargetDate] ?? '').trim() || undefined,
+        appearanceCount: Number(row[idxAppearanceCount] ?? 0) || undefined,
+        insightAnalysis: String(row[idxInsightAnalysis] ?? '').trim() || undefined,
+        insightUaSuggestion: String(row[idxInsightUaSuggestion] ?? '').trim() || undefined,
+        insightCoverStyle: String(row[idxInsightCoverStyle] ?? '').trim() || undefined,
+      } satisfies AiUaGalleryItem;
+    });
+  } catch (error) {
+    console.error('Error loading AI UA gallery from video enhancer DB:', error);
+    return [];
   }
 }

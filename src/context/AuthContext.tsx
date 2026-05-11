@@ -9,7 +9,7 @@ import {
   setStoredApiToken,
   withApiAuth,
 } from '../utils/api';
-import { resetOurProductDatabaseCache } from '../data/ourProductAnalyticsLoader';
+import { resetOurProductDatabaseCache } from '../data/ourProductDailyLoader';
 
 const STATIC_AUTH_KEY = 'static-auth';
 const AUTH_CONFIG_URL = 'auth-config.json';

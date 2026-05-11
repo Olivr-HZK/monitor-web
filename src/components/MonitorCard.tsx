@@ -50,18 +50,18 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
     const { content, linkUrl: url } = getContentFromReportContent(item.reportContent);
     return { cardContent: buildAiCardContent(content), linkUrl: url || item.url || '' };
   }, [isAiHotspot, item.reportContent, item.url]);
-  const getTypeColor = (type: string) => {
+  const getTypeMark = (type: string) => {
     switch (type) {
       case 'ai热点监测':
-        return 'from-blue-400 to-blue-600';
+        return 'AI';
       case '热点趋势监测':
-        return 'from-purple-400 to-purple-600';
+        return 'TR';
       case '竞品社媒监控':
-        return 'from-orange-400 to-orange-600';
+        return 'SM';
       case '休闲游戏监测':
-        return 'from-green-400 to-green-600';
+        return 'GM';
       default:
-        return 'from-slate-400 to-slate-600';
+        return 'MN';
     }
   };
 
@@ -91,7 +91,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
       case 'negative':
         return 'bg-rose-50 text-rose-700 border-rose-200';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-surface text-inkLight border-line';
     }
   };
 
@@ -105,13 +105,13 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
 
   return (
     <div 
-      className="flex gap-6 py-6 border-b border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+      className="group flex cursor-pointer gap-4 border-b border-line px-2 py-5 transition-colors hover:bg-surfaceHover/70 sm:gap-5 sm:px-4"
       onClick={handleClick}
     >
       {/* Cover/Type Indicator */}
       <div className="flex-shrink-0 relative">
         {showCover ? (
-          <div className="w-32 h-32 rounded-xl overflow-hidden relative border border-slate-200">
+          <div className="relative h-24 w-24 overflow-hidden rounded-xl border border-line bg-surface sm:h-28 sm:w-28">
             <img
               src={item.coverImage}
               alt={item.title}
@@ -119,25 +119,20 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
               referrerPolicy="no-referrer"
               onError={() => setCoverFailed(true)}
             />
-            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2`}>
-              <div className="text-xs font-bold text-white">{item.type}</div>
+            <div className="absolute bottom-2 left-2 rounded-md bg-white/90 px-1.5 py-0.5 backdrop-blur">
+              <div className="text-[10px] font-medium text-ink">{getTypeMark(item.type)}</div>
             </div>
             {item.trend && (
-              <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1">
+              <div className="absolute top-2 right-2 rounded-full bg-white/90 p-1">
                 {getTrendIcon(item.trend)}
               </div>
             )}
           </div>
         ) : (
-          <div className={`w-32 h-32 bg-gradient-to-br ${getTypeColor(item.type)} rounded-xl overflow-hidden relative flex items-center justify-center`}>
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-2 text-center">
-              <div className="text-2xl mb-1">
-                {item.type === 'ai热点监测' && '🤖'}
-                {item.type === '热点趋势监测' && '📈'}
-                {item.type === '竞品社媒监控' && '📱'}
-                {item.type === '休闲游戏监测' && '🎮'}
-              </div>
-              <div className="text-xs font-bold">{item.type}</div>
+          <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface sm:h-28 sm:w-28">
+            <div className="flex flex-col items-center justify-center p-2 text-center">
+              <div className="text-lg font-semibold text-ink">{getTypeMark(item.type)}</div>
+              <div className="mt-1 max-w-20 text-[10px] leading-tight text-muted">{item.type}</div>
             </div>
             {item.trend && (
               <div className="absolute top-2 right-2">
@@ -151,19 +146,19 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
       {/* Content：min-w-0 + overflow-hidden 防止长链接/长文案撑出卡片 */}
       <div className="flex-1 min-w-0 overflow-hidden">
         {/* Title */}
-        <h3 className="text-lg font-bold text-slate-900 mb-2 line-clamp-2 break-words">
+        <h3 className="mb-2 line-clamp-2 break-words text-base font-semibold leading-6 text-ink transition-colors group-hover:text-accent sm:text-lg">
           {item.title}
         </h3>
 
         {/* Source and Metadata */}
-        <div className="flex items-center gap-3 text-sm text-slate-600 mb-2 flex-wrap break-all min-w-0">
+        <div className="mb-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 break-all text-xs text-muted sm:text-sm">
           <div className="flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
             <span>{item.source}</span>
           </div>
-          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs border border-slate-200">
+          <span className="rounded-md border border-line bg-surface px-2 py-0.5 text-xs text-inkLight">
             {item.platform}
           </span>
           <span>{item.date}</span>
@@ -190,7 +185,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
           {!isAiHotspot && scoreValue !== null && (
             <div className="flex items-center gap-1">
               <span className="text-yellow-500">⭐</span>
-              <span className="font-semibold text-slate-700">{scoreValue.toFixed(1)}</span>
+              <span className="font-medium text-inkLight">{scoreValue.toFixed(1)}</span>
             </div>
           )}
         </div>
@@ -198,7 +193,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
         {/* Description：AI 日报卡片仅展示摘要+分析，以及可点击的「原文链接」；其他类型展示 description */}
         <div className="mb-3 space-y-1 overflow-hidden min-w-0">
           {isAiHotspot ? (
-            <div className="text-[13px] leading-snug text-slate-600 overflow-hidden max-h-40 [&_p]:mb-1 [&_p]:last:mb-0 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_strong]:text-slate-700 break-all">
+            <div className="max-h-40 overflow-hidden break-all text-[13px] leading-6 text-inkLight [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:mb-1 [&_p]:last:mb-0 [&_strong]:text-ink">
               <MarkdownRenderer content={cardContent || item.description || '暂无内容'} />
               {linkUrl && linkUrl !== '#' && (
                 <p className="mt-2 mb-0 truncate" title={linkUrl}>
@@ -207,7 +202,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-blue-600 hover:text-blue-700 underline"
+                    className="text-accent hover:text-blue-700 underline"
                   >
                     原文链接
                   </a>
@@ -215,7 +210,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-600 line-clamp-2 break-all overflow-hidden min-w-0" title={item.description}>
+            <p className="line-clamp-2 min-w-0 overflow-hidden break-all text-sm leading-6 text-inkLight" title={item.description}>
               {item.description}
             </p>
           )}
@@ -224,7 +219,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
         {/* Tags and Sentiment */}
         <div className="flex flex-wrap items-center gap-2 overflow-hidden min-w-0">
           {!isAiHotspot && item.sentiment && (
-            <span className={`px-2.5 py-1 text-xs rounded-full border ${getSentimentColor(item.sentiment)}`}>
+            <span className={`rounded-md border px-2 py-0.5 text-xs ${getSentimentColor(item.sentiment)}`}>
               {item.sentiment === 'positive' && '正面'}
               {item.sentiment === 'negative' && '负面'}
               {item.sentiment === 'neutral' && '中性'}
@@ -233,7 +228,7 @@ const MonitorCard = ({ item, onClick }: MonitorCardProps) => {
           {item.tags.map((tag, index) => (
             <span
               key={index}
-              className="px-2.5 py-1 text-xs rounded-full border bg-slate-100 text-slate-700 border-slate-200"
+              className="rounded-md border border-line bg-surface px-2 py-0.5 text-xs text-inkLight"
             >
               {tag}
             </span>

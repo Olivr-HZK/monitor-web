@@ -18,12 +18,8 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #F4F4F2;
-  color: #111110;
-  /* Subtle grid background for industrial feel */
-  background-image: linear-gradient(to right, rgba(17,17,16,0.03) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(17,17,16,0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-color: #f7f7f4;
+  color: #1d1d1b;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -33,6 +29,31 @@ h1, h2, h3, h4, h5, h6 {
 #root {
   min-height: 100vh;
   width: 100%;
+}
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c9c9c2 transparent;
 }
 
 /* Staggered animation delays for lists */

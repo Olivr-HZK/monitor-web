@@ -17,7 +17,7 @@
 | `sensortower_top100.db` | SensorTower：Top100、异动、商店信息、周报相关表等 |
 | `competitor_data.db` | 竞品社媒：`weekly_reports` 等 |
 | `ai_products_ua.db` | AI 产品 UA：素材榜单视图、`ad_creative_analysis` 等 |
-| `us_free_appid_weekly.db` | 我方产品 US 免费榜日总结等（`weekly_summaries` / `app_ranks`） |
+| `us_free_appid_weekly.db` | 我方产品 US 免费榜日总结与按产品追溯（`weekly_summaries` / `app_ranks`）；由同级 `sensortower/data/us free app id.db` 优先同步到 `public/`，不存在时回退 `sensortower/data/us_free_appid_weekly.db` |
 
 **检索策略（重要）**：助手**没有**「自动扫全库」；每次只执行你在工具调用里写的那条 SQL、指定的那个 `db`。因此当用户问**某游戏/产品名、排名、是否上榜**时：
 

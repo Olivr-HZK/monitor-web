@@ -44,6 +44,15 @@ from config import (
     FEISHU_ALLOWED_CHAT_IDS,
     FEISHU_BOT_MENTION_NAMES,
     FEISHU_ASSISTANT_SEND_THINKING,
+    CASUAL_FEISHU_BOT_ENABLED,
+    CASUAL_FEISHU_APP_ID,
+    CASUAL_FEISHU_APP_SECRET,
+    CASUAL_FEISHU_VERIFICATION_TOKEN,
+    CASUAL_FEISHU_ENCRYPT_KEY,
+    CASUAL_FEISHU_ALLOWED_OPEN_IDS,
+    CASUAL_FEISHU_ALLOWED_CHAT_IDS,
+    CASUAL_FEISHU_BOT_MENTION_NAMES,
+    CASUAL_FEISHU_ASSISTANT_SEND_THINKING,
     WECOM_WEBHOOK_URL,
     OPENAI_API_KEY,
     OPENAI_MODEL,
@@ -102,6 +111,8 @@ USERS_FILE = DATA_DIR / "users.json"
 _feishu_token_cache: dict = {"token": "", "expire_at": 0}
 _feishu_bot_client = FeishuBotClient(FEISHU_APP_ID, FEISHU_APP_SECRET)
 _assistant_session_store = AssistantSessionStore(DATA_DIR / "assistant_sessions.db")
+_casual_feishu_bot_client = FeishuBotClient(CASUAL_FEISHU_APP_ID, CASUAL_FEISHU_APP_SECRET)
+_casual_assistant_session_store = AssistantSessionStore(DATA_DIR / "casual_assistant_sessions.db")
 
 
 class InMemoryRateLimiter:
@@ -124,6 +135,7 @@ class InMemoryRateLimiter:
 
 _ai_rate_limiter = InMemoryRateLimiter(max_events=12, window_sec=60)
 _feishu_rate_limiter = InMemoryRateLimiter(max_events=8, window_sec=60)
+_casual_feishu_rate_limiter = InMemoryRateLimiter(max_events=8, window_sec=60)
 
 
 def _client_rate_key(request: Request, prefix: str) -> str:
@@ -900,6 +912,189 @@ async def feishu_events(request: Request):
             "text": event.text[:80],
         })
         asyncio.create_task(_process_feishu_message_event(event))
+        return {"ok": True}
+    except FeishuEventError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+def _casual_feishu_channel(event) -> str:
+    return "feishu_casual_group" if event.chat_type == "group" else "feishu_casual_dm"
+
+
+def _casual_feishu_prompt(user_text: str) -> str:
+    return (
+        "你是「休闲游戏监测飞书助手」，只聚焦休闲游戏监测相关数据。"
+        "你可以回答微信/抖音小游戏榜单、SensorTower 榜单与商店页变化、竞品社媒/UA、我方产品榜单追踪。"
+        "请用适合飞书阅读的中文回复：先给结论，再给关键依据；默认控制在 800 字以内，列表不超过 10 条。"
+        "如果问题涉及最新、最近、本周或今天，必须说明站内数据边界；"
+        "不要暴露数据库名、表名、SQL、内部路径或密钥。"
+        "\n\n用户问题："
+        + user_text
+    )
+
+
+async def _run_casual_monitor_assistant_for_feishu(
+    text: str,
+    history: list[dict] | None,
+    context: dict[str, Any] | None,
+) -> str:
+    channel = str((context or {}).get("channel") or "feishu_casual")
+    result = await run_monitor_assistant(text, history, context, channel=channel)
+    return result.answer
+
+
+async def _process_casual_feishu_message_event(event) -> None:
+    user_key = event.sender_open_id or event.sender_union_id
+    session_key = event.session_key
+    channel = _casual_feishu_channel(event)
+    started = time.monotonic()
+    try:
+        if not _casual_feishu_rate_limiter.allow(user_key or session_key):
+            await _casual_feishu_bot_client.reply_text(
+                event.message_id,
+                "当前提问有点密集，我先保护一下休闲游戏监测查询服务。请稍等一分钟再继续。",
+                uuid_prefix=f"{event.event_id}:casual-rate-limit",
+            )
+            _casual_assistant_session_store.mark_event_done(event.event_id, "rate_limited")
+            return
+
+        if not is_feishu_event_allowed(event, CASUAL_FEISHU_ALLOWED_OPEN_IDS, CASUAL_FEISHU_ALLOWED_CHAT_IDS):
+            await _casual_feishu_bot_client.reply_text(
+                event.message_id,
+                "你暂时没有使用休闲游戏监测助手的权限，请联系管理员加入休闲助手白名单。",
+                uuid_prefix=f"{event.event_id}:casual-denied",
+            )
+            _casual_assistant_session_store.mark_event_done(event.event_id, "denied")
+            return
+
+        normalized_command = event.text.strip().lower()
+        if normalized_command in {"清空上下文", "重新开始", "重置会话", "/reset", "reset"}:
+            removed = _casual_assistant_session_store.clear_session(session_key)
+            await _casual_feishu_bot_client.reply_text(
+                event.message_id,
+                f"已清空当前休闲游戏监测助手会话上下文（{removed} 条历史）。接下来我会从新问题开始回答。",
+                uuid_prefix=f"{event.event_id}:casual-reset",
+            )
+            _casual_assistant_session_store.mark_event_done(event.event_id, "reset")
+            return
+
+        history = _casual_assistant_session_store.load_history(session_key, ASSISTANT_MAX_HISTORY_TURNS)
+        _casual_assistant_session_store.append_message(
+            session_key,
+            "user",
+            event.text,
+            channel=channel,
+            user_key=user_key,
+        )
+
+        if CASUAL_FEISHU_ASSISTANT_SEND_THINKING:
+            await _casual_feishu_bot_client.reply_text(
+                event.message_id,
+                "收到，我在查询休闲游戏监测数据并整理答案。",
+                uuid_prefix=f"{event.event_id}:casual-thinking",
+            )
+
+        context = build_assistant_context(event)
+        context["channel"] = channel
+        context["monitorType"] = "休闲游戏监测"
+        prompt = _casual_feishu_prompt(event.text)
+        answer = await _run_casual_monitor_assistant_for_feishu(prompt, history, context)
+        answer = (answer or "").strip() or "我这边没有生成可用回答，请换个问法再试一次。"
+        _append_assistant_audit({
+            "channel": channel,
+            "provider": AI_PROVIDER,
+            "user": user_key,
+            "sessionKey": session_key,
+            "status": "done",
+            "question": event.text,
+            "answerChars": len(answer),
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        _casual_assistant_session_store.append_message(
+            session_key,
+            "assistant",
+            answer,
+            channel=channel,
+            user_key=user_key,
+        )
+        await _casual_feishu_bot_client.reply_text(
+            event.message_id,
+            answer,
+            uuid_prefix=f"{event.event_id}:casual-answer",
+        )
+        _casual_assistant_session_store.mark_event_done(event.event_id, "done")
+    except Exception as e:
+        err = str(e)[:1000]
+        print("[casual-feishu-assistant]", err)
+        _append_assistant_audit({
+            "channel": channel,
+            "provider": AI_PROVIDER,
+            "user": user_key,
+            "sessionKey": session_key,
+            "status": "error",
+            "question": getattr(event, "text", ""),
+            "error": err,
+            "elapsedMs": int((time.monotonic() - started) * 1000),
+        })
+        _casual_assistant_session_store.mark_event_done(event.event_id, "error", err)
+        try:
+            await _casual_feishu_bot_client.reply_text(
+                event.message_id,
+                "休闲游戏监测助手这次处理失败了，请稍后重试；如果连续失败，请联系管理员查看后端日志。",
+                uuid_prefix=f"{event.event_id}:casual-error",
+            )
+        except Exception as notify_error:
+            print("[casual-feishu-assistant-notify]", notify_error)
+
+
+@app.post("/api/feishu/casual-agent/events")
+async def casual_feishu_events(request: Request):
+    """独立休闲游戏飞书 Agent 事件订阅入口。"""
+    if not CASUAL_FEISHU_BOT_ENABLED:
+        return {"ok": True, "ignored": "casual feishu bot disabled"}
+
+    raw = await request.body()
+    if CASUAL_FEISHU_ENCRYPT_KEY and not verify_feishu_signature(request.headers, raw, CASUAL_FEISHU_ENCRYPT_KEY):
+        raise HTTPException(status_code=401, detail="休闲游戏飞书事件签名校验失败")
+
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="休闲游戏飞书事件不是合法 JSON") from None
+
+    try:
+        verification = handle_url_verification(payload, CASUAL_FEISHU_VERIFICATION_TOKEN)
+        if verification is not None:
+            print("[casual-feishu-events] url_verification ok")
+            return verification
+
+        event = parse_message_event(payload, CASUAL_FEISHU_VERIFICATION_TOKEN, CASUAL_FEISHU_BOT_MENTION_NAMES)
+        if event is None:
+            header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
+            print("[casual-feishu-events] ignored unsupported", {
+                "type": payload.get("type"),
+                "event_type": header.get("event_type") or payload.get("event_type"),
+            })
+            return {"ok": True, "ignored": "unsupported event"}
+        if event.requires_mention_but_missing:
+            print("[casual-feishu-events] ignored group without mention", {
+                "event_id": event.event_id,
+                "chat_id": event.chat_id,
+                "text": event.text[:80],
+            })
+            return {"ok": True, "ignored": "group message without bot mention"}
+
+        if not _casual_assistant_session_store.mark_event_received(event.event_id):
+            print("[casual-feishu-events] ignored duplicate", {"event_id": event.event_id})
+            return {"ok": True, "ignored": "duplicate event"}
+
+        print("[casual-feishu-events] accepted", {
+            "event_id": event.event_id,
+            "channel": _casual_feishu_channel(event),
+            "chat_type": event.chat_type,
+            "text": event.text[:80],
+        })
+        asyncio.create_task(_process_casual_feishu_message_event(event))
         return {"ok": True}
     except FeishuEventError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

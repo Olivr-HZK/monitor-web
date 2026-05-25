@@ -40,3 +40,4 @@ __pycache__/
 *.pyc
 .venv/
 backend/.venv/
+.worktrees/

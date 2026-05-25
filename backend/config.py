@@ -59,6 +59,21 @@ FEISHU_ALLOWED_OPEN_IDS = _csv(os.environ.get("FEISHU_ALLOWED_OPEN_IDS"))
 FEISHU_ALLOWED_CHAT_IDS = _csv(os.environ.get("FEISHU_ALLOWED_CHAT_IDS"))
 FEISHU_BOT_MENTION_NAMES = _csv(os.environ.get("FEISHU_BOT_MENTION_NAMES"), ["监测助手", "飞书监测助手", "飞书 CLI"])
 FEISHU_ASSISTANT_SEND_THINKING = os.environ.get("FEISHU_ASSISTANT_SEND_THINKING", "true").strip().lower() not in ("0", "false", "no")
+CASUAL_FEISHU_BOT_ENABLED = _bool(os.environ.get("CASUAL_FEISHU_BOT_ENABLED"))
+CASUAL_FEISHU_APP_ID = _str(os.environ.get("CASUAL_FEISHU_APP_ID"))
+CASUAL_FEISHU_APP_SECRET = _str(os.environ.get("CASUAL_FEISHU_APP_SECRET"))
+CASUAL_FEISHU_VERIFICATION_TOKEN = _str(os.environ.get("CASUAL_FEISHU_VERIFICATION_TOKEN"))
+CASUAL_FEISHU_ENCRYPT_KEY = _str(os.environ.get("CASUAL_FEISHU_ENCRYPT_KEY"))
+CASUAL_FEISHU_ALLOWED_OPEN_IDS = _csv(os.environ.get("CASUAL_FEISHU_ALLOWED_OPEN_IDS"))
+CASUAL_FEISHU_ALLOWED_CHAT_IDS = _csv(os.environ.get("CASUAL_FEISHU_ALLOWED_CHAT_IDS"))
+CASUAL_FEISHU_BOT_MENTION_NAMES = _csv(
+    os.environ.get("CASUAL_FEISHU_BOT_MENTION_NAMES"),
+    ["休闲监测助手", "休闲游戏助手"],
+)
+CASUAL_FEISHU_ASSISTANT_SEND_THINKING = (
+    os.environ.get("CASUAL_FEISHU_ASSISTANT_SEND_THINKING", "true").strip().lower()
+    not in ("0", "false", "no")
+)
 WECOM_WEBHOOK_URL = _str(os.environ.get("WECOM_WEBHOOK_URL_REAL") or os.environ.get("WECOM_WEBHOOK_URL"))
 
 OPENAI_API_KEY = _str(os.environ.get("OPENAI_API_KEY"))

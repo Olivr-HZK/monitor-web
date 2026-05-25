@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "predeploy": "npm run build",
     "build:cf": "npm run build && node scripts/strip-sensitive-from-dist.js",
+    "sync:overseas-weekly": "node scripts/sync_overseas_weekly_reports.js",
     "deploy:api": "npm run build && STRIP_DIST_DB=1 bash scripts/deploy.sh",
     "deploy": "bash scripts/deploy.sh",
     "deploy:staging": "npm run build:staging && bash scripts/deploy.sh -b gh-pages-staging"

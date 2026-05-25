@@ -352,7 +352,9 @@ def main() -> int:
         print(md)
         return 0
 
-    feishu_url = (os.environ.get("FEISHU_WEBHOOK_URL") or "").strip().replace("\r", "").replace("\n", "")
+    feishu_url = (
+        os.environ.get("FEISHU_WEEKLY_WEBHOOK_URL") or os.environ.get("FEISHU_WEBHOOK_URL") or ""
+    ).strip().replace("\r", "").replace("\n", "")
     wecom_url = (
         (os.environ.get("WECOM_WEBHOOK_URL_REAL") or os.environ.get("WECOM_WEBHOOK_URL") or "")
         .strip()
@@ -360,7 +362,10 @@ def main() -> int:
         .replace("\n", "")
     )
     if not feishu_url and not wecom_url:
-        print("未配置 FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL/WECOM_WEBHOOK_URL", file=sys.stderr)
+        print(
+            "未配置 FEISHU_WEEKLY_WEBHOOK_URL / FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL/WECOM_WEBHOOK_URL",
+            file=sys.stderr,
+        )
         return 1
 
     title = "竞品检测简报（玩法更新/线下活动）"

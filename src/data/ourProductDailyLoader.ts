@@ -1,10 +1,38 @@
 import type { MonitorItem, MonitorType, CasualGameMainCategory } from '../types';
-import { fetchInitForDataUrl } from '../utils/api';
+import { fetchInitForDataUrl, getApiUrl, withApiAuth } from '../utils/api';
 import { buildSensorTowerOverviewUrl } from '../utils/rankingLabels';
 
 type GetDataUrl = (filename: string) => string;
 
 let ourProductDbPromise: Promise<any | null> | null = null;
+
+function shouldUseBackendFrontendData(getDataUrl?: GetDataUrl): boolean {
+  if (!getDataUrl) return false;
+  try {
+    return getDataUrl('us_free_appid_weekly.db').includes('/api/data/');
+  } catch {
+    return false;
+  }
+}
+
+async function loadBackendDailyItems(getDataUrl?: GetDataUrl): Promise<MonitorItem[] | null> {
+  if (!shouldUseBackendFrontendData(getDataUrl)) return null;
+  try {
+    const res = await fetch(
+      getApiUrl('/api/frontend/our-products/daily-items'),
+      withApiAuth({ headers: { Accept: 'application/json' } })
+    );
+    if (!res.ok) {
+      console.warn('Failed to fetch /api/frontend/our-products/daily-items:', res.status, res.statusText);
+      return null;
+    }
+    const data = await res.json();
+    return Array.isArray(data?.items) ? (data.items as MonitorItem[]) : null;
+  } catch (e) {
+    console.warn('Error fetching /api/frontend/our-products/daily-items:', e);
+    return null;
+  }
+}
 
 /**
  * public 下的文件在 Vite 里挂在 import.meta.env.BASE_URL 下（如 /monitor-web/xxx.db），
@@ -290,6 +318,9 @@ function buildCompactMarkdown(
 }
 
 export async function loadOurProductDailyItems(getDataUrl?: GetDataUrl): Promise<MonitorItem[]> {
+  const backendItems = await loadBackendDailyItems(getDataUrl);
+  if (backendItems) return backendItems;
+
   const db = await getOurProductDatabase(getDataUrl);
   if (!db) return [];
 

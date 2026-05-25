@@ -153,6 +153,7 @@ const MonitorTypePage = () => {
   const getCasualGamePageTitle = () => {
     if (!selectedCasualGameCategory) return '休闲游戏监测';
     if (selectedCasualGameCategory === '周报简要') return '休闲游戏监测 - 周报简要';
+    if (selectedCasualGameCategory === '出海周报') return '休闲游戏监测 - 每周出海周报';
     if (selectedCasualGameCategory === '我方产品') {
       const sub = selectedCasualOurProductSub ?? '日总结';
       if (sub === '日总结') return '休闲游戏监测 - 我方产品 · US 免费榜日总结';
@@ -316,6 +317,30 @@ const MonitorTypePage = () => {
 
                   <div className="flex flex-col justify-between rounded-2xl border border-line bg-panel p-5 shadow-brutal-sm">
                     <div>
+                      <h2 className="mb-2 break-words text-lg font-semibold tracking-tight text-ink">每周出海周报</h2>
+                      <p className="mb-4 line-clamp-4 text-sm leading-6 text-inkLight md:line-clamp-none">
+                        同步 game daily report2 的 Puzzle Game 出海市场周报，集中查看竞品、玩法、AI 与买量信号。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCasualGameCategory('出海周报');
+                        setSelectedGamePlatform(null);
+                        setSelectedCasualGameCompetitorSub(null);
+                        setSelectedCompany(null);
+                      }}
+                      className="mt-auto inline-flex items-center justify-center rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-inkLight shadow-brutal-sm transition-colors hover:border-ink/20 hover:bg-surfaceHover hover:text-ink"
+                    >
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="square" strokeLinejoin="miter" d="M4 19h16M6 17V5h8l4 4v8M14 5v4h4" />
+                      </svg>
+                      <span className="truncate">打开出海周报</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col justify-between rounded-2xl border border-line bg-panel p-5 shadow-brutal-sm">
+                    <div>
                       <h2 className="mb-2 break-words text-lg font-semibold tracking-tight text-ink">竞品监测</h2>
                       <p className="mb-4 line-clamp-4 text-sm leading-6 text-inkLight md:line-clamp-none">
                         快速进入休闲游戏竞品监控视图，查看社媒更新与 UA 素材等内容。
@@ -340,6 +365,7 @@ const MonitorTypePage = () => {
 
                 <MonitorList
                   items={monitorItems}
+                  dataLoading={dataLoading}
                   selectedType="休闲游戏监测"
                   selectedCompanyName={selectedCompany}
                   companies={companyOptions}
@@ -361,6 +387,7 @@ const MonitorTypePage = () => {
               ) : (
                 <MonitorList
                   items={monitorItems}
+                  dataLoading={dataLoading}
                   selectedType="AI产品监测"
                   selectedAiProductSub={selectedAiProductSub ?? undefined}
                   pageTitle={getAiProductPageTitle()}
@@ -383,6 +410,7 @@ const MonitorTypePage = () => {
             ) : (
               <MonitorList
                 items={monitorItems}
+                dataLoading={dataLoading}
                 selectedType={selectedType}
                 selectedCompanyName={selectedCompany}
                 onNavigateMonitorType={goMonitorType}
@@ -407,6 +435,10 @@ const MonitorTypePage = () => {
                 setSelectedCasualGameCompetitorSub('社媒更新');
                 setSelectedGamePlatform(null);
                 setSelectedCompany(null);
+              } else if (cat === '出海周报') {
+                setSelectedGamePlatform(null);
+                setSelectedCasualGameCompetitorSub(null);
+                setSelectedCompany(null);
               } else {
                 setSelectedGamePlatform(null);
                 setSelectedCasualGameCompetitorSub(null);
@@ -424,11 +456,6 @@ const MonitorTypePage = () => {
             onCasualOurProductSubSelect={setSelectedCasualOurProductSub}
           />
         </div>
-        {dataLoading && (
-          <div className="mt-8 text-center text-sm text-muted">
-            数据加载中...
-          </div>
-        )}
       </main>
     </div>
   );

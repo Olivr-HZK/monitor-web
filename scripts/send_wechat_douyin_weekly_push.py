@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 微信/抖音小游戏周报推送（单文件自包含，不依赖本目录其他脚本）。
 
@@ -296,6 +298,22 @@ def build_minigame_weekly_report_doc(
             "week_range": week_range,
         },
     }
+
+
+def _safe_week_filename(week_range: str) -> str:
+    safe_week = week_range.replace("～", "~").replace(" ", "").replace("年", "-").replace("月", "-").replace("日", "")
+    return safe_week.replace("~", "_").replace("/", "_")
+
+
+def write_minigame_weekly_json(repo_root: Path, week_range: str, content_md: str) -> Path:
+    weekly_doc = build_minigame_weekly_report_doc(week_range, content_md)
+    reports_dir = repo_root / "public" / "ai热点"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    json_path = reports_dir / f"minigame_weekly_{_safe_week_filename(week_range)}.json"
+    json_path.write_text(json.dumps(weekly_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    return json_path
+
+
 def _post_json(url: str, payload: dict) -> tuple[int, str]:
     url = normalize_webhook_url(url)
     data = json.dumps(payload).encode("utf-8")
@@ -402,11 +420,11 @@ def send_wecom_markdown(webhook: str, md_content: str) -> bool:
     return False
 
 def push_wechat_douyin_message(title: str, body: str) -> None:
-    feishu = _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
+    feishu = _clean_url(os.environ.get("FEISHU_WEEKLY_WEBHOOK_URL")) or _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
     wecom = _clean_url(os.environ.get("WECOM_WEBHOOK_URL_REAL")) or _clean_url(os.environ.get("WECOM_WEBHOOK_URL"))
     if not feishu and not wecom:
         print(
-            "未配置 Webhook。请在 .env 中设置 FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL（或 WECOM_WEBHOOK_URL）",
+            "未配置 Webhook。请在 .env 中设置 FEISHU_WEEKLY_WEBHOOK_URL / FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL（或 WECOM_WEBHOOK_URL）",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -424,6 +442,8 @@ def main() -> int:
     parser.add_argument("--db", type=Path, default=Path("public/wechatdouyin.db"))
     parser.add_argument("--date", type=str, default=None, metavar="YYYY-MM-DD")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--write-json-only", action="store_true", help="只生成 public/ai热点 周报 JSON，不发送 webhook")
+    parser.add_argument("--skip-json-write", action="store_true", help="发送 webhook 后不再写 public/ai热点 周报 JSON")
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[1]
     _load_env(repo_root)
@@ -456,19 +476,21 @@ def main() -> int:
         print(f"=== {title}（dry-run）===\n")
         print(wd_md)
         return 0
+    if args.write_json_only:
+        try:
+            json_path = write_minigame_weekly_json(repo_root, wd_week, wd_md)
+        except OSError as e:
+            print(f"[错误] 写入 JSON 失败：{e}", file=sys.stderr)
+            return 1
+        print(f"[JSON] 已写入：{json_path}")
+        return 0
     push_wechat_douyin_message(title, wd_md)
-    try:
-        weekly_doc = build_minigame_weekly_report_doc(wd_week, wd_md)
-        reports_dir = repo_root / "public" / "ai热点"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        safe_week = (
-            wd_week.replace("～", "~").replace(" ", "").replace("年", "-").replace("月", "-").replace("日", "")
-        )
-        safe_week = safe_week.replace("~", "_").replace("/", "_")
-        json_path = reports_dir / f"minigame_weekly_{safe_week}.json"
-        json_path.write_text(json.dumps(weekly_doc, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError as e:
-        print(f"[警告] 写入 JSON 失败：{e}", file=sys.stderr)
+    if not args.skip_json_write:
+        try:
+            json_path = write_minigame_weekly_json(repo_root, wd_week, wd_md)
+            print(f"[JSON] 已写入：{json_path}")
+        except OSError as e:
+            print(f"[警告] 写入 JSON 失败：{e}", file=sys.stderr)
     return 0
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { MonitorItem, MonitorType } from '../types';
 import type {
   GamePlatformKey,
@@ -20,6 +20,12 @@ function getCasualGameHeading(
   selectedCasualOurProductSub?: CasualGameOurProductSub | null
 ): { crumbs: string[]; headline: string } {
   const root = '休闲游戏监测';
+  if (selectedCasualGameCategory === '出海周报') {
+    return {
+      crumbs: [root, '每周出海周报'],
+      headline: '每周出海周报',
+    };
+  }
   if (selectedCasualGameCategory === '我方产品') {
     const sub = selectedCasualOurProductSub ?? '日总结';
     const leaf = sub === '日总结' ? '日总结' : '按产品追溯';
@@ -86,6 +92,8 @@ interface MonitorListProps {
   /** 列表页切换顶层监测类型（如从社媒视图跳到 AI 热点）；有则「分类」下拉会触发路由跳转 */
   onNavigateMonitorType?: (type: MonitorType) => void;
   onItemClick?: (item: MonitorItem) => void;
+  /** 为 true 时不在加载阶段误显「暂无监测数据」 */
+  dataLoading?: boolean;
 }
 
 const MonitorList = ({
@@ -104,7 +112,8 @@ const MonitorList = ({
   selectedCasualOurProductSub,
   ourProductRankAnalytics,
   onNavigateMonitorType,
-  onItemClick
+  onItemClick,
+  dataLoading = false,
 }: MonitorListProps) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [internalSelectedType, setInternalSelectedType] = useState<MonitorType | '全部'>('全部');
@@ -121,6 +130,10 @@ const MonitorList = ({
   /** 商店页变化：仅日期 + 游戏名搜索 */
   const [storeChangeDate, setStoreChangeDate] = useState<'all' | string>('all');
   const [storeChangeSearch, setStoreChangeSearch] = useState('');
+
+  useEffect(() => {
+    setWeeklySummaryDate('all');
+  }, [selectedCasualGameCategory, selectedCasualSourceSection]);
 
   const hotTrendPlatformOptions = useMemo(() => {
     const platforms = items
@@ -149,6 +162,9 @@ const MonitorList = ({
   /** 周报简要（微信/抖音 或 SensorTower）：只保留日期筛选，不显示其他下拉 */
   const isWeeklySummaryView =
     selectedType === '休闲游戏监测' && selectedCasualGameCategory === '周报简要';
+  const isOverseasWeeklyView =
+    selectedType === '休闲游戏监测' && selectedCasualGameCategory === '出海周报';
+  const isCasualDateReportView = isWeeklySummaryView || isOverseasWeeklyView;
 
   /** 我方产品：日总结显示真实卡片，按产品追溯显示真实榜单曲线 */
   const isOurProductView =
@@ -163,17 +179,21 @@ const MonitorList = ({
 
   /** 周报简要的日期选项（根据当前数据块取对应来源的 item.date） */
   const weeklySummaryDateOptions = useMemo(() => {
-    if (!isWeeklySummaryView) return [];
+    if (!isCasualDateReportView) return [];
     const dates = new Set<string>();
     for (const it of items) {
       if (it.type !== '休闲游戏监测') continue;
-      if (it.casualGameCategory !== '周报简要') continue;
-      if (selectedCasualSourceSection === 'sensortower' && it.casualGameSource !== 'sensortower') continue;
-      if (selectedCasualSourceSection !== 'sensortower' && it.casualGameSource === 'sensortower') continue;
+      if (isOverseasWeeklyView) {
+        if (it.casualGameCategory !== '出海周报' && it.casualGameSource !== 'overseas_weekly') continue;
+      } else {
+        if (it.casualGameCategory !== '周报简要') continue;
+        if (selectedCasualSourceSection === 'sensortower' && it.casualGameSource !== 'sensortower') continue;
+        if (selectedCasualSourceSection !== 'sensortower' && it.casualGameSource === 'sensortower') continue;
+      }
       if (it.date) dates.add(it.date);
     }
     return Array.from(dates).sort().reverse();
-  }, [items, isWeeklySummaryView, selectedCasualSourceSection]);
+  }, [items, isCasualDateReportView, isOverseasWeeklyView, selectedCasualSourceSection]);
 
   /** 商店页变化的日期选项 */
   const storeChangeDateOptions = useMemo(() => {
@@ -204,6 +224,13 @@ const MonitorList = ({
       filtered = filtered.filter((item) => item.type === '休闲游戏监测');
       if (selectedCasualGameCategory === '我方产品') {
         filtered = filtered.filter((item) => item.casualGameSource === 'our_product');
+      } else if (selectedCasualGameCategory === '出海周报') {
+        filtered = filtered.filter(
+          (item) => item.casualGameCategory === '出海周报' || item.casualGameSource === 'overseas_weekly'
+        );
+        if (weeklySummaryDate !== 'all') {
+          filtered = filtered.filter((item) => item.date === weeklySummaryDate);
+        }
       } else {
         if (selectedCasualSourceSection === 'sensortower') {
           filtered = filtered.filter((item) => item.casualGameSource === 'sensortower');
@@ -287,7 +314,7 @@ const MonitorList = ({
 
     // 排序
     const sorted = [...filtered].sort((a, b) => {
-      if (isWeeklySummaryView || isWechatDouyinWeeklyBrief || isStoreChangeView) {
+      if (isCasualDateReportView || isWechatDouyinWeeklyBrief || isStoreChangeView) {
         return parseItemDate(b) - parseItemDate(a);
       }
       switch (sortBy) {
@@ -327,6 +354,7 @@ const MonitorList = ({
     timeRange,
     isWechatDouyinWeeklyBrief,
     isWeeklySummaryView,
+    isCasualDateReportView,
     weeklySummaryDate,
     isStoreChangeView,
     storeChangeDate,
@@ -390,11 +418,11 @@ const MonitorList = ({
         {headerAction}
       </div>
 
-      {/* Filters：周报简要（含 SensorTower 周报）只保留日期筛选；微信/抖音周报仅时间；其他场景显示完整筛选 */}
+      {/* Filters：周报简要、出海周报只保留日期筛选；微信/抖音周报仅时间；其他场景显示完整筛选 */}
       {!isOurProductView && (
       <div className="mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-start gap-3">
-          {isWeeklySummaryView ? (
+          {isCasualDateReportView ? (
             <div className="flex items-center gap-2">
               <span className="whitespace-nowrap text-sm text-muted">日期</span>
               <select
@@ -611,7 +639,7 @@ const MonitorList = ({
           )}
         </div>
 
-        {showAdvancedFilters && !isWechatDouyinWeeklyBrief && !isWeeklySummaryView && !isStoreChangeView && !isOurProductView && (
+        {showAdvancedFilters && !isWechatDouyinWeeklyBrief && !isCasualDateReportView && !isStoreChangeView && !isOurProductView && (
           <div className="rounded-xl border border-line bg-panel p-4 shadow-brutal-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -641,7 +669,13 @@ const MonitorList = ({
       {/* Results Count */}
       {!isOurProductView && (
         <div className="mb-3 text-sm text-muted">
-          共找到 <span className="font-semibold text-ink">{filteredAndSortedItems.length}</span> 条监测数据
+          {dataLoading ? (
+            <span>数据加载中…</span>
+          ) : (
+            <>
+              共找到 <span className="font-semibold text-ink">{filteredAndSortedItems.length}</span> 条监测数据
+            </>
+          )}
         </div>
       )}
       {/* 我方产品：真实数据视图 */}
@@ -669,7 +703,11 @@ const MonitorList = ({
         )
       ) : (
         <div className="space-y-0">
-          {filteredAndSortedItems.length > 0 ? (
+          {dataLoading && filteredAndSortedItems.length === 0 ? (
+            <div className="py-12 text-center text-slate-500">
+              <p>数据加载中…</p>
+            </div>
+          ) : filteredAndSortedItems.length > 0 ? (
             filteredAndSortedItems.map((item) => (
               <MonitorCard key={item.id} item={item} onClick={onItemClick} />
             ))

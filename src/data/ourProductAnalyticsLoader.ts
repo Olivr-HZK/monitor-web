@@ -1,4 +1,5 @@
 import { getOurProductDatabase } from './ourProductDailyLoader';
+import { getApiUrl, withApiAuth } from '../utils/api';
 
 type GetDataUrl = (filename: string) => string;
 
@@ -35,6 +36,36 @@ export interface OurProductRankAnalytics {
 }
 
 const MAX_DATES = 56;
+
+function shouldUseBackendFrontendData(getDataUrl?: GetDataUrl): boolean {
+  if (!getDataUrl) return false;
+  try {
+    return getDataUrl('us_free_appid_weekly.db').includes('/api/data/');
+  } catch {
+    return false;
+  }
+}
+
+async function loadBackendAnalytics(getDataUrl?: GetDataUrl): Promise<OurProductRankAnalytics | null> {
+  if (!shouldUseBackendFrontendData(getDataUrl)) return null;
+  try {
+    const res = await fetch(
+      getApiUrl('/api/frontend/our-products/analytics'),
+      withApiAuth({ headers: { Accept: 'application/json' } })
+    );
+    if (!res.ok) {
+      console.warn('Failed to fetch /api/frontend/our-products/analytics:', res.status, res.statusText);
+      return null;
+    }
+    const data = await res.json();
+    return Array.isArray(data?.dates) && Array.isArray(data?.products)
+      ? (data as OurProductRankAnalytics)
+      : null;
+  } catch (e) {
+    console.warn('Error fetching /api/frontend/our-products/analytics:', e);
+    return null;
+  }
+}
 
 function fmtCell(c: OurProductRankCell): string {
   const pi = c.ios == null ? '—' : String(c.ios);
@@ -85,6 +116,9 @@ function formatSeriesLabel(input: {
 export async function loadOurProductRankAnalytics(
   getDataUrl?: GetDataUrl
 ): Promise<OurProductRankAnalytics | null> {
+  const backendAnalytics = await loadBackendAnalytics(getDataUrl);
+  if (backendAnalytics) return backendAnalytics;
+
   const db = await getOurProductDatabase(getDataUrl);
   if (!db) return null;
 

@@ -19,6 +19,7 @@ import {
   loadAiUaCreativeCardsFromDb,
 } from '../data/aiProductLoader';
 import { loadReportsData, resetGameplayDatabaseCache } from '../data/reportsLoader';
+import { loadOverseasWeeklyReportItems } from '../data/overseasWeeklyReportLoader';
 import { loadWeeklyReportsFromDatabase } from '../data/weeklyReportLoader';
 import { loadAllDailyReports } from '../data/dailyReportLoader';
 import { loadReportDocuments } from '../data/reportDocumentsLoader';
@@ -220,6 +221,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         const [
           rankings,
           reportsData,
+          overseasWeeklyItems,
           weeklyReportsFromDb,
           dailyReports,
           reportDocuments,
@@ -243,6 +245,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           loadReportsData(getDataUrlFn).catch((error) => {
             console.error('Failed to load reports data:', error);
             return { wechatDouyinRankings: [], wechatDouyinRankingsByWeek: [], newGameItems: [], newPlayItems: [], weeklyBriefItems: [] };
+          }),
+          loadOverseasWeeklyReportItems(getDataUrlFn).catch((error) => {
+            console.error('Failed to load overseas weekly reports:', error);
+            return [];
           }),
           loadWeeklyReportsFromDatabase(dbUrl).catch((error) => {
             console.error('Failed to load weekly reports from database:', error);
@@ -332,6 +338,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         );
         const sensorTowerStoreChangeItems = buildStoreChangeMonitorItems(sensorTowerStoreChanges ?? []);
         const casualGameItems = [
+          ...(overseasWeeklyItems ?? []),
           ...(reportsData.weeklyBriefItems ?? []),
           ...(reportsData.newGameItems ?? []),
           ...(reportsData.newPlayItems ?? []),

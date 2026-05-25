@@ -12,12 +12,107 @@ export interface MarkdownRendererProps {
   className?: string;
 }
 
+/** 全角方括号 → 半角，便于解析模型输出的 `[标题](url)` 变体 */
+function normalizeMarkdownBrackets(text: string): string {
+  return text.replace(/\uFF3B/g, '[').replace(/\uFF3D/g, ']');
+}
+
+/**
+ * 查找下一个 Markdown 行内链接 `[label](href)`：
+ * - `]` 与 `(` 之间允许空白；
+ * - 目标地址支持半角括号配对（URL 内可含 `)`）；
+ * - 支持全角包裹 `（https://…）`（常见于中文模型输出）。
+ */
+function findNextMarkdownLink(
+  text: string,
+  from = 0
+): { start: number; end: number; label: string; href: string } | null {
+  let pos = from;
+  while (pos < text.length) {
+    const open = text.indexOf('[', pos);
+    if (open === -1) return null;
+    const closeBracket = text.indexOf(']', open + 1);
+    if (closeBracket === -1) return null;
+    let i = closeBracket + 1;
+    while (i < text.length && /\s/.test(text[i])) i++;
+    const oc = text[i];
+    if (oc === '\uFF08') {
+      const urlStart = i + 1;
+      const closeFw = text.indexOf('\uFF09', urlStart);
+      if (closeFw === -1) {
+        pos = open + 1;
+        continue;
+      }
+      const hrefRaw = text.slice(urlStart, closeFw).trim();
+      const label = text.slice(open + 1, closeBracket);
+      return { start: open, end: closeFw + 1, label, href: hrefRaw };
+    }
+    if (oc !== '(') {
+      pos = open + 1;
+      continue;
+    }
+    i++;
+    const urlStart = i;
+    let depth = 1;
+    while (i < text.length && depth > 0) {
+      const c = text[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth--;
+      i++;
+    }
+    if (depth !== 0) {
+      pos = open + 1;
+      continue;
+    }
+    const hrefRaw = text.slice(urlStart, i - 1).trim();
+    const label = text.slice(open + 1, closeBracket);
+    return { start: open, end: i, label, href: hrefRaw };
+  }
+  return null;
+}
+
+function pushLinkNode(
+  finalParts: (string | React.ReactElement)[],
+  keyCounter: { n: number },
+  key: string,
+  hrefRaw: string,
+  label: string,
+  onInternalLinkClick?: (id: string) => void
+): void {
+  let href = hrefRaw.replace(/^<|>$/g, '').trim();
+  const isEntryLink = href.startsWith('#entry:');
+  const entryId = isEntryLink ? href.replace(/^#entry:/, '') : '';
+  finalParts.push(
+    <a
+      key={`${key}-link-${keyCounter.n++}`}
+      href={href}
+      {...(isEntryLink && onInternalLinkClick
+        ? {
+            onClick: (e: React.MouseEvent) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onInternalLinkClick(entryId);
+            },
+          }
+        : {
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            onClick: (e: React.MouseEvent) => e.stopPropagation(),
+          })}
+      className="text-blue-600 hover:text-blue-700 underline"
+    >
+      {label}
+    </a>
+  );
+}
+
 /** 粗体、链接、裸 URL（不含行内 `![alt](url)`，避免与链接语法冲突） */
 function renderInlineMarkdownCore(
   text: string,
   onInternalLinkClick?: (id: string) => void,
   keyFragment = ''
 ): React.ReactNode[] {
+  const normalized = normalizeMarkdownBrackets(text);
   const parts: (string | React.ReactElement)[] = [];
   let currentIndex = 0;
 
@@ -25,9 +120,9 @@ function renderInlineMarkdownCore(
   let match: RegExpExecArray | null;
   let lastIndex = 0;
 
-  while ((match = boldRegex.exec(text)) !== null) {
+  while ((match = boldRegex.exec(normalized)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(text.substring(lastIndex, match.index));
+      parts.push(normalized.substring(lastIndex, match.index));
     }
     parts.push(
       <strong key={`${keyFragment}s-${currentIndex++}`} className="font-semibold text-slate-900">
@@ -37,52 +132,35 @@ function renderInlineMarkdownCore(
     lastIndex = match.index + match[0].length;
   }
 
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
+  if (lastIndex < normalized.length) {
+    parts.push(normalized.substring(lastIndex));
   }
 
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   const finalParts: (string | React.ReactElement)[] = [];
-  let linkLastIndex = 0;
+  const linkKeyCounter = { n: 0 };
 
   parts.forEach((part, partIndex) => {
     if (typeof part === 'string') {
-      linkRegex.lastIndex = 0;
-      while ((match = linkRegex.exec(part)) !== null) {
-        if (match.index > linkLastIndex) {
-          finalParts.push(part.substring(linkLastIndex, match.index));
+      let cursor = 0;
+      let link = findNextMarkdownLink(part, cursor);
+      while (link !== null) {
+        if (link.start > cursor) {
+          finalParts.push(part.slice(cursor, link.start));
         }
-        const href = match[2];
-        const isEntryLink = href.startsWith('#entry:');
-        const entryId = isEntryLink ? href.replace(/^#entry:/, '') : '';
-        finalParts.push(
-          <a
-            key={`${keyFragment}link-${partIndex}-${currentIndex++}`}
-            href={href}
-            {...(isEntryLink && onInternalLinkClick
-              ? {
-                  onClick: (e: React.MouseEvent) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onInternalLinkClick(entryId);
-                  },
-                }
-              : {
-                  target: '_blank',
-                  rel: 'noopener noreferrer',
-                  onClick: (e: React.MouseEvent) => e.stopPropagation(),
-                })}
-            className="text-blue-600 hover:text-blue-700 underline"
-          >
-            {match[1]}
-          </a>
+        pushLinkNode(
+          finalParts,
+          linkKeyCounter,
+          `${keyFragment}link-${partIndex}`,
+          link.href,
+          link.label,
+          onInternalLinkClick
         );
-        linkLastIndex = match.index + match[0].length;
+        cursor = link.end;
+        link = findNextMarkdownLink(part, cursor);
       }
-      if (linkLastIndex < part.length) {
-        finalParts.push(part.substring(linkLastIndex));
+      if (cursor < part.length) {
+        finalParts.push(part.slice(cursor));
       }
-      linkLastIndex = 0;
     } else {
       finalParts.push(part);
     }

@@ -2,21 +2,52 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import time
 from pathlib import Path
 from typing import Any
 
+OVERSEAS_WEEKLY_DIR = "休闲游戏检测/出海周报"
+ALLOWED_PUBLIC_REPORT_PREFIXES = (
+    f"{OVERSEAS_WEEKLY_DIR}/",
+    "休闲游戏检测/",
+)
+
 import httpx
+
+try:
+    from config import DATA_SOURCE_DB_PATHS
+except Exception:  # pragma: no cover - keeps this module usable in isolated tests.
+    DATA_SOURCE_DB_PATHS = {}
+
+
+def _iter_available_db_paths(public_dir: Path) -> list[tuple[str, Path]]:
+    """返回 canonical DB 名到实际路径的映射；源库优先，public 作为兼容回退。"""
+    out: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for name, raw_path in sorted(DATA_SOURCE_DB_PATHS.items()):
+        db_path = Path(raw_path).resolve()
+        if db_path.is_file() and db_path.suffix.lower() == ".db" and not name.startswith("."):
+            out.append((name, db_path))
+            seen.add(name)
+    try:
+        public_paths = sorted(public_dir.glob("*.db"))
+    except OSError:
+        public_paths = []
+    for db_path in public_paths:
+        if not db_path.is_file() or db_path.name.startswith(".") or db_path.name in seen:
+            continue
+        out.append((db_path.name, db_path.resolve()))
+        seen.add(db_path.name)
+    return out
 
 
 def _build_db_schema_cache(public_dir: Path) -> dict[str, dict[str, list[str]]]:
-    """启动时扫描 public/*.db 的表结构，缓存为 {db_name: {table: [col1, col2, ...]}}。"""
+    """启动时扫描可用 .db 的表结构，缓存为 {db_name: {table: [col1, col2, ...]}}。"""
     cache: dict[str, dict[str, list[str]]] = {}
-    for db_path in sorted(public_dir.glob("*.db")):
-        if not db_path.is_file() or db_path.name.startswith("."):
-            continue
+    for db_name, db_path in _iter_available_db_paths(public_dir):
         tables: dict[str, list[str]] = {}
         try:
             conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
@@ -30,7 +61,7 @@ def _build_db_schema_cache(public_dir: Path) -> dict[str, dict[str, list[str]]]:
         except Exception:
             continue
         if tables:
-            cache[db_path.name] = tables
+            cache[db_name] = tables
     return cache
 
 
@@ -56,18 +87,12 @@ def _normalize_db_filter(db_names: list[str] | tuple[str, ...] | set[str] | None
 def build_data_freshness_text(public_dir: Path) -> str:
     """生成面向模型的数据新鲜度摘要，让回答“最近/最新”时有边界感。"""
     items: list[tuple[float, str, int]] = []
-    try:
-        db_paths = sorted(public_dir.glob("*.db"))
-    except OSError:
-        db_paths = []
-    for p in db_paths:
-        if not p.is_file() or p.name.startswith("."):
-            continue
+    for db_name, p in _iter_available_db_paths(public_dir):
         try:
             stat = p.stat()
         except OSError:
             continue
-        items.append((stat.st_mtime, p.name, stat.st_size))
+        items.append((stat.st_mtime, db_name, stat.st_size))
     if not items:
         return ""
     items.sort(reverse=True)
@@ -82,10 +107,89 @@ def build_data_freshness_text(public_dir: Path) -> str:
     return "\n".join(lines)
 
 
+def _validate_public_report_path(public_dir: Path, rel_path: str) -> tuple[str, Path]:
+    decoded = rel_path.replace("\\", "/").strip().lstrip("/")
+    if not decoded or ".." in decoded:
+        raise ValueError("path 非法")
+    basename = Path(decoded).name
+    if basename.startswith("."):
+        raise ValueError("path 非法")
+    if not any(decoded.startswith(prefix) for prefix in ALLOWED_PUBLIC_REPORT_PREFIXES):
+        raise ValueError("仅允许读取休闲游戏监测目录下的报告文件")
+    file_path = (public_dir / decoded).resolve()
+    base = public_dir.resolve()
+    if os.path.commonpath([str(file_path), str(base)]) != str(base):
+        raise ValueError("path 越界")
+    if not file_path.is_file():
+        raise ValueError(f"报告不存在: {decoded}")
+    if file_path.suffix.lower() not in (".json", ".md", ".markdown"):
+        raise ValueError("仅支持 .json / .md 报告")
+    return decoded, file_path
+
+
+def _resolve_overseas_weekly_latest(public_dir: Path) -> str:
+    index_path = public_dir / OVERSEAS_WEEKLY_DIR / "index.json"
+    if not index_path.is_file():
+        raise ValueError("出海周报索引不存在")
+    try:
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("出海周报索引读取失败") from exc
+    reports = index.get("reports") or []
+    if not reports:
+        raise ValueError("出海周报暂无可用期数")
+    return f"{OVERSEAS_WEEKLY_DIR}/{reports[0]}"
+
+
+def build_overseas_weekly_prompt_block(public_dir: Path) -> str:
+    """为 system prompt 注入出海周报索引与读法（数据在 JSON，不在 SQLite）。"""
+    index_path = public_dir / OVERSEAS_WEEKLY_DIR / "index.json"
+    if not index_path.is_file():
+        return ""
+    try:
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    reports = [str(name) for name in (index.get("reports") or []) if str(name).strip()]
+    if not reports:
+        return ""
+    lines = [
+        "\n\n【每周出海周报（JSON 报告，非 SQLite）】",
+        "Puzzle Game 出海市场周报同步自 game daily report2，覆盖竞品、玩法、AI、买量与新兴市场。",
+        "请用 read_public_report 读取，不要用 query_sqlite / query_and_chart。",
+        f"- 索引路径：{OVERSEAS_WEEKLY_DIR}/index.json",
+        f"- 可用期数（新→旧）：{', '.join(reports[:8])}",
+        f'- 读最新：read_public_report(path="latest")',
+        f'- 读指定期：read_public_report(path="{OVERSEAS_WEEKLY_DIR}/<文件名>")',
+    ]
+    latest_rel = f"{OVERSEAS_WEEKLY_DIR}/{reports[0]}"
+    latest_path = public_dir / latest_rel
+    if latest_path.is_file():
+        try:
+            doc = json.loads(latest_path.read_text(encoding="utf-8"))
+            title = str(doc.get("title") or "").strip()
+            summary = str(doc.get("summary") or "").strip()
+            end_date = str((doc.get("meta") or {}).get("endDate") or doc.get("date") or "").strip()
+            if title or summary:
+                headline = title or summary
+                if end_date:
+                    headline = f"{headline}（截至 {end_date}）"
+                lines.append(f"- 最新一期速览：{headline}")
+        except (OSError, json.JSONDecodeError):
+            pass
+    return "\n".join(lines)
+
+
 def _validate_db_name(public_dir: Path, db_raw: str) -> tuple[str, Path]:
     db = Path(db_raw).name.strip()
     if not db or db.startswith(".") or "/" in db or "\\" in db:
         raise ValueError("db 参数非法，仅允许数据库文件名")
+    source_path = DATA_SOURCE_DB_PATHS.get(db)
+    if source_path:
+        db_path = Path(source_path).resolve()
+        if db_path.exists() and db_path.suffix.lower() == ".db":
+            return db, db_path
+        raise ValueError(f"数据库不存在: {db}")
     db_path = (public_dir / db).resolve()
     if not db_path.exists() or db_path.suffix.lower() != ".db":
         raise ValueError(f"数据库不存在: {db}")
@@ -211,6 +315,8 @@ class AgentToolDispatcher:
             return self.query_and_chart(args)
         if tool_name == "query_sqlite" and self.enable_db_tool:
             return self.query_sqlite(args)
+        if tool_name == "read_public_report":
+            return self.read_public_report(args)
         if tool_name == "web_search" and self.enable_web_search_tool:
             return await self.web_search(args)
         if tool_name == "render_chart":
@@ -303,6 +409,49 @@ class AgentToolDispatcher:
             "chart": chart_result,
             "hint": "图表已生成，请在文字中简要解读趋势即可，无需重复列出数据点。" if chart_result else "数据已返回，但无法自动生成图表，请用文字总结。",
         }
+
+    # ------------------------------------------------------------------
+    #  read_public_report：读取 public 下 JSON/Markdown 周报（如出海周报）
+    # ------------------------------------------------------------------
+    def read_public_report(self, args: dict[str, Any]) -> dict[str, Any]:
+        path_raw = str(args.get("path") or "").strip()
+        if not path_raw:
+            raise ValueError("path 不能为空")
+        if path_raw.lower() in {"latest", "最新", "最新一期"}:
+            path_raw = _resolve_overseas_weekly_latest(self.public_dir)
+        rel, file_path = _validate_public_report_path(self.public_dir, path_raw)
+        try:
+            max_chars = int(args.get("maxChars") or 16000)
+        except Exception:
+            max_chars = 16000
+        max_chars = max(1000, min(max_chars, 32000))
+        raw_text = file_path.read_text(encoding="utf-8")
+        suffix = file_path.suffix.lower()
+        if suffix == ".json":
+            try:
+                doc = json.loads(raw_text)
+            except json.JSONDecodeError as exc:
+                raise ValueError("JSON 报告解析失败") from exc
+            if not isinstance(doc, dict):
+                raise ValueError("JSON 报告格式异常")
+            content = str(doc.get("content") or "")
+            if len(content) > max_chars:
+                content = content[:max_chars] + "\n…（内容已截断，可缩小问题范围或指定更早一期）"
+            meta = doc.get("meta") if isinstance(doc.get("meta"), dict) else {}
+            return {
+                "path": rel,
+                "title": doc.get("title"),
+                "date": doc.get("date"),
+                "summary": doc.get("summary"),
+                "tags": doc.get("tags"),
+                "meta": meta,
+                "content": content,
+                "hint": "请基于 content 与 summary 回答；对用户不要暴露 path 或内部文件名。",
+            }
+        text = raw_text
+        if len(text) > max_chars:
+            text = text[:max_chars] + "\n…（内容已截断）"
+        return {"path": rel, "content": text, "hint": "Markdown 源文仅供理解，回复用户时请转为纯文本。"}
 
     # ------------------------------------------------------------------
     #  query_sqlite：纯查库（保留向后兼容）
@@ -469,6 +618,33 @@ def openai_style_tools_schema(
 ) -> list[dict[str, Any]]:
     """OpenAI / OpenRouter `tools` 列表（function calling）。"""
     tools: list[dict[str, Any]] = []
+    tools.append(
+        {
+            "type": "function",
+            "function": {
+                "name": "read_public_report",
+                "description": (
+                    "读取站内 JSON/Markdown 报告（非 SQLite）。"
+                    "休闲游戏「每周出海周报」、Puzzle Game 海外市场动态必须用此工具；"
+                    "path 填 latest 读最新一期，或填 index.json 列出的具体文件名（含目录前缀）。"
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": '如 latest、或 休闲游戏检测/出海周报/weekly_report_YYYY-MM-DD_YYYY-MM-DD.json',
+                        },
+                        "maxChars": {
+                            "type": "integer",
+                            "description": "content 最大字符数，默认 16000",
+                        },
+                    },
+                    "required": ["path"],
+                },
+            },
+        }
+    )
     if enable_db:
         tools.append(
             {

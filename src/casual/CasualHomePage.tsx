@@ -64,6 +64,7 @@ const CasualHomePage = () => {
   const getCasualGamePageTitle = () => {
     if (!selectedCasualGameCategory) return '休闲游戏监测';
     if (selectedCasualGameCategory === '周报简要') return '休闲游戏监测 - 周报简要';
+    if (selectedCasualGameCategory === '出海周报') return '休闲游戏监测 - 每周出海周报';
     if (selectedCasualGameCategory === '我方产品') {
       const sub = selectedCasualOurProductSub ?? '日总结';
       if (sub === '日总结') return '休闲游戏监测 - 我方产品 · US 免费榜日总结';
@@ -171,6 +172,35 @@ const CasualHomePage = () => {
 
                   <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
                     <div>
+                      <h2 className="text-lg font-semibold text-slate-900 mb-2 break-words">每周出海周报</h2>
+                      <p className="text-sm text-slate-600 mb-4 line-clamp-4 md:line-clamp-none">
+                        同步 game daily report2 的 Puzzle Game 出海市场周报，集中查看竞品、玩法、AI 与买量信号。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCasualGameCategory('出海周报');
+                        setSelectedGamePlatform(null);
+                        setSelectedCasualGameCompetitorSub(null);
+                        setSelectedCompany(null);
+                      }}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors border border-amber-200 mt-auto"
+                    >
+                      <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 19h16M6 17V5h8l4 4v8M14 5v4h4"
+                        />
+                      </svg>
+                      <span className="truncate">打开出海周报</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                    <div>
                       <h2 className="text-lg font-semibold text-slate-900 mb-2 break-words">竞品监测</h2>
                       <p className="text-sm text-slate-600 mb-4 line-clamp-4 md:line-clamp-none">
                         快速进入休闲游戏竞品监控视图，查看社媒更新与 UA 素材等内容。
@@ -200,6 +230,7 @@ const CasualHomePage = () => {
 
                 <MonitorList
                   items={monitorItems}
+                  dataLoading={dataLoading}
                   selectedType="休闲游戏监测"
                   selectedCompanyName={selectedCompany}
                   companies={companyOptions}
@@ -217,17 +248,12 @@ const CasualHomePage = () => {
             ) : (
               <MonitorList
                 items={monitorItems}
+                dataLoading={dataLoading}
                 selectedType="AI产品监测"
                 selectedAiProductSub={selectedAiProductSub}
                 pageTitle={`AI 产品监测 - ${selectedAiProductSub}`}
                 onItemClick={handleReportClick}
               />
-            )}
-
-            {dataLoading && (
-              <div className="mt-8 text-center text-sm text-slate-500">
-                数据加载中...
-              </div>
             )}
           </div>
           <Sidebar
@@ -250,6 +276,10 @@ const CasualHomePage = () => {
               } else if (cat === '竞品') {
                 setSelectedCasualGameCompetitorSub('社媒更新');
                 setSelectedGamePlatform(null);
+                setSelectedCompany(null);
+              } else if (cat === '出海周报') {
+                setSelectedGamePlatform(null);
+                setSelectedCasualGameCompetitorSub(null);
                 setSelectedCompany(null);
               } else {
                 setSelectedGamePlatform(null);

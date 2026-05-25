@@ -10,6 +10,7 @@ export type GamePlatformKey = '微信' | '抖音' | 'iOS' | '安卓';
 
 /** 休闲游戏监测大类
  * - 周报简要：按监控日期命名的完整报告
+ * - 出海周报：game daily report2 生成的每周出海市场报告
  * - 新游戏 / 新玩法：从榜单中自动抽取，用于玩法拆解
  * - 玩法拆解：汇总视图，同时包含 新游戏 + 新玩法
  * - 竞品：竞品动态（社媒更新 / UA素材）
@@ -20,6 +21,7 @@ export type CasualGameMainCategory =
   | '玩法拆解'
   | '竞品'
   | '周报简要'
+  | '出海周报'
   | '商店页变化'
   | '我方产品';
 
@@ -440,8 +442,8 @@ export interface MonitorItem {
   companyName?: string; // 公司名（用于竞品周报筛选）
   /** 休闲游戏监测：大类（新游戏/新玩法/竞品） */
   casualGameCategory?: CasualGameMainCategory;
-  /** 休闲游戏监测-数据来源块：仅微信/抖音 或 仅 SensorTower，用于前后端隔离 */
-  casualGameSource?: 'wechat_douyin' | 'sensortower' | 'our_product';
+  /** 休闲游戏监测-数据来源块：微信/抖音、SensorTower、我方产品或出海周报，用于前后端隔离 */
+  casualGameSource?: 'wechat_douyin' | 'sensortower' | 'our_product' | 'overseas_weekly';
   /** 休闲游戏监测-竞品：小类（社媒更新/UA素材） */
   casualGameCompetitorSub?: CasualGameCompetitorSub;
   /** AI产品监测：子类（排行榜/产品周报/UA素材） */

@@ -26,6 +26,7 @@ def _extract_message_text(message: dict[str, Any]) -> str:
 _TOOL_DISPLAY_NAMES: dict[str, str] = {
     "query_and_chart": "正在查询数据并生成图表…",
     "query_sqlite": "正在查询数据库…",
+    "read_public_report": "正在读取周报报告…",
     "render_chart": "正在生成图表…",
     "web_search": "正在联网搜索…",
 }

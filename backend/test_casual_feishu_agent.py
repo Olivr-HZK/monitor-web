@@ -20,6 +20,7 @@ def load_main(monkeypatch, tmp_path, **env: str):
         "CASUAL_FEISHU_ALLOWED_OPEN_IDS",
         "CASUAL_FEISHU_ALLOWED_CHAT_IDS",
         "CASUAL_FEISHU_BOT_MENTION_NAMES",
+        "CASUAL_FEISHU_BOT_OPEN_ID",
         "CASUAL_FEISHU_ASSISTANT_SEND_THINKING",
         "OPENAI_API_KEY",
     ]
@@ -98,6 +99,24 @@ def test_casual_feishu_url_verification_uses_independent_token(monkeypatch, tmp_
     assert response.json() == {"challenge": "ok"}
 
 
+def test_casual_feishu_url_verification_works_when_bot_disabled(monkeypatch, tmp_path):
+    main = load_main(
+        monkeypatch,
+        tmp_path,
+        CASUAL_FEISHU_BOT_ENABLED="false",
+        CASUAL_FEISHU_VERIFICATION_TOKEN="verify-token",
+    )
+    client = TestClient(main.app)
+
+    response = client.post(
+        "/api/feishu/casual-agent/events",
+        json={"type": "url_verification", "token": "verify-token", "challenge": "ok"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"challenge": "ok"}
+
+
 def _patch_immediate_create_task(monkeypatch, main) -> list:
     pending: list = []
 
@@ -162,7 +181,7 @@ def test_casual_feishu_denies_user_outside_whitelist(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
-    assert any("没有使用休闲游戏监测助手的权限" in item for item in replies)
+    assert any("休闲游戏之神" in item for item in replies) or any("白名单" in item for item in replies)
 
 
 def test_casual_feishu_dm_runs_casual_assistant(monkeypatch, tmp_path):
@@ -179,6 +198,7 @@ def test_casual_feishu_dm_runs_casual_assistant(monkeypatch, tmp_path):
 
     class Result:
         answer = "微信小游戏最近榜单变化摘要"
+        charts = []
 
     async def fake_run(user_text, history=None, page_context=None, *, channel="web", on_tool_call=None):
         calls.append((user_text, channel, page_context))
@@ -199,7 +219,7 @@ def test_casual_feishu_dm_runs_casual_assistant(monkeypatch, tmp_path):
     assert response.json() == {"ok": True}
     assert calls
     assert calls[0][1] == "feishu_casual_dm"
-    assert "休闲游戏监测飞书助手" in calls[0][0]
+    assert "休闲游戏之神" in calls[0][0]
     assert replies[-1] == "微信小游戏最近榜单变化摘要"
 
 
@@ -218,6 +238,7 @@ def test_casual_feishu_group_mention_runs_with_group_channel(monkeypatch, tmp_pa
 
     class Result:
         answer = "SensorTower 榜单摘要"
+        charts = []
 
     async def fake_run(user_text, history=None, page_context=None, *, channel="web", on_tool_call=None):
         calls.append((user_text, channel, page_context))
@@ -246,6 +267,50 @@ def test_casual_feishu_group_mention_runs_with_group_channel(monkeypatch, tmp_pa
     assert replies[-1] == "SensorTower 榜单摘要"
 
 
+def test_casual_feishu_group_mention_matches_bot_open_id(monkeypatch, tmp_path):
+    main = load_main(
+        monkeypatch,
+        tmp_path,
+        CASUAL_FEISHU_BOT_ENABLED="true",
+        CASUAL_FEISHU_VERIFICATION_TOKEN="verify-token",
+        CASUAL_FEISHU_BOT_MENTION_NAMES="wrong-name",
+        CASUAL_FEISHU_BOT_OPEN_ID="ou_bot_test",
+        CASUAL_FEISHU_ASSISTANT_SEND_THINKING="false",
+        OPENAI_API_KEY="test-key",
+    )
+    calls: list[tuple[str, str, dict[str, Any] | None]] = []
+    replies: list[str] = []
+
+    class Result:
+        answer = "榜单摘要"
+        charts = []
+
+    async def fake_run(user_text, history=None, page_context=None, *, channel="web", on_tool_call=None):
+        calls.append((user_text, channel, page_context))
+        return Result()
+
+    async def fake_reply(message_id: str, text: str, *, uuid_prefix: str | None = None) -> None:
+        replies.append(text)
+
+    pending = _patch_immediate_create_task(monkeypatch, main)
+    monkeypatch.setattr(main, "run_monitor_assistant", fake_run)
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_text", fake_reply)
+    client = TestClient(main.app)
+    payload = event_payload(
+        chat_type="group",
+        text="@_user_1 最近微信小游戏榜单有什么变化",
+        mentions=[{"key": "@_user_1", "name": "游戏之神", "id": {"open_id": "ou_bot_test"}}],
+    )
+
+    response = client.post("/api/feishu/casual-agent/events", json=payload)
+    _run_pending_tasks(pending)
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert calls
+    assert calls[0][1] == "feishu_casual_group"
+
+
 def test_casual_feishu_reset_clears_casual_session(monkeypatch, tmp_path):
     main = load_main(
         monkeypatch,
@@ -271,4 +336,4 @@ def test_casual_feishu_reset_clears_casual_session(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
-    assert any("休闲游戏监测助手会话上下文" in item for item in replies)
+    assert any("Game Start" in item or "清空" in item for item in replies)

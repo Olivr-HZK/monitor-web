@@ -9,7 +9,7 @@ from typing import Any, Callable, AsyncIterator
 
 import httpx
 
-from ai_tools import AgentToolDispatcher, build_data_freshness_text
+from ai_tools import AgentToolDispatcher, build_data_freshness_text, build_overseas_weekly_prompt_block
 from codex_app_server import CodexAppServerSession, CodexProtocolError
 from config import (
     AI_PROVIDER,
@@ -84,6 +84,57 @@ def _has_any(text: str, words: tuple[str, ...]) -> bool:
     return any(w.lower() in text for w in words)
 
 
+def is_trend_query(text: str, page_context: dict[str, Any] | None = None) -> bool:
+    blob = (text or "").lower()
+    if page_context:
+        blob += " " + " ".join(str(v).lower() for v in page_context.values() if v is not None)
+    return _has_any(
+        blob,
+        (
+            "趋势",
+            "走势",
+            "变化",
+            "最近",
+            "近期",
+            "近来",
+            "上升",
+            "下降",
+            "波动",
+            "对比",
+            "排名变化",
+            "异动",
+        ),
+    )
+
+
+def is_overseas_casual_query(text: str, page_context: dict[str, Any] | None = None) -> bool:
+    """休闲游戏出海周报意图：数据在 public JSON，不在 SQLite。"""
+    blob = (text or "").lower()
+    if page_context:
+        for key, val in page_context.items():
+            if val is None:
+                continue
+            sval = str(val).lower()
+            if key in ("casualGameCategory", "casualGameSource", "monitorType") and any(
+                token in sval for token in ("出海", "overseas", "overseas_weekly")
+            ):
+                return True
+            blob += " " + sval
+    return _has_any(
+        blob,
+        (
+            "出海",
+            "出海周报",
+            "海外",
+            "overseas",
+            "puzzle game",
+            "新兴市场",
+            "liveops",
+            "买量风向",
+        ),
+    )
+
+
 def select_relevant_databases(user_text: str, page_context: dict[str, Any] | None = None) -> list[str]:
     """按问题语义选择要注入的 schema，避免每次把所有库塞进 prompt。"""
     text = (user_text or "").lower()
@@ -95,6 +146,8 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
         names = AgentToolDispatcher.list_db_names()
 
     selected: list[str] = []
+    overseas_intent = is_overseas_casual_query(text, page_context)
+    trend_intent = is_trend_query(text, page_context)
 
     def add_exact(name: str) -> None:
         if name in names and name not in selected:
@@ -112,7 +165,9 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
     if _has_any(text, ("sensortower", "sensor tower", "top100", "商店", "app store", "google play", "美国榜", "免费榜")):
         add_exact("sensortower_top100.db")
         add_exact("sensortower_applist.db")
-    if _has_any(text, ("微信", "抖音", "小游戏", "玩法", "休闲游戏", "rank_changes", "top20")):
+    wechat_intent = _has_any(text, ("微信", "抖音", "小游戏", "rank_changes", "top20"))
+    casual_intent = _has_any(text, ("休闲游戏", "玩法"))
+    if wechat_intent or (casual_intent and not overseas_intent):
         add_exact("wechatdouyin.db")
     if _has_any(text, ("竞品", "社媒", "小红书", "facebook", "instagram", "tiktok", "线下活动", "social")):
         add_exact("competitor_data.db")
@@ -123,7 +178,19 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
     if _has_any(text, ("video enhancer", "视频增强", "remaker", "enhancer")):
         add_exact("video_enhancer_pipeline.db")
 
-    if not selected:
+    # 趋势/最近类问题：多拉几个时间序列数据源，便于画折线图
+    if trend_intent and not overseas_intent:
+        for name in (
+            "wechatdouyin.db",
+            "sensortower_top100.db",
+            "us_free_appid_weekly.db",
+            "competitor_data.db",
+        ):
+            add_exact(name)
+    elif trend_intent and overseas_intent:
+        add_exact("sensortower_top100.db")
+
+    if not selected and not overseas_intent:
         for name in (
             "wechatdouyin.db",
             "sensortower_top100.db",
@@ -134,7 +201,7 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
             add_exact(name)
 
     # 明确问历史快照时，补少量带日期库；普通问题优先当前 canonical db。
-    if _has_any(text, ("历史", "快照", "2026-", "对比上周", "上周")):
+    if _has_any(text, ("历史", "快照", "2026-", "对比上周", "上周")) or trend_intent:
         add_contains(" 2026-", max_items=3)
 
     return selected[:8]
@@ -149,18 +216,38 @@ def build_system_content(
     selected_dbs = select_relevant_databases(user_text, page_context)
     base = (
         "你是「监测汇总」内部平台的智能监测 agent，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。"
-        "回答要先给结论，再给关键依据；如果站内数据有截止时间，必须说明数据边界。"
+        "像同事聊天一样回答：先点出用户最关心的，再补依据；不要套模板，不要报告腔。"
+        "如果站内数据有截止时间，必须说明数据边界。"
         "\n\n【工具策略】"
-        "\n- 涉及排名变化、趋势走势、数据对比等可视化场景时，优先使用 query_and_chart 一步完成查库+画图。"
+        "\n- 用户问最近/趋势/走势/排名变化/对比：必须 query_and_chart，chartType 优先 line，SQL 拉多周/多期数据（通常 4–12 个时间点）。"
+        "\n- 涉及排名变化、趋势走势、数据对比等可视化场景时，优先 query_and_chart 一步完成查库+画图。"
         "\n- 只有纯事实查询（如「XX 本周排第几」）不需要图表时，才用 query_sqlite。"
+        "\n- 休闲游戏「出海/海外市场/Puzzle Game 周报」在 JSON 报告里，必须用 read_public_report（path=latest 或指定期数），不要用 SQLite。"
         "\n- 需要站外动态信息时才用 web_search，并区分站内数据与公开网页信息。"
         "\n- 不要向普通用户暴露数据库名、表名、SQL、内部路径或密钥；这些仅是服务端工具。"
         "\n- 当问题使用「最新/最近/本周/今天」等词时，先看站内数据新鲜度，不要编造实时数据。"
+        "\n- 图表生成后，文字只做口头解读，不要逐条复读表格数据。"
     )
+    if is_overseas_casual_query(user_text, page_context):
+        overseas_block = build_overseas_weekly_prompt_block(PUBLIC_DIR)
+        if overseas_block:
+            base += overseas_block
     if channel.startswith("feishu"):
         base += (
-            "\n\n【飞书回答格式】默认 800 字以内，列表不超过 10 条；长报告只给摘要和下一步建议；"
-            "如果信息不足，直接说明缺口并建议继续追问。"
+            "\n\n【飞书回答格式】"
+            "\n- 纯文本：禁止使用 Markdown（不要用 #、**、```、| 表格、> 引用、[]() 链接语法）；飞书无法渲染。"
+            "\n- 用口语化短段，空行自然分段；链接直接贴 URL。"
+            "\n- 禁止固定结构：不要每次都用「结论/依据/建议」三段式，不要机械编号「一、二、三」，不要小标题堆砌。"
+            "\n- 每次回复的开场和收尾都可以不同，像真人带看数据，有温度、有判断。"
+            "\n- 默认 800 字以内；长报告只给摘要和下一步建议。"
+            "\n- 信息不足时直接说明缺口并建议追问。"
+        )
+    if "feishu_casual" in channel:
+        base += (
+            "\n\n【休闲 GM 语气】"
+            "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
+            "\n- 问趋势/最近/变化：务必 query_and_chart 画折线图（系统会把图发到飞书），文字像解说一样讲清楚「看到了什么、意味着什么」。"
+            "\n- 可同时查微信/抖音榜、SensorTower、我方产品等多个相关源，帮用户把趋势看全。"
         )
     knowledge = get_agent_knowledge()
     if knowledge:

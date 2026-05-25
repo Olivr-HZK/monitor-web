@@ -6,6 +6,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import {
   getApiBase,
   getApiUrl,
+  parseApiErrorBody,
   setStoredApiToken,
   withApiAuth,
 } from '../utils/api';
@@ -175,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          return { ok: false, error: data.error || '登录失败' };
+          return { ok: false, error: parseApiErrorBody(data) || '登录失败' };
         }
         resetOurProductDatabaseCache();
         if (typeof data.token === 'string' && data.token.trim()) {

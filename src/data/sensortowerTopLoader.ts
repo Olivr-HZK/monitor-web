@@ -8,7 +8,7 @@ import type {
   SensorTowerRemovedGameItem,
   SensorTowerTop5OverviewItem,
 } from '../types';
-import { fetchInitForDataUrl } from '../utils/api';
+import { fetchInitForDataUrl, getApiUrl, withApiAuth } from '../utils/api';
 
 type GetDataUrl = (filename: string) => string;
 
@@ -17,6 +17,37 @@ let sensorTowerDbPromise: Promise<any | null> | null = null;
 /** 登录态或数据 URL 切换后必须清空，否则会一直复用首次失败结果（如先 401/404、后走 /api/data 仍为空） */
 export function resetSensorTowerDatabaseCache(): void {
   sensorTowerDbPromise = null;
+}
+
+function shouldUseBackendFrontendData(getDataUrl?: GetDataUrl): boolean {
+  if (!getDataUrl) return false;
+  try {
+    return getDataUrl('sensortower_top100.db').includes('/api/data/');
+  } catch {
+    return false;
+  }
+}
+
+async function loadFrontendDataItems<T>(
+  path: string,
+  getDataUrl?: GetDataUrl
+): Promise<T[] | null> {
+  if (!shouldUseBackendFrontendData(getDataUrl)) return null;
+  try {
+    const res = await fetch(
+      getApiUrl(path),
+      withApiAuth({ headers: { Accept: 'application/json' } })
+    );
+    if (!res.ok) {
+      console.warn(`Failed to fetch ${path}:`, res.status, res.statusText);
+      return null;
+    }
+    const data = await res.json();
+    return Array.isArray(data?.items) ? (data.items as T[]) : null;
+  } catch (e) {
+    console.warn(`Error fetching ${path}:`, e);
+    return null;
+  }
 }
 
 async function getSensorTowerDatabase(getDataUrl?: GetDataUrl): Promise<any | null> {
@@ -521,6 +552,12 @@ function getLastRankDates(db: any, tableName: string): string[] {
 
 /** 从 sensortower_top100.db 读取 iOS / Android Top100 榜单（仅最近四周），并关联 app_metadata */
 export async function loadSensorTowerTop100(getDataUrl?: GetDataUrl): Promise<SensorTowerTopItem[]> {
+  const backendItems = await loadFrontendDataItems<SensorTowerTopItem>(
+    '/api/frontend/sensortower/top100',
+    getDataUrl
+  );
+  if (backendItems) return backendItems;
+
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
 
@@ -573,6 +610,12 @@ export async function loadSensorTowerTop100(getDataUrl?: GetDataUrl): Promise<Se
 
 /** 从 sensortower_top100.db 读取异动榜单 rank_changes（仅最近四周），并关联 app_metadata */
 export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promise<SensorTowerRankChangeItem[]> {
+  const backendItems = await loadFrontendDataItems<SensorTowerRankChangeItem>(
+    '/api/frontend/sensortower/rank-changes',
+    getDataUrl
+  );
+  if (backendItems) return backendItems;
+
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
 
@@ -650,6 +693,12 @@ export async function loadSensorTowerRankChanges(getDataUrl?: GetDataUrl): Promi
 export async function loadSensorTowerNewTop3StoreCards(
   getDataUrl?: GetDataUrl
 ): Promise<SensorTowerStoreCard[]> {
+  const backendItems = await loadFrontendDataItems<SensorTowerStoreCard>(
+    '/api/frontend/sensortower/store-cards',
+    getDataUrl
+  );
+  if (backendItems) return backendItems;
+
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
 
@@ -784,6 +833,12 @@ export async function loadSensorTowerNewTop3StoreCards(
 export async function loadSensorTowerStoreChanges(
   getDataUrl?: GetDataUrl
 ): Promise<SensorTowerStoreChangeItem[]> {
+  const backendItems = await loadFrontendDataItems<SensorTowerStoreChangeItem>(
+    '/api/frontend/sensortower/store-changes',
+    getDataUrl
+  );
+  if (backendItems) return backendItems;
+
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
 
@@ -890,6 +945,12 @@ export async function loadSensorTowerStoreChanges(
 export async function loadSensorTowerRemovedGames(
   getDataUrl?: GetDataUrl
 ): Promise<SensorTowerRemovedGameItem[]> {
+  const backendItems = await loadFrontendDataItems<SensorTowerRemovedGameItem>(
+    '/api/frontend/sensortower/removed-games',
+    getDataUrl
+  );
+  if (backendItems) return backendItems;
+
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
 
@@ -947,6 +1008,12 @@ export async function loadSensorTowerRemovedGames(
 export async function loadSensorTowerTop5Overview(
   getDataUrl?: GetDataUrl
 ): Promise<SensorTowerTop5OverviewItem[]> {
+  const backendItems = await loadFrontendDataItems<SensorTowerTop5OverviewItem>(
+    '/api/frontend/sensortower/top5-overview',
+    getDataUrl
+  );
+  if (backendItems) return backendItems;
+
   const db = await getSensorTowerDatabase(getDataUrl);
   if (!db) return [];
 

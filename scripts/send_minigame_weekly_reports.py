@@ -9,7 +9,7 @@
 企业微信：发 Markdown 消息（单条 4096 字节上限，每条日报/周报单独发送）。
 
 环境变量（.env 或系统环境）：
-  - FEISHU_WEBHOOK_URL：飞书自定义机器人 Webhook
+  - FEISHU_WEEKLY_WEBHOOK_URL / FEISHU_WEBHOOK_URL：飞书自定义机器人 Webhook（周报优先用前者）
   - WECOM_WEBHOOK_URL_REAL 或 WECOM_WEBHOOK_URL：企业微信自定义机器人 Webhook
   - SENSORTOWER_OVERVIEW_BASE：SensorTower 概览页域名，默认 https://app.sensortower-china.com
   - SENSORTOWER_OVERVIEW_PROJECT_ID：可选，一般不填（站点会自动处理）
@@ -744,11 +744,11 @@ def push_game_weekly_message(
     feishu_segments: list | None = None,
 ) -> None:
     """根据标题与内容发送到已配置的飞书/企微（SensorTower 标题会拆多条企微）。feishu_segments 非空时飞书走 column_set。"""
-    feishu = _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
+    feishu = _clean_url(os.environ.get("FEISHU_WEEKLY_WEBHOOK_URL")) or _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
     wecom = _clean_url(os.environ.get("WECOM_WEBHOOK_URL_REAL")) or _clean_url(os.environ.get("WECOM_WEBHOOK_URL"))
     if not feishu and not wecom:
         print(
-            "未配置 Webhook。请在 .env 中设置 FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL（或 WECOM_WEBHOOK_URL）",
+            "未配置 Webhook。请在 .env 中设置 FEISHU_WEEKLY_WEBHOOK_URL / FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL（或 WECOM_WEBHOOK_URL）",
             file=sys.stderr,
         )
         raise SystemExit(1)

@@ -1,8 +1,8 @@
 # Cron 下自动部署到 GitHub Pages 的认证配置
 
-定时任务 `sync_dbs_and_deploy.sh` 会执行 `npm run deploy`（gh-pages 推送到 GitHub）。在 cron 环境中没有交互界面，无法输入用户名/密码，需要事先配置**免交互认证**。
+定时任务 `sync_dbs_and_deploy.sh` 会执行 **`npm run deploy:api`**（build → `STRIP_DIST_DB=1` → **`scripts/deploy.sh`** → gh-pages）。在 cron 环境中没有交互界面，无法输入用户名/密码，需要事先配置**免交互认证**。
 
-**说明（易踩坑）**：`gh-pages` 在缓存目录里执行 **`git clone`**，**不会**沿用你在本仓库设置的 `core.sshCommand`，因此即使用户级/Deploy Key 已配对，仍可能出现 `Permission denied (publickey)`。本仓库的 **`npm run deploy`** 已改为通过 `scripts/deploy.sh` 把 `core.sshCommand` **同步导出为环境变量 `GIT_SSH_COMMAND`** 再调用 gh-pages；若你手动只跑 `gh-pages -d dist`，需自行先执行 `export GIT_SSH_COMMAND="$(git config --get core.sshCommand)"`（或配置下文 `~/.ssh/config`）。
+**说明（易踩坑）**：`gh-pages` 在缓存目录里执行 **`git clone`**，**不会**沿用你在本仓库设置的 `core.sshCommand`，因此即使用户级/Deploy Key 已配对，仍可能出现 `Permission denied (publickey)`。本仓库的 **`npm run deploy`** / **`npm run deploy:api`** 均通过 `scripts/deploy.sh` 把 `core.sshCommand` **同步导出为环境变量 `GIT_SSH_COMMAND`** 再调用 gh-pages；若你手动只跑 `gh-pages -d dist`，需自行先执行 `export GIT_SSH_COMMAND="$(git config --get core.sshCommand)"`（或配置下文 `~/.ssh/config`）。
 
 **推荐方式：为该仓库单独配置 SSH Deploy Key（无密码）**  
 - 只对当前仓库有推送权限，不影响其他仓库  
@@ -90,13 +90,13 @@ npm run deploy
 
 ## 六、cron 下再测一次
 
-确认手动 `npm run deploy` 成功后，再跑一次完整脚本（跳过等待）：
+确认手动 `npm run deploy:api`（或按需 `npm run deploy`）成功后，再跑一次完整脚本（跳过等待）：
 
 ```bash
 SYNC_WAIT_MAX=0 /bin/bash /Users/ggbond/lyb/monitor-web/scripts/sync_dbs_and_deploy.sh
 ```
 
-若能看到 “npm run deploy 完成” 和 “游戏检测周报推送完成”，说明在你这台机器上 cron 定时跑也会用同一套 Git 配置，周一 11:30 的定时任务即可正常部署并推送游戏周报。
+若日志里能看到 **「deploy:api 完成」** 与 **「源库校验/产物 → deploy:api → 幂等推送 全部结束」**，说明在你这台机器上 cron 定时跑也会用同一套 Git 配置。
 
 ---
 
@@ -108,6 +108,6 @@ SYNC_WAIT_MAX=0 /bin/bash /Users/ggbond/lyb/monitor-web/scripts/sync_dbs_and_dep
 | 2 | 在 GitHub 仓库 Settings → Deploy keys 添加公钥，并勾选 Allow write access |
 | 3 | 本仓库目录下（如 `cd /Users/ggbond/lyb/monitor-web`）：`git remote set-url origin git@github.com:Olivr-HZK/monitor-web.git` |
 | 4 | 同上目录下：`git config core.sshCommand "ssh -i ~/.ssh/id_ed25519_monitor_web -o IdentitiesOnly=yes"` |
-| 5 | 运行 `npm run deploy` 验证；再运行 `SYNC_WAIT_MAX=0 .../sync_dbs_and_deploy.sh` 做完整测试 |
+| 5 | 运行 `npm run deploy:api` 验证；再运行 `SYNC_WAIT_MAX=0 .../sync_dbs_and_deploy.sh` 做完整测试（脚本内会先检测 API 是否在线） |
 
 若你有多台机器或多人跑 cron，每台机器生成自己的 Deploy Key 并在 GitHub 里加多个 key 即可（同一仓库可添加多个 Deploy keys）。

@@ -50,15 +50,28 @@ CORS_ORIGIN=https://app.example.com
 2. 在 Tunnel 里配置 **Public Hostname**：
    - **Subdomain**：`api.example.com`（或你选的子域）
    - **Service**：`http://127.0.0.1:3001`（与 `backend` 的 `PORT` 一致）
-3. 确保本机已启动 API，例如：
+3. 确保本机已启动 API。macOS（Homebrew Python）若提示 *externally-managed-environment*，请在 `backend` 下用虚拟环境启动（端口须与 Tunnel 里配置的 **Service** 一致，默认 **3001**）：
 
    ```bash
-   cd backend && uvicorn main:app --host 127.0.0.1 --port 3001
+   cd backend
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+   .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 3001
    ```
 
 4. Cloudflare 会自动为该子域提供 **HTTPS**；访客访问 `https://api.example.com`，实际请求经 Tunnel 转到本机。
 
 **注意**：若机器关机或 `cloudflared` 未运行，API 会不可用。生产可用 **systemd** 或进程守护保证 `cloudflared` 与 `uvicorn` 常驻。
+
+### 故障：`HTTP 530` / Cloudflare 错误码 **1033**
+
+含义：**Tunnel 已接入 Cloudflare，但连不上你配置的源站**（本机对应端口没有进程在听、地址写错、或 `cloudflared` 与 API 不在同一台机器上）。
+
+建议在**运行 `cloudflared tunnel run` 的那台电脑**上逐项核对：
+
+1. `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/openapi.json` 应返回 **200**（端口改成你在 Zero Trust 里填的 Service 端口）。
+2. Cloudflare **Zero Trust → Tunnels → Public Hostname**：`api.*` 的 **Service** 是否为 `http://127.0.0.1:3001`（与上一步一致）。
+3. 区分用途：`cloudflared tunnel --url http://127.0.0.1:4173` 只会起一个临时 `*.trycloudflare.com` 地址，**不会**替你修复 `https://api.你的域名`；正式子域依赖 **`tunnel run` + 令牌/配置里绑定的那条 Tunnel**。若长期开着多个 `cloudflared`，以 Zero Trust 里显示 **CONNECTED** 的那条为准。
 
 ---
 

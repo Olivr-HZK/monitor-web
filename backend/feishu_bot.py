@@ -108,6 +108,54 @@ class FeishuBotClient:
                 if data.get("code") != 0:
                     raise FeishuEventError(f"飞书回复失败: code={data.get('code')} msg={data.get('msg')}")
 
+    async def upload_image(self, image_bytes: bytes, *, filename: str = "chart.png") -> str:
+        token = await self.tenant_access_token()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                "https://open.feishu.cn/open-apis/im/v1/images",
+                headers={"Authorization": f"Bearer {token}"},
+                data={"image_type": "message"},
+                files={"image": (filename, image_bytes, "image/png")},
+            )
+        if r.status_code >= 400:
+            raise FeishuEventError(f"飞书上传图片 HTTP {r.status_code}: {r.text[:1000]}")
+        data = r.json()
+        if data.get("code") != 0:
+            raise FeishuEventError(f"飞书上传图片失败: code={data.get('code')} msg={data.get('msg')}")
+        image_key = str((data.get("data") or {}).get("image_key") or "").strip()
+        if not image_key:
+            raise FeishuEventError("飞书上传图片响应缺少 image_key")
+        return image_key
+
+    async def reply_image(
+        self,
+        message_id: str,
+        image_bytes: bytes,
+        *,
+        uuid_prefix: str | None = None,
+        filename: str = "chart.png",
+    ) -> None:
+        image_key = await self.upload_image(image_bytes, filename=filename)
+        token = await self.tenant_access_token()
+        prefix = uuid_prefix or message_id or str(uuid.uuid4())
+        payload = {
+            "msg_type": "image",
+            "content": json.dumps({"image_key": image_key}, ensure_ascii=False),
+            "reply_in_thread": True,
+            "uuid": _stable_uuid(f"{prefix}:image:{image_key}"),
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}/reply",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+        if r.status_code >= 400:
+            raise FeishuEventError(f"飞书图片回复 HTTP {r.status_code}: {r.text[:1000]}")
+        data = r.json()
+        if data.get("code") != 0:
+            raise FeishuEventError(f"飞书图片回复失败: code={data.get('code')} msg={data.get('msg')}")
+
 
 class AssistantSessionStore:
     def __init__(self, db_path: Path) -> None:
@@ -254,6 +302,7 @@ def parse_message_event(
     payload: dict[str, Any],
     verification_token: str = "",
     bot_mention_names: list[str] | None = None,
+    bot_open_ids: list[str] | None = None,
 ) -> FeishuMessageEvent | None:
     if "encrypt" in payload:
         raise FeishuEventError("当前未启用飞书加密事件解密，请在飞书后台关闭事件加密或补充解密实现")
@@ -279,7 +328,12 @@ def parse_message_event(
     mention_keys = _extract_mention_keys(message.get("mentions"))
     raw_text = _extract_text(message.get("content"))
     text_has_mention = raw_text.strip().startswith("@")
-    bot_mentioned = _mentions_include_bot(message.get("mentions"), raw_text, bot_mention_names)
+    bot_mentioned = _mentions_include_bot(
+        message.get("mentions"),
+        raw_text,
+        bot_mention_names,
+        bot_open_ids=bot_open_ids,
+    )
     text = _clean_user_text(raw_text, mention_keys if bot_mentioned else [])
     if not text:
         return None
@@ -370,15 +424,23 @@ def _normalize_mention_name(text: str) -> str:
     return (text or "").strip().lstrip("@").replace("\u200b", "").strip().lower()
 
 
-def _mentions_include_bot(mentions: Any, raw_text: str, bot_names: list[str] | None) -> bool:
+def _mentions_include_bot(
+    mentions: Any,
+    raw_text: str,
+    bot_names: list[str] | None,
+    bot_open_ids: list[str] | None = None,
+) -> bool:
     allowed = {_normalize_mention_name(name) for name in (bot_names or []) if _normalize_mention_name(name)}
-    if not allowed:
-        return False
+    allowed_open_ids = {x.strip() for x in (bot_open_ids or []) if x.strip()}
 
     if isinstance(mentions, list):
         for item in mentions:
             if not isinstance(item, dict):
                 continue
+            id_obj = item.get("id") if isinstance(item.get("id"), dict) else {}
+            mention_open_id = str(id_obj.get("open_id") or "").strip()
+            if mention_open_id and mention_open_id in allowed_open_ids:
+                return True
             candidates = [
                 item.get("name"),
                 item.get("text"),
@@ -389,6 +451,8 @@ def _mentions_include_bot(mentions: Any, raw_text: str, bot_names: list[str] | N
                 normalized = _normalize_mention_name(str(candidate or ""))
                 if normalized and normalized in allowed:
                     return True
+    if not allowed and not allowed_open_ids:
+        return False
 
     stripped = (raw_text or "").strip().replace("\u200b", "")
     for name in allowed:

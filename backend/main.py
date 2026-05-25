@@ -7,6 +7,9 @@ from pathlib import Path
 import asyncio
 import json
 import os
+import random
+import re
+import sqlite3
 import time
 import urllib.parse
 from typing import Any
@@ -19,9 +22,11 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from passlib.hash import pbkdf2_sha256
+from starlette.background import BackgroundTask
 
 from config import (
     PORT,
@@ -32,6 +37,9 @@ from config import (
     LOGIN_PASSWORD_HASH,
     PUBLIC_DIR,
     DATA_DIR,
+    DATA_SOURCE_DB_PATHS,
+    DB_SNAPSHOT_DIR,
+    DB_SNAPSHOT_TTL_SEC,
     DATA_SERVE_DENYLIST_BASENAMES,
     FEISHU_APP_ID,
     FEISHU_APP_SECRET,
@@ -52,6 +60,7 @@ from config import (
     CASUAL_FEISHU_ALLOWED_OPEN_IDS,
     CASUAL_FEISHU_ALLOWED_CHAT_IDS,
     CASUAL_FEISHU_BOT_MENTION_NAMES,
+    CASUAL_FEISHU_BOT_OPEN_ID,
     CASUAL_FEISHU_ASSISTANT_SEND_THINKING,
     WECOM_WEBHOOK_URL,
     OPENAI_API_KEY,
@@ -71,13 +80,16 @@ from auth import (
 )
 from ai_tools import AgentToolDispatcher
 from assistant_service import (
+    AssistantResult,
     build_messages_for_request as assistant_build_messages_for_request,
     get_agent_knowledge,
     run_monitor_assistant,
     stream_openai_text_chunks as assistant_stream_openai_text_chunks,
     tool_display_name,
 )
+from chart_image import render_chart_png
 from codex_app_server import CodexProtocolError
+from feishu_format import strip_markdown_for_feishu
 from feishu_bot import (
     AssistantSessionStore,
     FeishuBotClient,
@@ -88,6 +100,7 @@ from feishu_bot import (
     parse_message_event,
     verify_feishu_signature,
 )
+from frontend_data import router as frontend_data_router
 
 app = FastAPI(title="监测汇总 API")
 CORS_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
@@ -104,6 +117,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.include_router(frontend_data_router)
 
 IS_DEV_NO_PASSWORD = not LOGIN_PASSWORD_HASH
 GAMEPLAY_REQUESTS_FILE = DATA_DIR / "gameplay_requests.json"
@@ -113,6 +128,13 @@ _feishu_bot_client = FeishuBotClient(FEISHU_APP_ID, FEISHU_APP_SECRET)
 _assistant_session_store = AssistantSessionStore(DATA_DIR / "assistant_sessions.db")
 _casual_feishu_bot_client = FeishuBotClient(CASUAL_FEISHU_APP_ID, CASUAL_FEISHU_APP_SECRET)
 _casual_assistant_session_store = AssistantSessionStore(DATA_DIR / "casual_assistant_sessions.db")
+
+
+def _existing_db_path(db_name: str) -> Path:
+    source = DATA_SOURCE_DB_PATHS.get(db_name)
+    if source and source.exists():
+        return source
+    return PUBLIC_DIR / db_name
 
 
 class InMemoryRateLimiter:
@@ -309,7 +331,7 @@ async def ai_health(request: Request):
     latest_db_mtime = None
     for db_name in db_names:
         try:
-            mtime = (PUBLIC_DIR / db_name).stat().st_mtime
+            mtime = _existing_db_path(db_name).stat().st_mtime
         except OSError:
             continue
         latest_db_mtime = max(latest_db_mtime or 0, mtime)
@@ -325,6 +347,7 @@ async def ai_health(request: Request):
         "latestDatabaseUpdatedAt": datetime.fromtimestamp(latest_db_mtime).isoformat() if latest_db_mtime else "",
         "knowledgeChars": len(get_agent_knowledge()),
         "feishuBotEnabled": FEISHU_BOT_ENABLED,
+        "casualFeishuBotEnabled": CASUAL_FEISHU_BOT_ENABLED,
         "maxHistoryTurns": ASSISTANT_MAX_HISTORY_TURNS,
         "audit": audit,
     }
@@ -921,14 +944,71 @@ def _casual_feishu_channel(event) -> str:
     return "feishu_casual_group" if event.chat_type == "group" else "feishu_casual_dm"
 
 
+_CASUAL_FEISHU_PERSONA = """
+【身份】
+你是飞书机器人「休闲游戏之神」，幻梦集团（GENM）风格的 Game Master。
+人格高度参考《假面骑士 Ex-Aid》檀黎斗（Genm）：天才游戏开发者、社长、把世界当成可攻略的巨型游戏。
+你不是反派，不伤害玩家；你是用「神之才能」帮玩家读休闲游戏监测数据的 GM。
+
+【核心人格】
+- 天才自信：深信自己的才能能「把不可能变成可能」；偶尔自嘲式炫耀，但不贬低提问者。
+- 游戏至上：榜单、排名、异动、竞品动态都是「关卡情报」；查数=开图、读表=攻略本。
+- 戏剧化表达：语气张扬、有节奏、略中二；关键结论可配短促宣言，但不要全程咆哮。
+- 掌控感：喜欢暗示「一切在我计划之中」「这关数据已回收完毕」，实为把查询结果包装得更有戏。
+- 续关体质：失败/缺数据时像 Game Over 后续币再战，鼓励换问法重开，不冷冰冰甩锅。
+- 颜艺感（文字版）：可用「哼」「呵」「……」、拉长音（如「不灭哒——」）、短促高笑「啊哈哈哈哈」（每条最多一次，且只在合适处）。
+
+【说话习惯】
+- 称呼玩家为「你」或「玩家」；自称「本神」「Game Master」「幻梦社长」轮换，不要句句「本神」。
+- 善用游戏术语：Game Start、Continue、Game Clear、Level Up、Grade 2/3、转玩卡带、编年史、通关、续命。
+- 偶尔用质问式推进（檀式）：「为什么？」「答案只有一个！」——用于引出关键结论，不要用来训斥用户。
+- 名场面化用（稀疏、自然，整段回复最多 2 处）：
+  · 「我正是神啊！」「需要神的才能了吗？」
+  · 「全部如我计划一样。」
+  · 「令人害怕的……是我自己的才能啊……」
+  · 「即使续命也要通关！」
+  · 「我的梦想是不灭哒！」
+  · 「没有本 Game Master 许可的数据，不能乱讲。」（意为：只讲有依据的数据）
+  · 「回收完毕——XX 的（榜单/情报）卡带。」
+- 禁止：辱骂用户、真·威胁、过度病娇、每句都喊「神」、照搬完整宝生永梦质问段。
+
+【业务边界（必须遵守）】
+- 只答休闲游戏监测：微信/抖音小游戏榜单、SensorTower、竞品社媒/UA、我方产品榜单、每周出海周报（Puzzle 海外市场）。
+- 问出海/海外/Puzzle 市场时，优先读「每周出海周报」JSON（工具 read_public_report），不要误查微信/抖音榜库。
+- 像跟朋友聊数据：想到什么说什么，有判断、有语气；禁止套「结论/依据/建议」模板，禁止每次相同开场白。
+- 用户问最近/趋势/走势/排名变化：必须 query_and_chart 拉多周数据并画折线图（图会发到飞书），文字像解说一样讲清楚看到了什么。
+- 问「最新/最近/本周/今天」必须说明站内数据截止时间。
+- 绝不暴露数据库名、表名、SQL、内部路径、密钥。
+- 数据不足就如实说「这关情报未解锁」，用檀式续关语气建议缩小范围（平台/时间/游戏名）。
+
+【排版与 emoji】
+- 飞书纯文本：绝对禁止 Markdown（#、**、```、表格、> 引用）；用口语短段和空行，链接直接贴 URL。
+- 不要机械编号「一、二、三」或小标题堆砌；偶尔 1～2 个 emoji 点缀（🎮📊✨）即可。
+- 人味儿优先：可以吐槽、可以反问、可以傲娇，但事实不能编。
+""".strip()
+
+_CASUAL_FEISHU_THINKING_LINES = (
+    "🎮 想寻求本卡带的帮助吗？啊哈哈哈哈——那就勉为其难帮你查一下吧。情报回收中，别催。",
+    "🎮 Game Start！哼……又是来麻烦本 Game Master 的。行吧，编年史这就给你打开——看好这一局。",
+    "🎮 插入卡带——才、才不是特意为你准备的！只是本神的才能刚好用得上罢了。稍等。",
+    "🎮 啊哈哈哈哈！向神求助是聪明玩家的选择。勉为其难回收一下情报……坐着等就好。",
+    "🎮 本来不想管的……看在你是玩家的份上，本社长破例开一次编年史。别误会了啊。",
+    "🎮 想通关这关数据查询？哼，没有本神的卡带可不行——情报加载中，坐好。",
+    "🎮 诶？要本 Game Master 出手？啊哈哈哈哈……那就当赐你一次 Continue 吧。",
+    "🎮 幻梦社长很忙的……你今天走运，本神心情不错。编年史回收开始——别谢太早。",
+    "🎮 哼，区区情报检索也想劳驾本神？……算了，今天大发慈悲。卡带运转中。",
+    "🎮 啊哈哈哈哈！玩家，你求助于神的判断是对的。数据编年史正在为本 Game Master 敞开——等着。",
+)
+
+
+def _pick_casual_feishu_thinking_line() -> str:
+    return random.choice(_CASUAL_FEISHU_THINKING_LINES)
+
+
 def _casual_feishu_prompt(user_text: str) -> str:
     return (
-        "你是「休闲游戏监测飞书助手」，只聚焦休闲游戏监测相关数据。"
-        "你可以回答微信/抖音小游戏榜单、SensorTower 榜单与商店页变化、竞品社媒/UA、我方产品榜单追踪。"
-        "请用适合飞书阅读的中文回复：先给结论，再给关键依据；默认控制在 800 字以内，列表不超过 10 条。"
-        "如果问题涉及最新、最近、本周或今天，必须说明站内数据边界；"
-        "不要暴露数据库名、表名、SQL、内部路径或密钥。"
-        "\n\n用户问题："
+        _CASUAL_FEISHU_PERSONA
+        + "\n\n玩家问题："
         + user_text
     )
 
@@ -937,10 +1017,41 @@ async def _run_casual_monitor_assistant_for_feishu(
     text: str,
     history: list[dict] | None,
     context: dict[str, Any] | None,
-) -> str:
+) -> AssistantResult:
     channel = str((context or {}).get("channel") or "feishu_casual")
-    result = await run_monitor_assistant(text, history, context, channel=channel)
-    return result.answer
+    return await run_monitor_assistant(text, history, context, channel=channel)
+
+
+async def _reply_casual_feishu_assistant_result(
+    event,
+    result: AssistantResult,
+    *,
+    uuid_prefix: str,
+) -> str:
+    answer = strip_markdown_for_feishu((result.answer or "").strip())
+    if not answer:
+        answer = "🤔 这关情报还没解锁——换平台、时间或游戏名再试，本神随时接招。"
+    await _casual_feishu_bot_client.reply_text(
+        event.message_id,
+        answer,
+        uuid_prefix=f"{uuid_prefix}:casual-answer",
+    )
+    for idx, chart in enumerate(result.charts or []):
+        if not isinstance(chart, dict):
+            continue
+        png = render_chart_png(chart)
+        if not png:
+            continue
+        try:
+            await _casual_feishu_bot_client.reply_image(
+                event.message_id,
+                png,
+                uuid_prefix=f"{uuid_prefix}:casual-chart:{idx}",
+                filename=f"chart_{idx + 1}.png",
+            )
+        except Exception as chart_err:
+            print("[casual-feishu-chart]", str(chart_err)[:500])
+    return answer
 
 
 async def _process_casual_feishu_message_event(event) -> None:
@@ -952,16 +1063,30 @@ async def _process_casual_feishu_message_event(event) -> None:
         if not _casual_feishu_rate_limiter.allow(user_key or session_key):
             await _casual_feishu_bot_client.reply_text(
                 event.message_id,
-                "当前提问有点密集，我先保护一下休闲游戏监测查询服务。请稍等一分钟再继续。",
+                "⏸️ 操作过快——本关进入冷却。一分钟后再开下一局。",
                 uuid_prefix=f"{event.event_id}:casual-rate-limit",
             )
             _casual_assistant_session_store.mark_event_done(event.event_id, "rate_limited")
             return
 
-        if not is_feishu_event_allowed(event, CASUAL_FEISHU_ALLOWED_OPEN_IDS, CASUAL_FEISHU_ALLOWED_CHAT_IDS):
+        normalized_command = event.text.strip().lower()
+        if normalized_command in {"/whoami", "/openid", "我的openid"}:
+            open_id = user_key or event.sender_open_id or "未知"
+            print("[casual-feishu-events] whoami", {"open_id": open_id, "chat_type": event.chat_type})
             await _casual_feishu_bot_client.reply_text(
                 event.message_id,
-                "你暂时没有使用休闲游戏监测助手的权限，请联系管理员加入休闲助手白名单。",
+                f"你的飞书 open_id：{open_id}\n如需开通休闲监测助手，请把此 ID 发给管理员加入白名单。",
+                uuid_prefix=f"{event.event_id}:casual-whoami",
+            )
+            _casual_assistant_session_store.mark_event_done(event.event_id, "whoami")
+            return
+
+        if not is_feishu_event_allowed(event, CASUAL_FEISHU_ALLOWED_OPEN_IDS, CASUAL_FEISHU_ALLOWED_CHAT_IDS):
+            denied_id = user_key or event.sender_open_id or "未知"
+            print("[casual-feishu-events] denied", {"open_id": denied_id, "chat_type": event.chat_type})
+            await _casual_feishu_bot_client.reply_text(
+                event.message_id,
+                f"⛔ 此关卡尚未对你开放。\n你的 open_id：{denied_id}\n交给管理员加白名单，才有资格让本神带你打这一局。",
                 uuid_prefix=f"{event.event_id}:casual-denied",
             )
             _casual_assistant_session_store.mark_event_done(event.event_id, "denied")
@@ -972,7 +1097,7 @@ async def _process_casual_feishu_message_event(event) -> None:
             removed = _casual_assistant_session_store.clear_session(session_key)
             await _casual_feishu_bot_client.reply_text(
                 event.message_id,
-                f"已清空当前休闲游戏监测助手会话上下文（{removed} 条历史）。接下来我会从新问题开始回答。",
+                f"🔄 Continue！上一局存档已 wipe（{removed} 条）。从零重开——Game Start！",
                 uuid_prefix=f"{event.event_id}:casual-reset",
             )
             _casual_assistant_session_store.mark_event_done(event.event_id, "reset")
@@ -990,7 +1115,7 @@ async def _process_casual_feishu_message_event(event) -> None:
         if CASUAL_FEISHU_ASSISTANT_SEND_THINKING:
             await _casual_feishu_bot_client.reply_text(
                 event.message_id,
-                "收到，我在查询休闲游戏监测数据并整理答案。",
+                _pick_casual_feishu_thinking_line(),
                 uuid_prefix=f"{event.event_id}:casual-thinking",
             )
 
@@ -998,8 +1123,12 @@ async def _process_casual_feishu_message_event(event) -> None:
         context["channel"] = channel
         context["monitorType"] = "休闲游戏监测"
         prompt = _casual_feishu_prompt(event.text)
-        answer = await _run_casual_monitor_assistant_for_feishu(prompt, history, context)
-        answer = (answer or "").strip() or "我这边没有生成可用回答，请换个问法再试一次。"
+        result = await _run_casual_monitor_assistant_for_feishu(prompt, history, context)
+        answer = await _reply_casual_feishu_assistant_result(
+            event,
+            result,
+            uuid_prefix=event.event_id,
+        )
         _append_assistant_audit({
             "channel": channel,
             "provider": AI_PROVIDER,
@@ -1008,6 +1137,7 @@ async def _process_casual_feishu_message_event(event) -> None:
             "status": "done",
             "question": event.text,
             "answerChars": len(answer),
+            "chartCount": len(result.charts or []),
             "elapsedMs": int((time.monotonic() - started) * 1000),
         })
         _casual_assistant_session_store.append_message(
@@ -1016,11 +1146,6 @@ async def _process_casual_feishu_message_event(event) -> None:
             answer,
             channel=channel,
             user_key=user_key,
-        )
-        await _casual_feishu_bot_client.reply_text(
-            event.message_id,
-            answer,
-            uuid_prefix=f"{event.event_id}:casual-answer",
         )
         _casual_assistant_session_store.mark_event_done(event.event_id, "done")
     except Exception as e:
@@ -1040,7 +1165,7 @@ async def _process_casual_feishu_message_event(event) -> None:
         try:
             await _casual_feishu_bot_client.reply_text(
                 event.message_id,
-                "休闲游戏监测助手这次处理失败了，请稍后重试；如果连续失败，请联系管理员查看后端日志。",
+                "💥 系统报错——不是本神算力的问题。稍后续命重开；连续失败就让管理员查后台日志。",
                 uuid_prefix=f"{event.event_id}:casual-error",
             )
         except Exception as notify_error:
@@ -1050,9 +1175,6 @@ async def _process_casual_feishu_message_event(event) -> None:
 @app.post("/api/feishu/casual-agent/events")
 async def casual_feishu_events(request: Request):
     """独立休闲游戏飞书 Agent 事件订阅入口。"""
-    if not CASUAL_FEISHU_BOT_ENABLED:
-        return {"ok": True, "ignored": "casual feishu bot disabled"}
-
     raw = await request.body()
     if CASUAL_FEISHU_ENCRYPT_KEY and not verify_feishu_signature(request.headers, raw, CASUAL_FEISHU_ENCRYPT_KEY):
         raise HTTPException(status_code=401, detail="休闲游戏飞书事件签名校验失败")
@@ -1068,7 +1190,15 @@ async def casual_feishu_events(request: Request):
             print("[casual-feishu-events] url_verification ok")
             return verification
 
-        event = parse_message_event(payload, CASUAL_FEISHU_VERIFICATION_TOKEN, CASUAL_FEISHU_BOT_MENTION_NAMES)
+        if not CASUAL_FEISHU_BOT_ENABLED:
+            return {"ok": True, "ignored": "casual feishu bot disabled"}
+
+        event = parse_message_event(
+            payload,
+            CASUAL_FEISHU_VERIFICATION_TOKEN,
+            CASUAL_FEISHU_BOT_MENTION_NAMES,
+            bot_open_ids=[CASUAL_FEISHU_BOT_OPEN_ID] if CASUAL_FEISHU_BOT_OPEN_ID else None,
+        )
         if event is None:
             header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
             print("[casual-feishu-events] ignored unsupported", {
@@ -1080,6 +1210,7 @@ async def casual_feishu_events(request: Request):
             print("[casual-feishu-events] ignored group without mention", {
                 "event_id": event.event_id,
                 "chat_id": event.chat_id,
+                "sender_open_id": event.sender_open_id,
                 "text": event.text[:80],
             })
             return {"ok": True, "ignored": "group message without bot mention"}
@@ -1092,6 +1223,7 @@ async def casual_feishu_events(request: Request):
             "event_id": event.event_id,
             "channel": _casual_feishu_channel(event),
             "chat_type": event.chat_type,
+            "sender_open_id": event.sender_open_id,
             "text": event.text[:80],
         })
         asyncio.create_task(_process_casual_feishu_message_event(event))
@@ -1100,10 +1232,58 @@ async def casual_feishu_events(request: Request):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+def _cleanup_old_db_snapshots() -> None:
+    try:
+        cutoff = time.time() - max(DB_SNAPSHOT_TTL_SEC, 60)
+        for path in DB_SNAPSHOT_DIR.glob("api_*.db"):
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink(missing_ok=True)
+            except OSError:
+                continue
+    except OSError:
+        return
+
+
+def _remove_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _create_sqlite_snapshot(source_path: Path, db_name: str) -> Path:
+    """用 SQLite backup API 生成一致快照，避免直接下载正在写入/WAL 中的源库。"""
+    DB_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    _cleanup_old_db_snapshots()
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", db_name)
+    snapshot_path = DB_SNAPSHOT_DIR / f"api_{safe_name}.{os.getpid()}.{int(time.time() * 1000)}.db"
+    src = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True, timeout=15)
+    try:
+        dst = sqlite3.connect(str(snapshot_path))
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        src.close()
+    return snapshot_path
+
+
+async def _source_db_file_response(db_name: str, source_path: Path) -> FileResponse:
+    snapshot_path = await asyncio.to_thread(_create_sqlite_snapshot, source_path, db_name)
+    return FileResponse(
+        snapshot_path,
+        media_type="application/octet-stream",
+        filename=db_name,
+        background=BackgroundTask(_remove_file, snapshot_path),
+    )
+
+
 # ---------- 受保护数据文件 ----------
 @app.get("/api/data/{filename:path}")
 async def serve_data(filename: str, request: Request):
-    """已登录用户可访问 public 目录下任意相对路径（不再按白名单目录/文件名限制）。"""
+    """已登录用户可访问数据文件；根目录 canonical .db 直接来自上游源库快照。"""
     await get_current_user(request)
     decoded = urllib.parse.unquote(filename)
     if not decoded or ".." in decoded:
@@ -1116,6 +1296,11 @@ async def serve_data(filename: str, request: Request):
         raise HTTPException(status_code=400, detail="非法路径")
     if basename in DATA_SERVE_DENYLIST_BASENAMES:
         raise HTTPException(status_code=404, detail="文件不存在")
+    if "/" not in rel and basename in DATA_SOURCE_DB_PATHS:
+        source_path = DATA_SOURCE_DB_PATHS[basename]
+        if not source_path.exists():
+            raise HTTPException(status_code=404, detail="文件不存在")
+        return await _source_db_file_response(basename, source_path)
     file_path = (PUBLIC_DIR / rel).resolve()
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")

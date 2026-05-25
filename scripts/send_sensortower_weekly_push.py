@@ -992,18 +992,18 @@ def push_game_weekly_message(
 ) -> None:
     """根据标题与内容发送到已配置的飞书/企微（SensorTower 标题会拆多条企微）。feishu_only=True 时只发飞书。
     feishu_segments 非空时飞书走 column_set 列式卡片；body_wecom 非空时企微用其正文（无行内应用图），否则回退 body_feishu。"""
-    feishu = _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
+    feishu = _clean_url(os.environ.get("FEISHU_WEEKLY_WEBHOOK_URL")) or _clean_url(os.environ.get("FEISHU_WEBHOOK_URL"))
     wecom = None if feishu_only else (
         _clean_url(os.environ.get("WECOM_WEBHOOK_URL_REAL")) or _clean_url(os.environ.get("WECOM_WEBHOOK_URL"))
     )
     if not feishu and not wecom:
         print(
-            "未配置 Webhook。请在 .env 中设置 FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL（或 WECOM_WEBHOOK_URL）",
+            "未配置 Webhook。请在 .env 中设置 FEISHU_WEEKLY_WEBHOOK_URL / FEISHU_WEBHOOK_URL 或 WECOM_WEBHOOK_URL_REAL（或 WECOM_WEBHOOK_URL）",
             file=sys.stderr,
         )
         raise SystemExit(1)
     if feishu_only and not feishu:
-        print("已指定仅发飞书，但未配置 FEISHU_WEBHOOK_URL。", file=sys.stderr)
+        print("已指定仅发飞书，但未配置 FEISHU_WEEKLY_WEBHOOK_URL 或 FEISHU_WEBHOOK_URL。", file=sys.stderr)
         raise SystemExit(1)
     body_w = body_wecom if body_wecom is not None else body_feishu
     if feishu:

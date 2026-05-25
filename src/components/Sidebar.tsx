@@ -169,6 +169,11 @@ const Sidebar = ({
               const sensortowerOnlySubItems: { key: CasualGameMainCategory; label: string; icon: string }[] = [
                 { key: '商店页变化', label: '商店页变化', icon: 'SC' },
               ];
+              const overseasSubItem: { key: CasualGameMainCategory; label: string; icon: string } = {
+                key: '出海周报',
+                label: '每周出海周报',
+                icon: 'OS',
+              };
               const competitorSubItems: { key: CasualGameCompetitorSub; label: string; icon: string }[] = [
                 { key: '社媒更新', label: '社媒监控', icon: 'SM' },
                 { key: 'UA素材', label: 'UA素材', icon: 'UA' },
@@ -187,6 +192,27 @@ const Sidebar = ({
 
                   {(selectedType === type || (type === '休闲游戏监测' && selectedType === '竞品社媒监控')) && (
                     <div className="ml-4 space-y-3">
+                      <div className="space-y-1">
+                        <div className={groupLabelClass}>
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-line bg-surface text-[10px]">
+                            GL
+                          </span>
+                          <span>出海情报</span>
+                        </div>
+                        <div className="ml-2 space-y-1 border-l border-line pl-2">
+                          <button
+                            type="button"
+                            className={subButtonClass(selectedCasualGameCategory === overseasSubItem.key)}
+                            onClick={() => onCasualGameCategorySelect?.(overseasSubItem.key)}
+                          >
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-xs">
+                              {overseasSubItem.icon}
+                            </span>
+                            <span className="flex-1 truncate">{overseasSubItem.label}</span>
+                          </button>
+                        </div>
+                      </div>
+
                       {/* 微信 / 抖音 & SensorTower 两个大块 */}
                       {casualSourceSections.map((section) => (
                         <div key={section.id} className="space-y-1">

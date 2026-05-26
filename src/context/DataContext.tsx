@@ -43,9 +43,12 @@ import type {
   CasualGameMainCategory,
   AiCreativeLibraryItem,
 } from '../types';
+import { DataLoadProgressBar } from '../components/DataLoadProgressBar';
 
 interface DataContextValue {
   dataLoading: boolean;
+  /** 0–100，并行数据源完成比例 */
+  dataLoadProgress: number;
   monitorItems: MonitorItem[];
   weeklyReports: MonitorItem[];
   aiProductRankings: GameRanking[];
@@ -182,6 +185,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [monitorItems, setMonitorItems] = useState<MonitorItem[]>([]);
   const [weeklyReports, setWeeklyReports] = useState<MonitorItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [dataLoadProgress, setDataLoadProgress] = useState(0);
 
   // 鉴权完成前勿拉数据：否则 authMode 仍为初始 static，会误用静态 .db 路径（deploy:api 下 404）
   const shouldLoadData = !authLoading && (authMode === 'static' || user);
@@ -191,14 +195,26 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!shouldLoadData) return;
     const loadData = async () => {
+      setDataLoading(true);
+      setDataLoadProgress(0);
+
       // 避免 sql.js 模块级缓存锁死：曾 401/静态 404 后永久 null，改走 API 也不重拉
       resetSensorTowerDatabaseCache();
       resetGameplayDatabaseCache();
       resetOurProductDatabaseCache();
 
+      const loadTaskCount = 18;
+      let completedTasks = 0;
+      const trackLoad = <T,>(promise: Promise<T>): Promise<T> =>
+        promise.finally(() => {
+          completedTasks += 1;
+          setDataLoadProgress(Math.min(99, Math.round((completedTasks / loadTaskCount) * 100)));
+        });
+
       // 超时保护：避免大文件/慢网络导致永远停在「数据加载中」
       const timeoutMs = 28000;
       const timeoutId = setTimeout(() => {
+        setDataLoadProgress(100);
         setDataLoading(false);
       }, timeoutMs);
 
@@ -238,72 +254,104 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
           ourProductDailyItems,
           ourProductAnalytics,
         ] = await Promise.all([
-          loadUsGameRankingsFromCSVs(csvConfig).catch((error) => {
-            console.error('Failed to load game rankings from CSVs:', error);
-            return [];
-          }),
-          loadReportsData(getDataUrlFn).catch((error) => {
-            console.error('Failed to load reports data:', error);
-            return { wechatDouyinRankings: [], wechatDouyinRankingsByWeek: [], newGameItems: [], newPlayItems: [], weeklyBriefItems: [] };
-          }),
-          loadOverseasWeeklyReportItems(getDataUrlFn).catch((error) => {
-            console.error('Failed to load overseas weekly reports:', error);
-            return [];
-          }),
-          loadWeeklyReportsFromDatabase(dbUrl).catch((error) => {
-            console.error('Failed to load weekly reports from database:', error);
-            return [];
-          }),
-          loadAllDailyReports(getDataUrlFn).catch((error) => {
-            console.error('Failed to load daily reports:', error);
-            return [];
-          }),
-          loadReportDocuments(getDataUrlFn).catch((error) => {
-            console.error('Failed to load report_documents.json:', error);
-            return [];
-          }),
-          loadAiProductUADailyReport(getDataUrlFn).catch(() => null),
-          loadAiUaWeeklyReportFromDb(getDataUrlFn).catch(() => null),
-          loadAiUaCreativeCardsFromDb(getDataUrlFn).catch((error) => {
-            console.error('Failed to load AI UA creative cards from DB:', error);
-            return [];
-          }),
-          loadAiCreativeLibraryFromDb(getDataUrlFn).catch((error) => {
-            console.error('Failed to load AI creative library from DB:', error);
-            return { newItems: [], hotItems: [], surgeItems: [] };
-          }),
-          loadSensorTowerTop100(getDataUrlFn).catch((error) => {
-            console.error('Failed to load SensorTower top100 from DB:', error);
-            return [];
-          }),
-          loadSensorTowerRankChanges(getDataUrlFn).catch((error) => {
-            console.error('Failed to load SensorTower rank changes from DB:', error);
-            return [];
-          }),
-          loadSensorTowerNewTop3StoreCards(getDataUrlFn).catch((error) => {
-            console.error('Failed to load SensorTower new top3 store cards:', error);
-            return [];
-          }),
-          loadSensorTowerStoreChanges(getDataUrlFn).catch((error) => {
-            console.error('Failed to load SensorTower store changes:', error);
-            return [];
-          }),
-          loadSensorTowerRemovedGames(getDataUrlFn).catch((error) => {
-            console.error('Failed to load SensorTower removed games:', error);
-            return [];
-          }),
-          loadSensorTowerTop5Overview(getDataUrlFn).catch((error) => {
-            console.error('Failed to load SensorTower top5 overview:', error);
-            return [];
-          }),
-          loadOurProductDailyItems(getDataUrlFn).catch((error) => {
-            console.error('Failed to load own product daily items:', error);
-            return [];
-          }),
-          loadOurProductRankAnalytics(getDataUrlFn).catch((error) => {
-            console.error('Failed to load own product rank analytics:', error);
-            return null;
-          }),
+          trackLoad(
+            loadUsGameRankingsFromCSVs(csvConfig).catch((error) => {
+              console.error('Failed to load game rankings from CSVs:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadReportsData(getDataUrlFn).catch((error) => {
+              console.error('Failed to load reports data:', error);
+              return { wechatDouyinRankings: [], wechatDouyinRankingsByWeek: [], newGameItems: [], newPlayItems: [], weeklyBriefItems: [] };
+            })
+          ),
+          trackLoad(
+            loadOverseasWeeklyReportItems(getDataUrlFn).catch((error) => {
+              console.error('Failed to load overseas weekly reports:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadWeeklyReportsFromDatabase(dbUrl).catch((error) => {
+              console.error('Failed to load weekly reports from database:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadAllDailyReports(getDataUrlFn).catch((error) => {
+              console.error('Failed to load daily reports:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadReportDocuments(getDataUrlFn).catch((error) => {
+              console.error('Failed to load report_documents.json:', error);
+              return [];
+            })
+          ),
+          trackLoad(loadAiProductUADailyReport(getDataUrlFn).catch(() => null)),
+          trackLoad(loadAiUaWeeklyReportFromDb(getDataUrlFn).catch(() => null)),
+          trackLoad(
+            loadAiUaCreativeCardsFromDb(getDataUrlFn).catch((error) => {
+              console.error('Failed to load AI UA creative cards from DB:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadAiCreativeLibraryFromDb(getDataUrlFn).catch((error) => {
+              console.error('Failed to load AI creative library from DB:', error);
+              return { newItems: [], hotItems: [], surgeItems: [] };
+            })
+          ),
+          trackLoad(
+            loadSensorTowerTop100(getDataUrlFn).catch((error) => {
+              console.error('Failed to load SensorTower top100 from DB:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadSensorTowerRankChanges(getDataUrlFn).catch((error) => {
+              console.error('Failed to load SensorTower rank changes from DB:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadSensorTowerNewTop3StoreCards(getDataUrlFn).catch((error) => {
+              console.error('Failed to load SensorTower new top3 store cards:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadSensorTowerStoreChanges(getDataUrlFn).catch((error) => {
+              console.error('Failed to load SensorTower store changes:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadSensorTowerRemovedGames(getDataUrlFn).catch((error) => {
+              console.error('Failed to load SensorTower removed games:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadSensorTowerTop5Overview(getDataUrlFn).catch((error) => {
+              console.error('Failed to load SensorTower top5 overview:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadOurProductDailyItems(getDataUrlFn).catch((error) => {
+              console.error('Failed to load own product daily items:', error);
+              return [];
+            })
+          ),
+          trackLoad(
+            loadOurProductRankAnalytics(getDataUrlFn).catch((error) => {
+              console.error('Failed to load own product rank analytics:', error);
+              return null;
+            })
+          ),
         ]);
 
         const wechatDouyin = reportsData.wechatDouyinRankings ?? [];
@@ -376,6 +424,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Error loading data:', error);
       } finally {
         clearTimeout(timeoutId);
+        setDataLoadProgress(100);
         setDataLoading(false);
       }
     };
@@ -430,6 +479,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo<DataContextValue>(
     () => ({
       dataLoading,
+      dataLoadProgress,
       monitorItems,
       weeklyReports,
       aiProductRankings,
@@ -451,6 +501,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     }),
     [
       dataLoading,
+      dataLoadProgress,
       monitorItems,
       weeklyReports,
       aiProductRankings,
@@ -470,7 +521,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     ]
   );
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider value={value}>
+      <DataLoadProgressBar />
+      {children}
+    </DataContext.Provider>
+  );
 };
 
 export const useData = () => {

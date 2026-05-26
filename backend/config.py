@@ -77,11 +77,18 @@ CASUAL_FEISHU_ASSISTANT_SEND_THINKING = (
 )
 WECOM_WEBHOOK_URL = _str(os.environ.get("WECOM_WEBHOOK_URL_REAL") or os.environ.get("WECOM_WEBHOOK_URL"))
 
-OPENAI_API_KEY = _str(os.environ.get("OPENAI_API_KEY"))
-OPENAI_BASE_URL = (_str(os.environ.get("OPENAI_BASE_URL")) or "https://api.openai.com/v1").rstrip("/")
+OPENAI_API_KEY = _str(os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
+OPENAI_BASE_URL = (_str(os.environ.get("OPENAI_BASE_URL")) or (
+    "https://openrouter.ai/api/v1"
+    if _str(os.environ.get("OPENROUTER_API_KEY")) and not _str(os.environ.get("OPENAI_API_KEY"))
+    else "https://api.openai.com/v1"
+)).rstrip("/")
 OPENAI_MODEL = _str(os.environ.get("OPENAI_MODEL"), "gpt-4.1-mini")
 # openai=仅对话 | codex=Codex app-server+工具 | openrouter=OpenRouter+多轮 function calling+工具
-AI_PROVIDER = _str(os.environ.get("AI_PROVIDER"), "openai").lower()
+AI_PROVIDER = _str(os.environ.get("AI_PROVIDER"), (
+    "openrouter" if _str(os.environ.get("OPENROUTER_API_KEY")) and not _str(os.environ.get("OPENAI_API_KEY"))
+    else "openai"
+)).lower()
 # OpenRouter 可选：部分场景建议设置站点 Referer（见 https://openrouter.ai/docs）
 OPENROUTER_HTTP_REFERER = _str(os.environ.get("OPENROUTER_HTTP_REFERER"))
 CODEX_APP_SERVER_BIN = _str(os.environ.get("CODEX_APP_SERVER_BIN"), "codex")

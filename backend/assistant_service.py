@@ -178,6 +178,32 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
     if _has_any(text, ("video enhancer", "视频增强", "remaker", "enhancer")):
         add_exact("video_enhancer_pipeline.db")
 
+    # 页面上下文：问法模糊时按当前入口补全 schema（与前端 AiPageContext 对齐）
+    if page_context:
+        mt = str(page_context.get("monitorType") or "")
+        cat = str(page_context.get("casualGameCategory") or "")
+        ai_sub = str(page_context.get("aiProductSub") or "")
+        comp_sub = str(page_context.get("casualCompetitorSub") or "")
+        ranking_section = str(page_context.get("rankingSection") or "")
+        page_title = str(page_context.get("pageTitle") or "")
+
+        if any(token in mt for token in ("AI产品监测", "AI 产品")):
+            add_exact("ai_products_ua.db")
+        if any(token in cat for token in ("商店页变化", "商店页")):
+            add_exact("sensortower_top100.db")
+        if any(token in cat for token in ("周报简要", "新游戏", "玩法")) and not overseas_intent:
+            add_exact("wechatdouyin.db")
+        if any(token in ai_sub for token in ("UA", "素材", "投放", "创意")):
+            add_exact("ai_products_ua.db")
+        if any(token in comp_sub for token in ("社媒", "竞品", "动态")):
+            add_exact("competitor_data.db")
+        if ranking_section == "wechat_douyin":
+            add_exact("wechatdouyin.db")
+        elif ranking_section == "sensortower":
+            add_exact("sensortower_top100.db")
+        if any(token in page_title for token in ("我方产品", "US 免费", "US免费")):
+            add_exact("us_free_appid_weekly.db")
+
     # 趋势/最近类问题：多拉几个时间序列数据源，便于画折线图
     if trend_intent and not overseas_intent:
         for name in (

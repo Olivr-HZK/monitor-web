@@ -1,0 +1,35 @@
+{
+  "name": "sensortower-scripts",
+  "version": "1.0.0",
+  "description": "SensorTower Casual Top100 weekly workflow and reporting scripts",
+  "scripts": {
+    "crawl-google-play": "node scripts/crawl_google_play.js",
+    "fetch-top100": "node scripts/fetch_top100_to_db.js",
+    "generate-changes": "node scripts/generate_rank_changes_from_db.js",
+    "fetch-sales": "node scripts/fetch_top100_sales.js",
+    "workflow-week": "node scripts/workflow_week_rank_changes.js",
+    "weekly-automated": "node scripts/weekly_automated_workflow.js",
+    "setup-cron": "bash scripts/setup_cron.sh",
+    "setup-us-free-daily-cron": "bash scripts/setup_us_free_daily_cron.sh",
+    "setup-arrow-madness-daily-cron": "bash scripts/setup_arrow_madness_daily_cron.sh",
+    "update-app-names": "node scripts/update_app_names_from_metadata.js",
+    "top5-overview": "node scripts/generate_top5_overview.js",
+    "compare-us-free-metadata": "node scripts/fetch_us_free_metadata_and_compare.js",
+    "detect-removed": "node scripts/detect_removed_games.js",
+    "dryrun-weekly": "node scripts/test_weekly_workflow_dryrun.js",
+    "us-free-weekly": "node scripts/us_free_appid_weekly_rank_changes.js",
+    "us-free-weekly-feishu": "node scripts/us_free_appid_weekly_rank_changes.js --feishu-only",
+    "us-free-weekly-wework": "node scripts/us_free_appid_weekly_rank_changes.js --send-wework",
+    "us-free-daily": "node scripts/us_free_appid_weekly_rank_changes.js --daily --no-competitors",
+    "us-free-daily-feishu": "node scripts/us_free_appid_weekly_rank_changes.js --daily --no-competitors --feishu-only",
+    "us-free-daily-wework": "node scripts/us_free_appid_weekly_rank_changes.js --daily --no-competitors --wework-only",
+    "copy-arrow2-us-free": "node scripts/copy_arrow_madness_to_us_free_weekly.js",
+    "arrow-madness-daily-competitors": "node scripts/arrow_madness_daily_competitors.js",
+    "arrow-madness-daily-competitors-no-feishu": "node scripts/arrow_madness_daily_competitors.js --no-feishu",
+    "migrate-competitors-to-us-free": "node scripts/migrate_competitors_daily_to_us_free.js"
+  },
+  "dependencies": {
+    "playwright": "^1.58.1",
+    "sql.js": "^1.14.1"
+  }
+}

@@ -1,0 +1,327 @@
+{
+  "competitors": [
+    {
+      "name": "voodoo",
+      "priority": "high",
+      "platforms": [
+        {
+          "username": "voodooplatform",
+          "url": "https://x.com/voodooplatform",
+          "type": "twitter",
+          "enabled": false,
+          "user_id": "1471440541548224512"
+        },
+        {
+          "username": "voodoo.io",
+          "url": "https://www.instagram.com/voodoo.io/",
+          "type": "instagram",
+          "enabled": true
+        }
+      ],
+      "games": [
+        {
+          "name": "papers.io",
+          "platforms": [
+            {
+              "username": "gamepaper.io2",
+              "type": "tiktok",
+              "enabled": true,
+              "sec_uid": "MS4wLjABAAAA97P4TH9njxqDHqdftTvymu5lJES_A9AkvN7cnelhs6D6J-6dh_GC2rlXj1OuIn6D"
+            },
+            {
+              "channel_id": "UC7JNRW7j8oHqiGBNfXeJn4Q",
+              "type": "youtube",
+              "enabled": true
+            },
+            {
+              "username": "paper.io2game",
+              "type": "instagram",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "name": "mob control",
+          "platforms": [
+            {
+              "username": "gamemobcontrol",
+              "type": "tiktok",
+              "enabled": true,
+              "sec_uid": "MS4wLjABAAAAFUdOIGn8NFIfKzTz_w1lR5axsuSmvqwVgyjAkW4Z_M1Ne49AaugARlmiJ8iAUSbi"
+            },
+            {
+              "username": "mobcontrolgame",
+              "type": "instagram",
+              "enabled": true
+            },
+            {
+              "channel_id": "UCQs6Z88WlGFyMtuZeCv62Dg",
+              "type": "youtube",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dream games",
+      "priority": "high",
+      "platforms": [
+        {
+          "username": "dreamgames",
+          "type": "twitter",
+          "enabled": false,
+          "user_id": "1140560459449458688"
+        },
+        {
+          "username": "dreamgames",
+          "page_id": "351200148924894",
+          "type": "facebook",
+          "enabled": false
+        },
+        {
+          "username": "dreamgames",
+          "type": "instagram",
+          "enabled": true
+        }
+
+      ],
+      "games": [
+        {
+          "name": "royal match",
+          "platforms": [
+            {
+              "username": "Royal Match",
+              "type": "facebook",
+              "enabled": false,
+              "page_id": "634112870563430"
+            },
+            {
+              "username": "Royal Match",
+              "type": "instagram",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "name": "Royal Kingdom",
+          "platforms": [
+            {
+              "username": "RoyalKingdom",
+              "type": "youtube",
+              "enabled": true,
+              "channel_id": "UCCqjDoaMWl5I5-xHeLJHEig"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "King",
+      "priority": "high",
+      "platforms": [
+        {
+          "url": "https://www.linkedin.com/company/king",
+          "type": "linkedin",
+          "enabled": false
+        },
+        {
+          "username": "King_Games",
+          "url": "https://x.com/King_Games",
+          "type": "twitter",
+          "user_id": "30028228",
+          "enabled": false
+        },
+        {
+          "username": "lifeatking",
+         "type": "instagram",
+         "enabled": true
+        },
+        {
+          "channel_id": "UCw_LCWreyWaFKRGBuORlaFw",
+          "url": "https://www.youtube.com/@KingOnlineGames",
+          "type": "youtube",
+          "enabled": true
+        },
+        {
+          "page_id": "405162889610751",
+          "url": "https://www.facebook.com/King",
+          "type": "facebook",
+          "enabled": false
+        }
+        ],
+        "games":
+        [
+          {
+            "name": "Candy Crush Saga",
+            "platforms":
+            [
+              {
+              "url": "https://www.facebook.com/CandyCrushSaga",
+              "type": "facebook",
+              "page_id": "244944385603396",
+              "enabled": false
+            },
+            {
+              "username": "candycrushsaga",
+              "url": "https://www.instagram.com/candycrushsaga",
+              "type": "instagram",
+              "enabled": true
+            },
+            {
+              "channel_id": "UCOUh2z8YkidOzPLBXPMv33A",
+              "url": "https://www.youtube.com/@CandyCrushSagaOfficial",
+              "type": "youtube",
+              "enabled": true
+            },
+            {
+              "username": "CandyCrushSaga",
+              "url": "https://x.com/CandyCrushSaga",
+              "type": "twitter",
+              "user_id": "592700022",
+              "enabled": true
+            }
+            ]
+          },
+            {
+              "name": "Candy Crush Soda Saga",
+              "platforms":
+              [
+                {
+                  "url":"https://www.facebook.com/CandyCrushSodaSaga",
+                  "page_id": "669947926411298",
+                  "type": "facebook",
+                  "enabled": false
+                },
+                {
+                  "username": "candysodasaga",
+                  "url": "https://www.instagram.com/candysodasaga",
+                  "type": "instagram",
+                  "enabled": true
+                },
+                {
+                  "channel_id": "UCOUh2z8YkidOzPLBXPMv33A",
+                  "url": "https://www.youtube.com/@CandyCrushSagaOfficial",
+                  "type": "youtube",
+                  "enabled": true
+                },
+                {
+                "username": "CandyCrushSoda",
+                "user_id": "2534567084",
+                "url": "https://x.com/CandyCrushSoda",
+                "type": "twitter",
+                "enabled": true
+                }]},
+            {
+              "name": "Farm Heroes Saga",
+              "platforms":
+                [
+                  {
+                    "url": "https://www.facebook.com/FarmHeroes",
+                    "page_id": "416898068399728",
+                    "type": "facebook",
+                    "enabled": false
+                  },
+                  {
+                    "username": "farmheroessaga",
+                    "url": "https://www.instagram.com/farmheroessaga",
+                    "type": "instagram",
+                    "enabled": true
+                  },
+                  {
+                    "channel_id": "UCO9FCipLjcyNOPKzO7CuPug",
+                    "url": "https://www.youtube.com/user/FarmHeroesOfficial",
+                    "type": "youtube",
+                    "enabled": false
+                  },
+                  {
+                    "username": "farmheroessaga",
+                    "user_id": "1229343619",
+                    "url": "https://x.com/FarmHeroesSaga",
+                    "type": "twitter",
+                    "enabled": true
+                    }
+                  ]
+                }
+              ]
+            },
+    {
+      "name": "Homa",
+      "priority": "high",
+      "platforms": [
+        {
+          "username": "HomaGames",
+          "type": "tiktok",
+          "enabled": true,
+          "sec_uid": "MS4wLjABAAAAR-f8OILJM7v_pQ6X8pfEkHmhNxNXbguvwmEp_rfufaNZAL-87NFiG9OXUlwmLcMV"
+        },
+        {
+          "channel_id": "UCuJedok6iKCcJGVINI-dUVg",
+          "type": "youtube",
+          "enabled": false
+        },
+        {
+          "username": "homagames",
+          "type": "instagram",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "name": "Hungry Studio",
+      "priority": "high",
+      "games": [
+        {
+          "name": "Block Blast",
+          "platforms": [
+            {
+              "username": "BlockBlastSquad",
+              "type": "twitter",
+              "enabled": true,
+              "user_id": "1822950649929105408"
+            },
+            {
+              "username": "BlockBlastOfficial",
+              "type": "tiktok",
+              "enabled": true,
+              "sec_uid": "MS4wLjABAAAAre69Db79-jXYVxrrXMoREtDfbUdLrf0K_PV4XGMUZ8zQsfNFq7hsh9oubUa0dJAr"
+            },
+            {
+              "channel_id": "UCk5NU_he9qgn_ny6m8vLrKw",
+              "type": "youtube",
+              "enabled": true
+            },
+            {
+              "username": "blockblastglobal",
+              "type": "instagram",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vita studio",
+      "priority": "high",
+      "games": [
+        {
+          "name": "Vita Mahjong",
+          "platforms": [
+            {
+              "url": "https://www.facebook.com/p/Vita-Mahjong-61561738276462/",
+              "type": "facebook",
+              "enabled": true,
+              "page_id": "61561738276462"
+            },
+            {
+              "username": "vitamahjong_official",
+              "type": "tiktok",
+              "enabled": true,
+              "sec_uid": "MS4wLjABAAAAeHUdbQu8DoCa_R3zClxFdJm9vlzsvJlO8siXdelEMD62BMCz7Rs8VPiziarREo59"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

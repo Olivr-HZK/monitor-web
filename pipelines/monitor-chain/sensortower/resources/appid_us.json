@@ -1,0 +1,1476 @@
+[
+    {
+        "internal_name": "Sudoku",
+        "display_name": "Sudoku - Classic Sudoku Puzzle",
+        "product_code": "G-001",
+        "apple_app_id": "1492978794",
+        "google_app_id": "sudoku.puzzle.free.game.brain",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 95,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 72,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 232,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 298,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": null
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 183
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Jigsaw",
+        "display_name": "Jigsaw Puzzles HD Puzzle Games",
+        "product_code": "G-002",
+        "apple_app_id": "1510189987",
+        "google_app_id": "jigsaw.puzzle.free.games",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 163,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 294,
+                        "chart_device": "iphone"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 556
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Jigsaw Art(AI Avart Jigsaw)",
+        "display_name": "Jigsaw Art® - Puzzle Art Games",
+        "product_code": "G-002",
+        "apple_app_id": "6446246671",
+        "google_app_id": "art.puzzle.games.jigsaw.coloring.free.game",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Find-differences（DOF）",
+        "display_name": "Differences - Find Difference",
+        "product_code": "G-004",
+        "apple_app_id": "1522840765",
+        "google_app_id": "puzzle.game.find.differences",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 188,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 420,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": null,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 593
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Killer Sudoku",
+        "display_name": "Killer Sudoku - Sudoku Puzzle",
+        "product_code": "G-006",
+        "apple_app_id": "1549645019",
+        "google_app_id": "killer.sudoku.free.brain.puzzle",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Solitaire",
+        "display_name": "Solitaire - Card Games Classic",
+        "product_code": "G-007",
+        "apple_app_id": "1564391515",
+        "google_app_id": "solitaire.patience.card.games.klondike.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 222,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 149,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 19,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 18,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7005,
+                        "category_name": "category_7005",
+                        "rank": 19,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7005,
+                        "category_name": "category_7005",
+                        "rank": 9,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "all",
+                        "category_name": "all",
+                        "rank": 166
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 46
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_card",
+                        "category_name": "game_card",
+                        "rank": 3
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "DoF2（D2）",
+        "display_name": "Find Differences - Spot it",
+        "product_code": "G-009",
+        "apple_app_id": "1584796659",
+        "google_app_id": "find.differences.puzzle.games.spot.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 454,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Water Sort",
+        "display_name": "Water Sort Puzzle - Sort Color",
+        "product_code": "G-011",
+        "apple_app_id": "1597897013",
+        "google_app_id": "water.sort.puzzle.game.color.sorting.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 349,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 167,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 98,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 207,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 82,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 120,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 160
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 45
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Ball Sort",
+        "display_name": "Ball Sort Puzzle - Color Game",
+        "product_code": "G-015",
+        "apple_app_id": "1625097467",
+        "google_app_id": "ball.sort.puzzle.color.sorting.bubble.games",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 244,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 173,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 394,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 139,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 183,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 286
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 70
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "M2 Block",
+        "display_name": "2048 Merge Games - M2 Blocks",
+        "product_code": "G-016",
+        "apple_app_id": "1620319602",
+        "google_app_id": "merge.blocks.drop.number.puzzle.games",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": null
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Find Out",
+        "display_name": "Find It Out - Hidden Object",
+        "product_code": "G-019",
+        "apple_app_id": "1643481036",
+        "google_app_id": "find.out.hidden.objects.seek.puzzle.games.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 421,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 200,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 202,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 466,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 163,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 146,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 368
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 112
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Spider",
+        "display_name": "Spider Solitaire Classic Games",
+        "product_code": "G-020",
+        "apple_app_id": null,
+        "google_app_id": "spider.solitaire.card.games.free.klondike.patience",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": null,
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_card",
+                        "category_name": "game_card",
+                        "rank": 69
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Parking Jam 3D",
+        "display_name": "Parking Jam 3D - Car Puzzle",
+        "product_code": "G-021",
+        "apple_app_id": "1643116521",
+        "google_app_id": "parking.jam3d.traffic.jam.games.car.puzzle",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Crossmath",
+        "display_name": "Math Puzzle Games - Crossmath",
+        "product_code": "G-023",
+        "apple_app_id": "1671991909",
+        "google_app_id": "math.puzzle.games.crossmath.number.puzzles.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": null,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 56,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 107,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 15,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 41,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 176,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 424
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 107
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Ball Sort2",
+        "display_name": "Ball Sort: Color Puzzle Master",
+        "product_code": "G-026",
+        "apple_app_id": null,
+        "google_app_id": "ball.sort.puzzle.color.game.bubble.sorting.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": null,
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 330
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Find It",
+        "display_name": "Find It - Hidden Object Games",
+        "product_code": "G-030",
+        "apple_app_id": "6474999714",
+        "google_app_id": "hidden.objects.find.it.out.seek.puzzle.games.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 242,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 393,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 333,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 181,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 469
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 122
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Arrow (Tap It Away)",
+        "display_name": "Tap It Away - 3D Blocks Puzzle",
+        "product_code": "G-035",
+        "apple_app_id": null,
+        "google_app_id": "tap.away.out.tapout.master.cube.block.puzzle.games",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": null,
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 377
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Mahjong Solitaire",
+        "display_name": "Mahjong Solitaire Classic Game",
+        "product_code": "G-037",
+        "apple_app_id": "6504851426",
+        "google_app_id": "mahjong.solitaire.card.games.free.senior.match.puzzle",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 109,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 140,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 416,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 362,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_board",
+                        "category_name": "Game/Board",
+                        "rank": 93
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Goods Sort",
+        "display_name": "Goods Triple Match: Sorting 3D",
+        "product_code": "G-038",
+        "apple_app_id": "6499306806",
+        "google_app_id": "sorting.games.goods.sort.triple.match3d.puzzle.stuff",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 0,
+                        "category_name": "category_0",
+                        "rank": 166,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 150,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 57,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 32,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 67,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 77,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 42,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 427
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 135
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "NM Sudoku",
+        "display_name": "Sudoku - Classic Sudoku Games",
+        "product_code": "G-039",
+        "apple_app_id": "6550913213",
+        "google_app_id": "sudoku.puzzle.brain.games.number.puzzles.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 238,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 265,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "APFindDifference (apfd)",
+        "display_name": "Differences - Find & Spot It",
+        "product_code": "G-040",
+        "apple_app_id": "6504279468",
+        "google_app_id": "find.difference.spot.differences.hidden.puzzle.games.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 257,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 25,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 95,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 145,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 38,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 420,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 266
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 78
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Nuts Sort",
+        "display_name": "Nuts Color Sort: Sorting Games",
+        "product_code": "G-041",
+        "apple_app_id": "6739414342",
+        "google_app_id": "nuts.sort.nut.bolts.color.sorting.screw.puzzle.games",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Find Master",
+        "display_name": "Hidden Objects: Seek & Find It",
+        "product_code": "G-042",
+        "apple_app_id": "6590618349",
+        "google_app_id": "find.hidden.objects.out.scavenger.hunt.puzzle.games.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": null
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Word Search",
+        "display_name": "Word Search: Word Puzzle Games",
+        "product_code": "G-046",
+        "apple_app_id": null,
+        "google_app_id": "word.search.puzzle.games.free.puzzles.find.words.explorer",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": null,
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 569
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Number Match",
+        "display_name": "Number Match - Number Game",
+        "product_code": "G-047",
+        "apple_app_id": "6739208242",
+        "google_app_id": "number.match.numbers.math.games.free.puzzle.digit",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 210,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 230,
+                        "chart_device": "iphone"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 310
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Nuts Puzzle",
+        "display_name": "Nut Sort Puzzle - Color Sort",
+        "product_code": "G-048",
+        "apple_app_id": "6737799378",
+        "google_app_id": "nuts.sort.bolts.nut.color.game.free.screw.puzzle",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 229,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 188,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 403,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 384
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Ten and Pair",
+        "display_name": "Number Games - Ten & Pair",
+        "product_code": "G-049",
+        "apple_app_id": "6739333336",
+        "google_app_id": "number.games.match.numbers.ten.puzzle.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 410,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": null,
+                        "chart_device": "iphone"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Hexa Away",
+        "display_name": "Hexa Run: Hexa Puzzle Game",
+        "product_code": "G-050",
+        "apple_app_id": "6739333674",
+        "google_app_id": "hexa.away.game.tap.block.off.color.puzzle.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 426,
+                        "chart_device": "iphone"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": null
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Color Block Jam",
+        "display_name": "Block Color Mania, Puzzle Game",
+        "product_code": "G-052",
+        "apple_app_id": "6744049261",
+        "google_app_id": "block.color.game.jam.blocks.sort.puzzle.games.slide.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 105,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7004,
+                        "category_name": "Games/Board",
+                        "rank": 122,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 362,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 352,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": null
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 168
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Color Block Jam",
+        "display_name": "Block Puzzle - Puzzle Games",
+        "product_code": "G-052",
+        "apple_app_id": null,
+        "google_app_id": "blockpuzzle.game.block.puzzle",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": null,
+            "android": {
+                "charts": [],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Find Object",
+        "display_name": "Hidden Object Games: Seek It",
+        "product_code": "G-057",
+        "apple_app_id": "6751270213",
+        "google_app_id": "hidden.object.find.seek.search.mystery.puzzle.games.free",
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 163,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 81,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": 88,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": 189,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 75,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": 61,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "all",
+                        "category_name": "all",
+                        "rank": null
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": 122
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": 34
+                    }
+                ],
+                "fetched_at": "2026-04-08T07:25:18.509Z"
+            }
+        }
+    },
+    {
+        "internal_name": "Arrow2",
+        "display_name": "Arrow Madness: Tap Arrows Away",
+        "product_code": "G-058",
+        "apple_app_id": "6756872090",
+        "google_app_id": "com.arrow.madness.games.arrows.escape.puzzle.game",
+        "competitors": [
+            {
+                "name": "Arrows Puzzle Escape",
+                "apple_app_id": "6748397500",
+                "google_app_id": "com.ecffri.arrows"
+            },
+            {
+                "name": "Arrows GO!",
+                "apple_app_id": "6758326278",
+                "google_app_id": "com.oakever.arrows"
+            },
+            {
+                "name": "Arrow Puzzle: Tap Puzzle Games",
+                "apple_app_id": "6755482314",
+                "google_app_id": "com.easybrain.arrow.puzzle.game"
+            },
+            {
+                "name": "Snake Escape",
+                "apple_app_id": "6753841130",
+                "google_app_id": "com.snake.escape.maze.slither.puzzle"
+            },
+            {
+                "name": "Arrow Out",
+                "apple_app_id": "6754243057",
+                "google_app_id": "com.arrow.out"
+            },
+            {
+                "name": "Arrowscapes",
+                "apple_app_id": "6755216191",
+                "google_app_id": "com.red.arrows.android"
+            }
+        ],
+        "us_free_category_ranking_summary": {
+            "country": "US",
+            "ios": {
+                "charts": [
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": null,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": null,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": null,
+                        "chart_device": "iphone"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 6014,
+                        "category_name": "Games",
+                        "rank": null,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7003,
+                        "category_name": "Games/Casual",
+                        "rank": null,
+                        "chart_device": "ipad"
+                    },
+                    {
+                        "chart_type_id": "topfreeipadapplications",
+                        "category_id": 7012,
+                        "category_name": "Games/Puzzle",
+                        "rank": null,
+                        "chart_device": "ipad"
+                    }
+                ],
+                "fetched_at": "2026-04-08T12:00:00.000Z"
+            },
+            "android": {
+                "charts": [
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game",
+                        "category_name": "Game",
+                        "rank": null
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_casual",
+                        "category_name": "Game/Casual",
+                        "rank": null
+                    },
+                    {
+                        "chart_type_id": "topselling_free",
+                        "category_id": "game_puzzle",
+                        "category_name": "Game/Puzzle",
+                        "rank": null
+                    }
+                ],
+                "fetched_at": "2026-04-08T12:00:00.000Z"
+            }
+        }
+    }
+]

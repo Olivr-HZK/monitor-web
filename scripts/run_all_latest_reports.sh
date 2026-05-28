@@ -19,6 +19,7 @@ set -euo pipefail
 # 仓库根目录（本脚本位于 scripts/ 下）
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GURU_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
+LOCAL_DB_DIR="${MONITOR_LOCAL_DB_DIR:-$REPO_ROOT/data/databases}"
 cd "$REPO_ROOT"
 
 echo "[run_all_latest_reports] 仓库根目录：$REPO_ROOT"
@@ -40,10 +41,22 @@ if [ -z "$PYTHON_BIN" ]; then
 fi
 echo "[run_all_latest_reports] Python: $("$PYTHON_BIN" --version 2>&1)"
 
-SENSORTOWER_DB="${SENSORTOWER_DB:-$GURU_ROOT/sensortower-/data/sensortower_top100.db}"
-COMPETITOR_DB="${COMPETITOR_DB:-$GURU_ROOT/Olivr-competitor-monitor/db/competitor_data.db}"
-WECHAT_DB="${WECHAT_DB:-$GURU_ROOT/wechat-mini-game-ranking-post/data/wechatdouyin.db}"
-OUR_PRODUCT_DB="${OUR_PRODUCT_DB:-$GURU_ROOT/sensortower-/data/us_free_appid_weekly.db}"
+prefer_local_db() {
+  local local_path="$1"
+  local fallback_path="$2"
+  if [ -f "$local_path" ]; then
+    printf '%s\n' "$local_path"
+  else
+    printf '%s\n' "$fallback_path"
+  fi
+}
+
+SENSORTOWER_DB="${SENSORTOWER_DB:-$(prefer_local_db "$LOCAL_DB_DIR/sensortower_top100.db" "$GURU_ROOT/sensortower-/data/sensortower_top100.db")}"
+COMPETITOR_DB="${COMPETITOR_DB:-$(prefer_local_db "$LOCAL_DB_DIR/competitor_data.db" "$GURU_ROOT/Olivr-competitor-monitor/db/competitor_data.db")}"
+WECHAT_DB="${WECHAT_DB:-$(prefer_local_db "$LOCAL_DB_DIR/wechatdouyin.db" "$GURU_ROOT/wechat-mini-game-ranking-post/data/wechatdouyin.db")}"
+OUR_PRODUCT_DB="${OUR_PRODUCT_DB:-$(prefer_local_db "$LOCAL_DB_DIR/us_free_appid_weekly.db" "$GURU_ROOT/sensortower-/data/us_free_appid_weekly.db")}"
+
+echo "[run_all_latest_reports] DB 目录优先级：$LOCAL_DB_DIR -> 上游旧仓库"
 
 echo "[1/3] 发送 SensorTower 榜单周报（游戏检测 - SensorTower）..."
 "$PYTHON_BIN" scripts/send_sensortower_weekly_push.py --db "$SENSORTOWER_DB" || echo "[警告] send_sensortower_weekly_push.py 发送失败"

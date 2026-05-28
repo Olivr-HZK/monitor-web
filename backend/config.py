@@ -105,27 +105,48 @@ AI_CHAT_REQUIRE_AUTH = os.environ.get("NODE_ENV") == "production" and os.environ
 PUBLIC_DIR = Path(os.environ.get("PUBLIC_DIR", _PROJECT_ROOT / "public")).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", _PROJECT_ROOT / "data")).resolve()
 MONITOR_SOURCE_ROOT = Path(os.environ.get("MONITOR_SOURCE_ROOT", _PROJECT_ROOT.parent)).resolve()
+MONITOR_LOCAL_DB_DIR = Path(os.environ.get("MONITOR_LOCAL_DB_DIR", DATA_DIR / "databases")).resolve()
 
 
 def _path_env(name: str, default: Path) -> Path:
     return Path(os.environ.get(name, default)).expanduser().resolve()
 
 
+def _db_path_env(name: str, local: Path, fallback: Path) -> Path:
+    """Resolve a canonical monitor DB path.
+
+    Environment overrides always win. Otherwise prefer the local mirror inside
+    monitor-web/data/databases, while keeping old external repositories as a
+    compatibility fallback during migration.
+    """
+    raw = os.environ.get(name)
+    if raw:
+        return Path(raw).expanduser().resolve()
+    local = local.expanduser().resolve()
+    if local.exists():
+        return local
+    return fallback.expanduser().resolve()
+
+
 DATA_SOURCE_DB_PATHS = {
-    "sensortower_top100.db": _path_env(
+    "sensortower_top100.db": _db_path_env(
         "MONITOR_DB_SENSORTOWER",
+        MONITOR_LOCAL_DB_DIR / "sensortower_top100.db",
         MONITOR_SOURCE_ROOT / "sensortower-" / "data" / "sensortower_top100.db",
     ),
-    "competitor_data.db": _path_env(
+    "competitor_data.db": _db_path_env(
         "MONITOR_DB_COMPETITOR",
+        MONITOR_LOCAL_DB_DIR / "competitor_data.db",
         MONITOR_SOURCE_ROOT / "Olivr-competitor-monitor" / "db" / "competitor_data.db",
     ),
-    "wechatdouyin.db": _path_env(
+    "wechatdouyin.db": _db_path_env(
         "MONITOR_DB_WECHATDOUYIN",
+        MONITOR_LOCAL_DB_DIR / "wechatdouyin.db",
         MONITOR_SOURCE_ROOT / "wechat-mini-game-ranking-post" / "data" / "wechatdouyin.db",
     ),
-    "us_free_appid_weekly.db": _path_env(
+    "us_free_appid_weekly.db": _db_path_env(
         "MONITOR_DB_US_FREE",
+        MONITOR_LOCAL_DB_DIR / "us_free_appid_weekly.db",
         MONITOR_SOURCE_ROOT / "sensortower-" / "data" / "us_free_appid_weekly.db",
     ),
 }

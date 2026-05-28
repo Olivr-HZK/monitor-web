@@ -1,0 +1,20 @@
+{
+    "ios":{
+        "7003": "Games/Casual",
+        "7004": "Games/Board",
+        "7005": "Games/Card",
+        "7012": "Games/Puzzle",
+        "7017": "Games/Strategy",
+        "7018": "Games/Trivia",
+        "7019": "Games/Word"
+          },
+"android":{
+    "game_puzzle": "Games/Puzzle",
+    "game_strategy": "Games/Strategy",
+    "game_trivia": "Games/Trivia",
+    "game_word": "Games/Word",
+    "game_casual": "Games/Casual",
+    "game_board": "Games/Board",
+    "game_card": "Games/Card"
+    }
+}

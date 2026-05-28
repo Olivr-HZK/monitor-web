@@ -20,6 +20,8 @@
 #   MONITOR_API_TOKEN — 可选：用于 /api/data 检查；默认用 backend/.env 的 JWT_SECRET/LOGIN_USERNAME 生成短期 Bearer token
 #   MONITOR_API_DATA_TIMEOUT=60 — /api/data 单库下载超时时间
 #   SYNC_API_DATA_ATTEMPTS=2 / SYNC_API_DATA_RETRY_SLEEP=20 — /api/data 快照校验失败后的重试策略
+#   MONITOR_LOCAL_DB_DIR — monitor-web 内 canonical DB 目录，默认 data/databases
+#   SYNC_SKIP_DB_MIRROR=1 — 不把上游 DB 镜像到 monitor-web/data/databases（迁移期间调试用）
 #   SYNC_SKIP_PUSH=1 — 跳过推送
 #   SYNC_FORCE_PUSH=1 / FORCE_PUSH=1 — 忽略 sent marker，强制重发默认推送
 #   SYNC_PUSH_ATTEMPTS=3 / SYNC_PUSH_RETRY_SLEEP=90 — 单条推送失败（如飞书限流）后的重试策略
@@ -38,7 +40,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 GURU_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 PUBLIC_DIR="$REPO_ROOT/public"
+DATA_DIR="$REPO_ROOT/data"
 LOG_DIR="$REPO_ROOT/logs"
+LOCAL_DB_DIR="${MONITOR_LOCAL_DB_DIR:-$DATA_DIR/databases}"
 REPORT_DATE="${SYNC_REPORT_DATE:-$(date +%Y-%m-%d)}"
 LOG_FILE="$LOG_DIR/sync_dbs_and_deploy_$(date +%Y-%m-%d).log"
 STATUS_FILE="$LOG_DIR/monitor_chain_status_${REPORT_DATE}.md"
@@ -173,14 +177,21 @@ log "REPORT_DATE=$REPORT_DATE | TARGET_WEEK=$TARGET_WEEK_RANGE | PYTHON=$($PYTHO
 status_line "启动：report_date=${REPORT_DATE}，target_week=${TARGET_WEEK_RANGE}"
 
 # 源路径（与 ~/lyb 下各项目一致）
-SENSORTOWER_DB="$GURU_ROOT/sensortower-/data/sensortower_top100.db"
-COMPETITOR_DB="$GURU_ROOT/Olivr-competitor-monitor/db/competitor_data.db"
-COMPETITOR_DB_ALT="${COMPETITOR_DB_ALT:-}"
-WECHAT_DB="$GURU_ROOT/wechat-mini-game-ranking-post/data/wechatdouyin.db"
-OUR_PRODUCT_DB="${OUR_PRODUCT_DB:-$GURU_ROOT/sensortower-/data/us_free_appid_weekly.db}"
-OUR_PRODUCT_DB_ALT="${OUR_PRODUCT_DB_ALT:-$GURU_ROOT/sensortower-/data/us free app id.db}"
+SENSORTOWER_DB="${SENSORTOWER_DB:-$LOCAL_DB_DIR/sensortower_top100.db}"
+SENSORTOWER_DB_ALT="${SENSORTOWER_DB_ALT:-$GURU_ROOT/sensortower-/data/sensortower_top100.db}"
+COMPETITOR_DB="${COMPETITOR_DB:-$LOCAL_DB_DIR/competitor_data.db}"
+COMPETITOR_DB_ALT="${COMPETITOR_DB_ALT:-$GURU_ROOT/Olivr-competitor-monitor/db/competitor_data.db}"
+WECHAT_DB="${WECHAT_DB:-$LOCAL_DB_DIR/wechatdouyin.db}"
+WECHAT_DB_ALT="${WECHAT_DB_ALT:-$GURU_ROOT/wechat-mini-game-ranking-post/data/wechatdouyin.db}"
+OUR_PRODUCT_DB="${OUR_PRODUCT_DB:-$LOCAL_DB_DIR/us_free_appid_weekly.db}"
+OUR_PRODUCT_DB_ALT="${OUR_PRODUCT_DB_ALT:-$GURU_ROOT/sensortower-/data/us_free_appid_weekly.db}"
+OUR_PRODUCT_DB_OLD_NAME="${OUR_PRODUCT_DB_OLD_NAME:-$GURU_ROOT/sensortower-/data/us free app id.db}"
 OUR_PRODUCT_DB_LEGACY="${OUR_PRODUCT_DB_LEGACY:-$GURU_ROOT/sensortower/data/us_free_appid_weekly.db}"
 OUR_PRODUCT_DB_LEGACY_ALT="${OUR_PRODUCT_DB_LEGACY_ALT:-$GURU_ROOT/sensortower/data/us free app id.db}"
+SENSORTOWER_SOURCE="$SENSORTOWER_DB"
+COMPETITOR_SOURCE=""
+WECHAT_SOURCE="$WECHAT_DB"
+OUR_PRODUCT_SOURCE=""
 
 get_cutoff_epoch() {
   local today
@@ -325,11 +336,23 @@ current_competitor_source() {
   fi
 }
 
+current_sensortower_source() {
+  if [[ -f "$SENSORTOWER_DB" ]]; then
+    printf '%s\n' "$SENSORTOWER_DB"
+  elif [[ -n "${SENSORTOWER_DB_ALT:-}" && -f "$SENSORTOWER_DB_ALT" ]]; then
+    printf '%s\n' "$SENSORTOWER_DB_ALT"
+  else
+    printf '%s\n' "$SENSORTOWER_DB"
+  fi
+}
+
 current_our_product_source() {
   if [[ -f "$OUR_PRODUCT_DB" ]]; then
     printf '%s\n' "$OUR_PRODUCT_DB"
   elif [[ -n "${OUR_PRODUCT_DB_ALT:-}" && -f "$OUR_PRODUCT_DB_ALT" ]]; then
     printf '%s\n' "$OUR_PRODUCT_DB_ALT"
+  elif [[ -n "${OUR_PRODUCT_DB_OLD_NAME:-}" && -f "$OUR_PRODUCT_DB_OLD_NAME" ]]; then
+    printf '%s\n' "$OUR_PRODUCT_DB_OLD_NAME"
   elif [[ -n "${OUR_PRODUCT_DB_LEGACY:-}" && -f "$OUR_PRODUCT_DB_LEGACY" ]]; then
     printf '%s\n' "$OUR_PRODUCT_DB_LEGACY"
   elif [[ -n "${OUR_PRODUCT_DB_LEGACY_ALT:-}" && -f "$OUR_PRODUCT_DB_LEGACY_ALT" ]]; then
@@ -339,6 +362,36 @@ current_our_product_source() {
   fi
 }
 
+current_wechat_source() {
+  if [[ -f "$WECHAT_DB" ]]; then
+    printf '%s\n' "$WECHAT_DB"
+  elif [[ -n "${WECHAT_DB_ALT:-}" && -f "$WECHAT_DB_ALT" ]]; then
+    printf '%s\n' "$WECHAT_DB_ALT"
+  else
+    printf '%s\n' "$WECHAT_DB"
+  fi
+}
+
+mirror_databases_to_local() {
+  if [[ "${SYNC_SKIP_DB_MIRROR:-}" == "1" ]]; then
+    log "数据库镜像：已跳过（SYNC_SKIP_DB_MIRROR=1）"
+    return 0
+  fi
+  log "========== 2) 镜像数据库到 monitor-web/data/databases =========="
+  "$PYTHON_BIN" "$SCRIPT_DIR/db/mirror_databases.py" \
+    --dest-dir "$LOCAL_DB_DIR" \
+    --sensortower "$SENSORTOWER_SOURCE" \
+    --competitor "$COMPETITOR_SOURCE" \
+    --wechatdouyin "$WECHAT_SOURCE" \
+    --us-free "$OUR_PRODUCT_SOURCE" >> "$LOG_FILE" 2>&1
+
+  SENSORTOWER_SOURCE="$LOCAL_DB_DIR/sensortower_top100.db"
+  COMPETITOR_SOURCE="$LOCAL_DB_DIR/competitor_data.db"
+  WECHAT_SOURCE="$LOCAL_DB_DIR/wechatdouyin.db"
+  OUR_PRODUCT_SOURCE="$LOCAL_DB_DIR/us_free_appid_weekly.db"
+  status_line "四库已镜像到本项目 data/databases，后端优先读取本项目内数据库"
+}
+
 wait_until_sources_ready() {
   local cutoff_epoch
   cutoff_epoch=$(get_cutoff_epoch)
@@ -346,13 +399,15 @@ wait_until_sources_ready() {
   log "等待源库就绪（今日 ${CUTOFF_HOUR}:00 之后已更新），每 ${WAIT_INTERVAL}s 检查一次，最多等 $((WAIT_MAX / 60)) 分钟"
 
   while true; do
-    local competitor_file our_product_file
+    local sensortower_file competitor_file our_product_file wechat_file
+    sensortower_file="$(current_sensortower_source)"
     competitor_file="$(current_competitor_source)"
     our_product_file="$(current_our_product_source)"
+    wechat_file="$(current_wechat_source)"
 
-    if is_fresh "$SENSORTOWER_DB" "$cutoff_epoch" \
+    if is_fresh "$sensortower_file" "$cutoff_epoch" \
        && is_fresh "$competitor_file" "$cutoff_epoch" \
-       && is_fresh "$WECHAT_DB" "$cutoff_epoch" \
+       && is_fresh "$wechat_file" "$cutoff_epoch" \
        && is_fresh "$our_product_file" "$cutoff_epoch"; then
       log "源库均已就绪"
       status_line "源库 mtime 检查通过（cutoff=${CUTOFF_HOUR}:00）"
@@ -360,9 +415,9 @@ wait_until_sources_ready() {
     fi
 
     if [[ $waited -ge $WAIT_MAX ]]; then
-      log_source_state "SensorTower" "$SENSORTOWER_DB" "$cutoff_epoch"
+      log_source_state "SensorTower" "$sensortower_file" "$cutoff_epoch"
       log_source_state "竞品社媒" "$competitor_file" "$cutoff_epoch"
-      log_source_state "微信/抖音" "$WECHAT_DB" "$cutoff_epoch"
+      log_source_state "微信/抖音" "$wechat_file" "$cutoff_epoch"
       log_source_state "我方产品" "$our_product_file" "$cutoff_epoch"
       if [[ "${SYNC_ALLOW_STALE_SOURCES:-}" == "1" ]]; then
         log_err "等待超时（${WAIT_MAX}s），但 SYNC_ALLOW_STALE_SOURCES=1，继续执行（可能含未更新数据）"
@@ -384,26 +439,34 @@ log "========== 1) 等待上游源库 =========="
 log "监测汇总: $REPO_ROOT | GURU_ROOT: $GURU_ROOT"
 wait_until_sources_ready
 
+SENSORTOWER_SOURCE="$(current_sensortower_source)"
 COMPETITOR_SOURCE="$(current_competitor_source)"
+WECHAT_SOURCE="$(current_wechat_source)"
 OUR_PRODUCT_SOURCE="$(current_our_product_source)"
-log "源库路径：ST=$SENSORTOWER_DB"
+log "源库路径：ST=$SENSORTOWER_SOURCE"
 log "源库路径：竞品=$COMPETITOR_SOURCE"
-log "源库路径：微信/抖音=$WECHAT_DB"
+log "源库路径：微信/抖音=$WECHAT_SOURCE"
 log "源库路径：我方产品=$OUR_PRODUCT_SOURCE"
 status_line "上游源库就绪；monitor-web API 将按请求读取源库快照"
 
-# --- 2) 校验 + 生成本机 API 产物 ---
-log "========== 2) 业务校验 + 生成本机 API 产物 =========="
+# --- 2) 镜像 DB + 校验 + 生成本机 API 产物 ---
+mirror_databases_to_local
+log "本项目数据库路径：ST=$SENSORTOWER_SOURCE"
+log "本项目数据库路径：竞品=$COMPETITOR_SOURCE"
+log "本项目数据库路径：微信/抖音=$WECHAT_SOURCE"
+log "本项目数据库路径：我方产品=$OUR_PRODUCT_SOURCE"
+
+log "========== 3) 业务校验 + 生成本机 API 产物 =========="
 "$PYTHON_BIN" "$SCRIPT_DIR/validate_monitor_chain_sources.py" \
   --report-date "$REPORT_DATE" \
-  --sensortower-db "$SENSORTOWER_DB" \
+  --sensortower-db "$SENSORTOWER_SOURCE" \
   --competitor-db "$COMPETITOR_SOURCE" \
-  --wechat-db "$WECHAT_DB" \
+  --wechat-db "$WECHAT_SOURCE" \
   --our-product-db "$OUR_PRODUCT_SOURCE" >> "$LOG_FILE" 2>&1
 status_line "四库业务校验通过"
 
 "$PYTHON_BIN" "$SCRIPT_DIR/send_wechat_douyin_weekly_push.py" \
-  --db "$WECHAT_DB" \
+  --db "$WECHAT_SOURCE" \
   --date "$REPORT_DATE" \
   --write-json-only >> "$LOG_FILE" 2>&1
 status_line "微信/抖音小游戏周报 JSON 已生成到本机 public/ai热点（由 API 读取）"
@@ -412,7 +475,7 @@ log "提示：API 后端通过 DATA_SOURCE_DB_PATHS 直连四份源库；本脚�
 
 # --- 3) check-only：只做链路连通性检查 ---
 if [[ "${SYNC_CHECK_ONLY:-}" == "1" ]]; then
-  log "========== 3) 连通性检查（SYNC_CHECK_ONLY=1；不部署、不推送）=========="
+  log "========== 4) 连通性检查（SYNC_CHECK_ONLY=1；不部署、不推送）=========="
   if ! command -v curl >/dev/null 2>&1; then
     log_err "未找到 curl（PATH 需含 /usr/bin），无法检查 API 连通性"
     exit 1
@@ -437,7 +500,7 @@ fi
 # --- 3) 探测 API -> deploy:api ---
 if [[ "${SYNC_SKIP_DEPLOY:-}" == "1" ]]; then
   DEPLOY_MODE="skipped"
-  log "========== 3) 部署：已跳过（SYNC_SKIP_DEPLOY=1）=========="
+  log "========== 4) 部署：已跳过（SYNC_SKIP_DEPLOY=1）=========="
   status_line "部署已跳过（SYNC_SKIP_DEPLOY=1）"
 else
   if ! command -v npm >/dev/null 2>&1; then
@@ -464,7 +527,7 @@ else
     exit 1
   fi
   DEPLOY_MODE="api"
-  log "========== 3b) deploy:api =========="
+  log "========== 4b) deploy:api =========="
   npm run deploy:api >> "$LOG_FILE" 2>&1
   log "deploy:api 完成"
   status_line "部署完成：deploy:api"
@@ -484,7 +547,7 @@ if [[ "${SYNC_SKIP_PUSH:-}" == "1" ]]; then
   exit 0
 fi
 
-log "========== 4) 推送（三条：ST → 竞品社媒 → 微信/抖音；带 sent marker）=========="
+log "========== 5) 推送（三条：ST → 竞品社媒 → 微信/抖音；带 sent marker）=========="
 if [[ -n "${SYNC_PUSH_CMD:-}" ]]; then
   log "使用 SYNC_PUSH_CMD 覆盖默认推送（调用方需自行负责幂等）"
   if bash -lc "$SYNC_PUSH_CMD" >> "$LOG_FILE" 2>&1; then
@@ -542,7 +605,7 @@ else
 
   push_one "sensortower_${REPORT_DATE}" \
     "SensorTower 榜单周报" \
-    "$PYTHON_BIN" "$REPO_ROOT/scripts/send_sensortower_weekly_push.py" --db "$SENSORTOWER_DB" --date "$REPORT_DATE"
+    "$PYTHON_BIN" "$REPO_ROOT/scripts/send_sensortower_weekly_push.py" --db "$SENSORTOWER_SOURCE" --date "$REPORT_DATE"
 
   push_one "competitor_${TARGET_WEEK_END}" \
     "竞品社媒周报" \
@@ -550,7 +613,7 @@ else
 
   push_one "wechatdouyin_${TARGET_WEEK_RANGE}" \
     "微信/抖音小游戏周报" \
-    "$PYTHON_BIN" "$REPO_ROOT/scripts/send_wechat_douyin_weekly_push.py" --db "$WECHAT_DB" --date "$REPORT_DATE" --skip-json-write
+    "$PYTHON_BIN" "$REPO_ROOT/scripts/send_wechat_douyin_weekly_push.py" --db "$WECHAT_SOURCE" --date "$REPORT_DATE" --skip-json-write
 fi
 
 log "========== 源库校验/产物 → deploy:api → 幂等推送 全部结束 =========="

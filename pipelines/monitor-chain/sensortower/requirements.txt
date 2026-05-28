@@ -1,0 +1,10 @@
+# Python 依赖（可选）
+# 主工作流为 Node.js；以下脚本在需要时单独运行：
+#   - scripts/push_sensortower_db_to_s3.py（boto3、dotenv）
+#   - scripts/fetch_sensortower_db.py（dotenv）
+#   - scripts/export_to_bitable.py（requests）
+#   - fetch_top100_to_db.py（requests，历史/实验用榜单抓取）
+#   - fetch_app_ranks.py（仅标准库 + curl，无额外 pip 包）
+boto3>=1.26.0
+python-dotenv>=1.0.0
+requests>=2.28.0

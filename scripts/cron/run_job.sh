@@ -43,6 +43,7 @@ Job ids:
   trendradar_daily_0900
   trendradar_ainews_push
   xiaohei_ainews_prepare
+  xiaohei_ainews_prepare_if_needed
   xiaohei_ainews_push
   competitor_daily_scraper
   competitor_weekly_period
@@ -161,8 +162,11 @@ case "$JOB_ID" in
   xiaohei_ainews_prepare)
     run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh prepare "$@"
     ;;
+  xiaohei_ainews_prepare_if_needed)
+    run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh guarded-prepare "$@"
+    ;;
   xiaohei_ainews_push)
-    run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh push "$@"
+    run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh guarded-push "$@"
     ;;
   competitor_daily_scraper)
     run_in "$REPO_ROOT/pipelines/monitor-chain/competitor-social" /bin/bash ./run-daily-scraper.sh "$@"

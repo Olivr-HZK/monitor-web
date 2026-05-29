@@ -4,7 +4,8 @@
 PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 
 # Xiaohei AI news automation
-0 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_prepare
+30 7 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_prepare
+20 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_prepare_if_needed
 0 9 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_push
 
 # Monitor chain upstreams

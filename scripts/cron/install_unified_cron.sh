@@ -103,24 +103,16 @@ managed_markers = [
 ]
 
 legacy_blocks = [
-    ("# BEGIN XIAOHEI_AINEWS_AUTOMATION", "# END XIAOHEI_AINEWS_AUTOMATION"),
-    ("# BEGIN TRENDRADAR_AUTOMATION", "# END TRENDRADAR_AUTOMATION"),
-    ("# BEGIN LYB_MULTI_PROJECT_AUTOMATION", "# END LYB_MULTI_PROJECT_AUTOMATION"),
-    ("# BEGIN FESTIVALS_MARKETING_AUTOMATION", "# END FESTIVALS_MARKETING_AUTOMATION"),
-    ("# BEGIN ai- ua_workflows", "# END ai- ua_workflows"),
-    ("# BEGIN ai- ua_workflows (video_enhancer + arrow2)", "# END ai- ua_workflows"),
-    ("# BEGIN TASK_BUTLER_PROJECT_REPORTS", "# END TASK_BUTLER_PROJECT_REPORTS"),
 ]
 
 legacy_patterns = [
-    "xiaohei-agent && /bin/bash scripts/run_daily_cron.sh",
-    "TrendRadar-deployment-20260316-134108/run_ainews_top20_daily.sh",
-    "TrendRadar-deployment-20260316-134108/run_trendradar_daily.sh",
     "Olivr-competitor-monitor && /bin/bash run-weekly-period-workflow.sh",
     "Olivr-competitor-monitor && /bin/bash run-daily-scraper.sh",
     "sensortower-/scripts/cron_run_us_free_daily.sh",
     "sensortower-/scripts/cron_run_weekly.sh",
     "sensortower-/scripts/cron_run_arrow_madness_daily.sh",
+    "sensortower-/scripts/us_free_appid_weekly_rank_changes.js",
+    "wechat-mini-game-ranking-post && /bin/bash ./scripts/weekly_scrape_and_import.sh",
     "wechat-mini-game-ranking-post && /bin/bash ./scripts/weekly_wx_three_charts_scrape_and_import.sh",
     "wechat-mini-game-ranking-post && /bin/bash ./scripts/rerun_weekly_wx_three_charts_if_needed.sh",
     "monitor-web/pipelines/monitor-chain/wechat-douyin && /bin/bash ./scripts/weekly_wx_three_charts_scrape_and_import.sh",
@@ -128,24 +120,12 @@ legacy_patterns = [
     "monitor-web && SYNC_CHECK_ONLY=1 ./scripts/sync_dbs_and_deploy.sh",
     "monitor-web && SYNC_SKIP_DEPLOY=1 ./scripts/sync_dbs_and_deploy.sh",
     "monitor-web && ./scripts/check_monitor_chain.sh",
-    "trustmrr-feishu-push/run_trustmrr_cron.sh",
-    "AITools Competitor Monitor/scripts/cleanup-logs.sh",
-    "AITools Competitor Monitor/scripts/backup-db.sh",
-    "AITools Competitor Monitor/run-daily-scraper.sh",
-    "AITools Competitor Monitor/run-weekly-period-workflow.sh",
-    "gaming-daily-report2",
-    "/Users/ggbond/oliver/ai-/scripts/cron_ai_video_enhancer_daily.sh",
-    "/Users/ggbond/oliver/ai-/scripts/cron_ve_feedback_training_daily.sh",
-    "/Users/ggbond/oliver/ai-/scripts/cron_ai_arrow2_latest_daily.sh",
-    "/Users/ggbond/oliver/ai-/scripts/cron_ai_arrow2_exposure_wed_sat.sh",
-    "festivals-marketing/run-cron-task.sh",
-    "task_butler_status.py --watch-send",
+    "monitor-web && ./scripts/run_reports.sh",
 ]
 
 legacy_comment_patterns = [
     "monitor-web 监测链补充",
     "Olivr-competitor-monitor",
-    "游戏出海周报",
 ]
 
 blocks = managed_markers + (legacy_blocks if replace_known else [])

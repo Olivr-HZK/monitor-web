@@ -12,8 +12,8 @@ SensorTower 榜单周报推送（单文件自包含，不依赖本目录其他�
   python3 scripts/send_sensortower_weekly_push.py --date 2026-04-06 --dry-run
 
 飞书 ST 周报：
-  - 默认整卡 Markdown（行内图标）：与「群机器人 Webhook」兼容性最好，图标经 prepare_feishu_card_markdown 换 image_key。
-  - 若需左图右文 column_set，设 FEISHU_ST_USE_COLUMN_CARD=1（部分 Webhook/客户端对 column_set 内 img 展示不稳定，易出现在网页有图、推送无图）。
+  - 默认整卡 Markdown，不带应用图标，避免飞书卡片图片格式兼容问题。
+  - 若需恢复应用图标，设 FEISHU_ST_INCLUDE_ICONS=1；若还需左图右文 column_set，再设 FEISHU_ST_USE_COLUMN_CARD=1。
 列式时：FEISHU_ST_COLUMN_IMG_MODE 默认 small；可设 medium/large 或 FEISHU_ST_COLUMN_ICON_PX。
 """
 import json
@@ -88,7 +88,8 @@ def _weekly_report_url(st_date: str) -> str:
     """当周 SensorTower 周报直链。"""
     if not st_date:
         return DETAIL_LINK
-    return f"{DETAIL_LINK}?reportId=sensortower-weekly-{st_date}"
+    sep = "&" if "?" in DETAIL_LINK else "?"
+    return f"{DETAIL_LINK}{sep}reportId=sensortower-weekly-{st_date}"
 
 
 # ---------- SensorTower 周报 ----------
@@ -319,9 +320,15 @@ def _get_store_changes_from_weekly_metadata(
 
 
 def feishu_st_use_column_card() -> bool:
-    """是否用 column_set（左图右文）。未设置时默认关闭（0），整卡 Markdown+行内图，适合群机器人 Webhook；设 1 开启列式。"""
+    """是否用 column_set（左图右文）。需同时开启 FEISHU_ST_INCLUDE_ICONS。"""
     v = (os.environ.get("FEISHU_ST_USE_COLUMN_CARD") or "0").strip().lower()
     return v not in ("0", "false", "no", "off")
+
+
+def feishu_st_include_icons() -> bool:
+    """是否在飞书 ST 周报里展示应用图标。默认关闭，避免卡片图片格式问题。"""
+    v = (os.environ.get("FEISHU_ST_INCLUDE_ICONS") or "0").strip().lower()
+    return v in ("1", "true", "yes", "on")
 
 
 def _feishu_st_column_img_mode_and_upload_px() -> tuple[str, int]:
@@ -468,7 +475,8 @@ def _build_sensortower_only_push(
     if not st_date:
         return "", "", None, ""
 
-    use_col = feishu_st_use_column_card()
+    include_icons = feishu_st_include_icons()
+    use_col = include_icons and feishu_st_use_column_card()
     segments: list = []
     seg_text: list[str] = []
     # JOIN app_metadata.os 与 rank_changes.platform 不完全一致时 icon 常为空；按 app_id 回退任一条有 icon_url 的记录
@@ -510,7 +518,8 @@ def _build_sensortower_only_push(
             seg_text.append(line)
 
     def append_game_row(icon_url: str | None, rhs_no_icon: str, full_line: str) -> None:
-        lines.append(full_line)
+        line = full_line if include_icons else rhs_no_icon
+        lines.append(line)
         lines_wecom.append(rhs_no_icon)
         if not use_col:
             return
@@ -519,7 +528,7 @@ def _build_sensortower_only_push(
             flush_md()
             segments.append(("row", u, rhs_no_icon))
         else:
-            seg_text.append(full_line)
+            seg_text.append(line)
 
     st_project_id = os.environ.get("SENSORTOWER_OVERVIEW_PROJECT_ID", "").strip() or None
 

@@ -10,9 +10,11 @@ import pytest
 from ai_tools import AgentToolDispatcher, build_overseas_weekly_prompt_block
 from assistant_service import (
     build_system_content,
+    detect_data_source_intents,
     is_overseas_casual_query,
     is_trend_query,
     select_relevant_databases,
+    should_use_web_search,
 )
 from config import PUBLIC_DIR
 from feishu_format import strip_markdown_for_feishu
@@ -374,3 +376,42 @@ def test_overseas_prompts_prefer_json_report_tool(prompt: str):
     system, _ = build_system_content(prompt)
     if (PUBLIC_DIR / "休闲游戏检测/出海周报/index.json").is_file():
         assert "read_public_report" in system
+
+
+def test_casual_persona_wrapper_does_not_pollute_intent():
+    prompt = "【业务边界】这里会提到出海、Puzzle、竞品、UA。\n\n玩家问题：微信小游戏最近排名变化"
+    intents = detect_data_source_intents(prompt, channel="feishu_casual_dm")
+    assert "wechat_douyin" in intents
+    assert "overseas_report" not in intents
+    assert not is_overseas_casual_query(prompt)
+
+
+def test_casual_feishu_ua_routes_to_competitor_not_ai_product():
+    prompt = "玩家问题：竞品 UA 素材最近有什么变化？"
+    intents = detect_data_source_intents(prompt, channel="feishu_casual_dm")
+    assert "competitor" in intents
+    assert "ai_product" not in intents
+    selected = select_relevant_databases(prompt, channel="feishu_casual_dm")
+    assert "competitor_data.db" in selected
+    assert "ai_products_ua.db" not in selected
+
+
+def test_casual_ambiguous_trend_uses_four_sources():
+    selected = select_relevant_databases(
+        "最近有什么变化？",
+        {"monitorType": "休闲游戏监测"},
+        channel="feishu_casual_group",
+    )
+    available = _available_dbs()
+    for db in ("wechatdouyin.db", "sensortower_top100.db", "competitor_data.db", "us_free_appid_weekly.db"):
+        if db in available:
+            assert db in selected
+    assert "ai_products_ua.db" not in selected
+
+
+def test_web_search_intent_is_injected_into_system_prompt():
+    prompt = "联网搜一下 Block Blast 今天有什么公开新闻"
+    assert should_use_web_search(prompt)
+    system, _ = build_system_content(prompt, channel="feishu_casual_dm")
+    assert "web_search" in system
+    assert "联网资料" in system

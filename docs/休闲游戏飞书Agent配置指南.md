@@ -8,6 +8,7 @@
 - SensorTower Top100、商店页变化
 - 竞品社媒 / UA 素材
 - 我方产品 US 免费榜追踪
+- 联网补充公开网页 / 新闻 / 官网 / 应用商店实时信息，并与站内监测数据分开说明
 
 群聊需 @ 机器人；私聊直接提问。支持 `/reset` 或「清空上下文」重置会话。
 
@@ -27,7 +28,7 @@
 | `CASUAL_FEISHU_ALLOWED_CHAT_IDS` | 可选 | 群聊白名单；为空则不限制 |
 | `CASUAL_FEISHU_ASSISTANT_SEND_THINKING` | 可选 | 默认 `true`，先回复「正在查询」 |
 
-AI 与数据查询沿用现有配置：`OPENAI_API_KEY`、`AI_PROVIDER=openrouter`（推荐）、`CODEX_ENABLE_DB_TOOL=true` 等。
+AI、数据查询与联网搜索沿用现有配置：`OPENAI_API_KEY`、`AI_PROVIDER=openrouter`（推荐）、`CODEX_ENABLE_DB_TOOL=true`、`CODEX_ENABLE_WEB_SEARCH_TOOL=true` 等；配置 `TAVILY_API_KEY` 时优先用 Tavily，否则走 DuckDuckGo 摘要接口兜底。
 
 ## 3. 飞书开放平台步骤
 
@@ -132,6 +133,8 @@ curl -s -X POST http://127.0.0.1:3001/api/feishu/casual-agent/events \
 | 环境变量前缀 | `FEISHU_*` | `CASUAL_FEISHU_*` |
 | 会话库 | `assistant_sessions.db` | `casual_assistant_sessions.db` |
 | 数据范围 | 四类监测 | 休闲游戏监测为主 |
+
+休闲游戏 Agent 的站内路由默认围绕四个源：微信/抖音小游戏、SensorTower、竞品社媒/UA、我方产品 US 免费榜；用户明确问站外、新闻、官网或实时页面时，再调用联网搜索补充。
 
 ## 8. 常见问题
 

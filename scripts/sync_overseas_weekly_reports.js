@@ -15,6 +15,9 @@ const sourceDir =
 const destDir =
   process.argv[3] ||
   path.join(repoRoot, 'public', '休闲游戏检测', '出海周报');
+const stateDir =
+  process.env.OVERSEAS_WEEKLY_STATE_DIR ||
+  path.resolve(sourceDir, '..', '..', '.runtime', 'cron_state');
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -137,6 +140,21 @@ function normalizeReport(filePath, report) {
   };
 }
 
+function markerExists(name) {
+  const marker = path.join(stateDir, name);
+  if (!fs.existsSync(marker)) return false;
+  return fs.statSync(marker).size > 0;
+}
+
+function publishStateForEndDate(endDate) {
+  if (!fs.existsSync(stateDir)) return 'unknown';
+  const ok = markerExists(`${endDate}.gaming-weekly-push.ok`);
+  if (ok) return 'ok';
+  const failed = markerExists(`${endDate}.gaming-weekly-push.failed`);
+  if (failed) return 'failed';
+  return 'unknown';
+}
+
 function main() {
   if (!fs.existsSync(sourceDir)) {
     throw new Error(`源目录不存在: ${sourceDir}`);
@@ -149,11 +167,17 @@ function main() {
     .map((name) => path.join(sourceDir, name));
 
   const latestByWeek = new Map();
+  const skippedFailed = [];
   for (const filePath of candidates) {
     const report = readJson(filePath);
     const startDate = toDateOnly(report.date_window?.title_start_date || report.date_window?.start);
     const endDate = toDateOnly(report.date_window?.title_end_date || report.date_window?.end_exclusive);
     if (!startDate || !endDate || !report.reports?.zh) continue;
+    const publishState = publishStateForEndDate(endDate);
+    if (publishState === 'failed') {
+      skippedFailed.push(`${startDate}_${endDate}`);
+      continue;
+    }
     const key = `${startDate}_${endDate}`;
     const current = latestByWeek.get(key);
     const nextMs = generatedMs(report, filePath);
@@ -182,6 +206,7 @@ function main() {
   const index = {
     generated_at: new Date().toISOString(),
     source: 'gaming-daily-report2/output/weekly_reports',
+    skipped_failed_weeks: Array.from(new Set(skippedFailed)).sort(),
     reports: reportFiles,
   };
   fs.writeFileSync(path.join(destDir, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);

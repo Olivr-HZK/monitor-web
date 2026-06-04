@@ -68,8 +68,12 @@ def format_page_context(ctx: dict[str, Any] | None) -> str:
     return header + "\n".join(lines)
 
 
-def public_db_catalog_for_prompt() -> str:
-    names = AgentToolDispatcher.list_db_names()
+def public_db_catalog_for_prompt(db_names: list[str] | tuple[str, ...] | set[str] | None = None) -> str:
+    if db_names:
+        available = set(AgentToolDispatcher.list_db_names())
+        names = [name for name in db_names if name in available]
+    else:
+        names = AgentToolDispatcher.list_db_names()
     if not names:
         try:
             names = sorted(p.name for p in PUBLIC_DIR.glob("*.db") if p.is_file())
@@ -84,10 +88,53 @@ def _has_any(text: str, words: tuple[str, ...]) -> bool:
     return any(w.lower() in text for w in words)
 
 
+CASUAL_SOURCE_DBS: dict[str, tuple[str, ...]] = {
+    "wechat_douyin": ("wechatdouyin.db",),
+    "sensortower": ("sensortower_top100.db",),
+    "competitor": ("competitor_data.db",),
+    "our_product": ("us_free_appid_weekly.db",),
+}
+CASUAL_SOURCE_ORDER: tuple[str, ...] = ("wechat_douyin", "sensortower", "competitor", "our_product")
+GLOBAL_FALLBACK_DBS: tuple[str, ...] = (
+    "wechatdouyin.db",
+    "sensortower_top100.db",
+    "competitor_data.db",
+    "ai_products_ua.db",
+    "us_free_appid_weekly.db",
+)
+
+
+def _extract_user_intent_text(text: str) -> str:
+    """剥掉飞书人格包装，只让路由识别真实用户问题。"""
+    raw = text or ""
+    for marker in ("玩家问题：", "玩家问题:", "用户问题：", "用户问题:"):
+        if marker in raw:
+            return raw.rsplit(marker, 1)[-1].strip()
+    return raw.strip()
+
+
+def _context_blob(page_context: dict[str, Any] | None) -> str:
+    if not page_context:
+        return ""
+    return " ".join(str(v).lower() for v in page_context.values() if v is not None)
+
+
+def _intent_blob(text: str, page_context: dict[str, Any] | None = None) -> str:
+    blob = _extract_user_intent_text(text).lower()
+    ctx = _context_blob(page_context)
+    return f"{blob} {ctx}".strip() if ctx else blob
+
+
+def _is_casual_channel(channel: str) -> bool:
+    return "feishu_casual" in (channel or "")
+
+
+def _is_casual_context(page_context: dict[str, Any] | None, *, channel: str = "web") -> bool:
+    return _is_casual_channel(channel)
+
+
 def is_trend_query(text: str, page_context: dict[str, Any] | None = None) -> bool:
-    blob = (text or "").lower()
-    if page_context:
-        blob += " " + " ".join(str(v).lower() for v in page_context.values() if v is not None)
+    blob = _intent_blob(text, page_context)
     return _has_any(
         blob,
         (
@@ -109,7 +156,7 @@ def is_trend_query(text: str, page_context: dict[str, Any] | None = None) -> boo
 
 def is_overseas_casual_query(text: str, page_context: dict[str, Any] | None = None) -> bool:
     """休闲游戏出海周报意图：数据在 public JSON，不在 SQLite。"""
-    blob = (text or "").lower()
+    blob = _extract_user_intent_text(text).lower()
     if page_context:
         for key, val in page_context.items():
             if val is None:
@@ -135,11 +182,112 @@ def is_overseas_casual_query(text: str, page_context: dict[str, Any] | None = No
     )
 
 
-def select_relevant_databases(user_text: str, page_context: dict[str, Any] | None = None) -> list[str]:
-    """按问题语义选择要注入的 schema，避免每次把所有库塞进 prompt。"""
-    text = (user_text or "").lower()
+def should_use_web_search(user_text: str, page_context: dict[str, Any] | None = None) -> bool:
+    """识别需要站外/实时信息的问法；工具是否可用由 dispatcher 决定。"""
+    blob = _intent_blob(user_text, page_context)
+    return _has_any(
+        blob,
+        (
+            "联网",
+            "网上",
+            "站外",
+            "公开网页",
+            "公开信息",
+            "新闻",
+            "最新消息",
+            "实时",
+            "今天发布",
+            "刚发布",
+            "搜索一下",
+            "搜一下",
+            "官网",
+            "app store 页面",
+            "google play 页面",
+            "twitter",
+            "x.com",
+            "reddit",
+        ),
+    )
+
+
+def detect_data_source_intents(
+    user_text: str,
+    page_context: dict[str, Any] | None = None,
+    *,
+    channel: str = "web",
+) -> list[str]:
+    """把问题归到稳定数据源意图；休闲飞书只围绕四个站内源。"""
+    text = _intent_blob(user_text, page_context)
+    casual_scope = _is_casual_context(page_context, channel=channel)
+    intents: list[str] = []
+
+    def add(intent: str) -> None:
+        if intent not in intents:
+            intents.append(intent)
+
+    overseas_intent = is_overseas_casual_query(user_text, page_context)
+    if overseas_intent:
+        add("overseas_report")
+
+    if _has_any(text, ("sensortower", "sensor tower", "top100", "商店", "app store", "google play", "美国榜", "免费榜", "ios", "android")):
+        add("sensortower")
+
+    if _has_any(text, ("微信", "抖音", "小游戏", "小程序", "top20", "rank_changes", "周报简要", "新游戏")):
+        add("wechat_douyin")
+    if _has_any(text, ("玩法", "玩法分析", "新玩法")) and not overseas_intent:
+        add("wechat_douyin")
+
+    if _has_any(text, ("竞品", "社媒", "小红书", "facebook", "instagram", "tiktok", "线下活动", "social")):
+        add("competitor")
+    if casual_scope and _has_any(text, ("ua", "素材", "creative", "广告", "投放", "买量")) and not overseas_intent:
+        add("competitor")
+
+    if _has_any(text, ("我方", "自家", "own product", "our product", "appid", "us free", "us免费", "us 免费")):
+        add("our_product")
+
+    if not casual_scope and _has_any(text, ("ai 产品", "ai产品", "ai ua", "ua", "素材", "creative", "广告", "投放")):
+        add("ai_product")
+    if not casual_scope and _has_any(text, ("video enhancer", "视频增强", "remaker", "enhancer")):
+        add("video_enhancer")
+
     if page_context:
-        text += " " + " ".join(str(v).lower() for v in page_context.values() if v is not None)
+        mt = str(page_context.get("monitorType") or "")
+        cat = str(page_context.get("casualGameCategory") or "")
+        ai_sub = str(page_context.get("aiProductSub") or "")
+        comp_sub = str(page_context.get("casualCompetitorSub") or "")
+        ranking_section = str(page_context.get("rankingSection") or "")
+        page_title = str(page_context.get("pageTitle") or "")
+
+        if any(token in mt for token in ("AI产品监测", "AI 产品")):
+            add("ai_product")
+        if any(token in cat for token in ("商店页变化", "商店页")):
+            add("sensortower")
+        if any(token in cat for token in ("周报简要", "新游戏", "玩法")) and not overseas_intent:
+            add("wechat_douyin")
+        if any(token in cat for token in ("我方产品", "US 免费", "US免费")):
+            add("our_product")
+        if any(token in ai_sub for token in ("UA", "素材", "投放", "创意")):
+            add("ai_product")
+        if any(token in comp_sub for token in ("社媒", "竞品", "动态", "UA", "素材")):
+            add("competitor")
+        if ranking_section == "wechat_douyin":
+            add("wechat_douyin")
+        elif ranking_section == "sensortower":
+            add("sensortower")
+        if any(token in page_title for token in ("我方产品", "US 免费", "US免费")):
+            add("our_product")
+
+    return intents
+
+
+def select_relevant_databases(
+    user_text: str,
+    page_context: dict[str, Any] | None = None,
+    *,
+    channel: str = "web",
+) -> list[str]:
+    """按问题语义选择要注入的 schema，避免每次把所有库塞进 prompt。"""
+    text = _intent_blob(user_text, page_context)
     names = AgentToolDispatcher.list_db_names()
     if not names:
         AgentToolDispatcher(PUBLIC_DIR, TAVILY_API_KEY, CODEX_ENABLE_DB_TOOL, CODEX_ENABLE_WEB_SEARCH_TOOL)
@@ -148,6 +296,8 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
     selected: list[str] = []
     overseas_intent = is_overseas_casual_query(text, page_context)
     trend_intent = is_trend_query(text, page_context)
+    casual_scope = _is_casual_context(page_context, channel=channel)
+    source_intents = detect_data_source_intents(user_text, page_context, channel=channel)
 
     def add_exact(name: str) -> None:
         if name in names and name not in selected:
@@ -162,69 +312,40 @@ def select_relevant_databases(user_text: str, page_context: dict[str, Any] | Non
                 if count >= max_items:
                     break
 
-    if _has_any(text, ("sensortower", "sensor tower", "top100", "商店", "app store", "google play", "美国榜", "免费榜")):
-        add_exact("sensortower_top100.db")
-        add_exact("sensortower_applist.db")
-    wechat_intent = _has_any(text, ("微信", "抖音", "小游戏", "rank_changes", "top20"))
-    casual_intent = _has_any(text, ("休闲游戏", "玩法"))
-    if wechat_intent or (casual_intent and not overseas_intent):
-        add_exact("wechatdouyin.db")
-    if _has_any(text, ("竞品", "社媒", "小红书", "facebook", "instagram", "tiktok", "线下活动", "social")):
-        add_exact("competitor_data.db")
-    if _has_any(text, ("ai 产品", "ai产品", "ua", "素材", "creative", "广告", "投放")):
-        add_exact("ai_products_ua.db")
-    if _has_any(text, ("我方", "自家", "own product", "appid", "us free", "us免费")):
-        add_exact("us_free_appid_weekly.db")
-    if _has_any(text, ("video enhancer", "视频增强", "remaker", "enhancer")):
-        add_exact("video_enhancer_pipeline.db")
-
-    # 页面上下文：问法模糊时按当前入口补全 schema（与前端 AiPageContext 对齐）
-    if page_context:
-        mt = str(page_context.get("monitorType") or "")
-        cat = str(page_context.get("casualGameCategory") or "")
-        ai_sub = str(page_context.get("aiProductSub") or "")
-        comp_sub = str(page_context.get("casualCompetitorSub") or "")
-        ranking_section = str(page_context.get("rankingSection") or "")
-        page_title = str(page_context.get("pageTitle") or "")
-
-        if any(token in mt for token in ("AI产品监测", "AI 产品")):
-            add_exact("ai_products_ua.db")
-        if any(token in cat for token in ("商店页变化", "商店页")):
+    for intent in source_intents:
+        if intent in CASUAL_SOURCE_DBS:
+            for db_name in CASUAL_SOURCE_DBS[intent]:
+                add_exact(db_name)
+        elif intent == "overseas_report":
+            # 出海周报主体在 JSON；保留 SensorTower schema 供补充商店榜背景。
             add_exact("sensortower_top100.db")
-        if any(token in cat for token in ("周报简要", "新游戏", "玩法")) and not overseas_intent:
-            add_exact("wechatdouyin.db")
-        if any(token in ai_sub for token in ("UA", "素材", "投放", "创意")):
+        elif intent == "ai_product" and not casual_scope:
             add_exact("ai_products_ua.db")
-        if any(token in comp_sub for token in ("社媒", "竞品", "动态")):
-            add_exact("competitor_data.db")
-        if ranking_section == "wechat_douyin":
-            add_exact("wechatdouyin.db")
-        elif ranking_section == "sensortower":
-            add_exact("sensortower_top100.db")
-        if any(token in page_title for token in ("我方产品", "US 免费", "US免费")):
-            add_exact("us_free_appid_weekly.db")
+        elif intent == "video_enhancer" and not casual_scope:
+            add_exact("video_enhancer_pipeline.db")
 
     # 趋势/最近类问题：多拉几个时间序列数据源，便于画折线图
     if trend_intent and not overseas_intent:
-        for name in (
-            "wechatdouyin.db",
-            "sensortower_top100.db",
-            "us_free_appid_weekly.db",
-            "competitor_data.db",
-        ):
-            add_exact(name)
+        if casual_scope or any(intent in CASUAL_SOURCE_DBS for intent in source_intents):
+            for source in CASUAL_SOURCE_ORDER:
+                for db_name in CASUAL_SOURCE_DBS[source]:
+                    add_exact(db_name)
+        elif selected:
+            pass
+        else:
+            for name in GLOBAL_FALLBACK_DBS:
+                add_exact(name)
     elif trend_intent and overseas_intent:
         add_exact("sensortower_top100.db")
 
     if not selected and not overseas_intent:
-        for name in (
-            "wechatdouyin.db",
-            "sensortower_top100.db",
-            "competitor_data.db",
-            "ai_products_ua.db",
-            "us_free_appid_weekly.db",
-        ):
-            add_exact(name)
+        if casual_scope:
+            for source in CASUAL_SOURCE_ORDER:
+                for db_name in CASUAL_SOURCE_DBS[source]:
+                    add_exact(db_name)
+        else:
+            for name in GLOBAL_FALLBACK_DBS:
+                add_exact(name)
 
     # 明确问历史快照时，补少量带日期库；普通问题优先当前 canonical db。
     if _has_any(text, ("历史", "快照", "2026-", "对比上周", "上周")) or trend_intent:
@@ -239,7 +360,8 @@ def build_system_content(
     *,
     channel: str = "web",
 ) -> tuple[str, list[str]]:
-    selected_dbs = select_relevant_databases(user_text, page_context)
+    selected_dbs = select_relevant_databases(user_text, page_context, channel=channel)
+    web_intent = should_use_web_search(user_text, page_context)
     base = (
         "你是「监测汇总」内部平台的智能监测 agent，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。"
         "像同事聊天一样回答：先点出用户最关心的，再补依据；不要套模板，不要报告腔。"
@@ -249,11 +371,17 @@ def build_system_content(
         "\n- 涉及排名变化、趋势走势、数据对比等可视化场景时，优先 query_and_chart 一步完成查库+画图。"
         "\n- 只有纯事实查询（如「XX 本周排第几」）不需要图表时，才用 query_sqlite。"
         "\n- 休闲游戏「出海/海外市场/Puzzle Game 周报」在 JSON 报告里，必须用 read_public_report（path=latest 或指定期数），不要用 SQLite。"
-        "\n- 需要站外动态信息时才用 web_search，并区分站内数据与公开网页信息。"
         "\n- 不要向普通用户暴露数据库名、表名、SQL、内部路径或密钥；这些仅是服务端工具。"
         "\n- 当问题使用「最新/最近/本周/今天」等词时，先看站内数据新鲜度，不要编造实时数据。"
         "\n- 图表生成后，文字只做口头解读，不要逐条复读表格数据。"
     )
+    if CODEX_ENABLE_WEB_SEARCH_TOOL:
+        base += (
+            "\n- 用户明确问站外/公开网页/新闻/官网/实时/今天刚发布的信息，或站内数据不足以回答时，必须调用 web_search。"
+            "\n- web_search 结果只能作为联网资料；回复时要和站内监测数据分开说，并直接贴来源 URL。"
+        )
+        if web_intent:
+            base += "\n- 当前问题已识别为站外/实时意图：先用站内数据定边界，再调用 web_search 补最新公开信息。"
     if is_overseas_casual_query(user_text, page_context):
         overseas_block = build_overseas_weekly_prompt_block(PUBLIC_DIR)
         if overseas_block:
@@ -270,10 +398,16 @@ def build_system_content(
         )
     if "feishu_casual" in channel:
         base += (
+            "\n\n【休闲游戏站内四源路由】"
+            "\n- 微信/抖音小游戏榜、Top20、玩法、新游戏：查 wechatdouyin.db。"
+            "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db。"
+            "\n- 竞品动态、社媒、Facebook、Instagram、TikTok、小红书、竞品 UA/素材/投放：查 competitor_data.db。"
+            "\n- 我方产品、自家产品、US Free、appid、按产品追溯：查 us_free_appid_weekly.db。"
+            "\n- 休闲飞书入口不要主动使用 AI 产品 UA 库；除非用户明确跳出休闲范围，否则围绕上述四源回答。"
             "\n\n【休闲 GM 语气】"
             "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
             "\n- 问趋势/最近/变化：务必 query_and_chart 画折线图（系统会把图发到飞书），文字像解说一样讲清楚「看到了什么、意味着什么」。"
-            "\n- 可同时查微信/抖音榜、SensorTower、我方产品等多个相关源，帮用户把趋势看全。"
+            "\n- 可同时查微信/抖音榜、SensorTower、竞品动态、我方产品等四源，帮用户把趋势看全。"
         )
     knowledge = get_agent_knowledge()
     if knowledge:
@@ -281,7 +415,7 @@ def build_system_content(
     freshness = build_data_freshness_text(PUBLIC_DIR)
     if freshness:
         base += freshness
-    base += public_db_catalog_for_prompt()
+    base += public_db_catalog_for_prompt(selected_dbs)
     schema_text = AgentToolDispatcher.get_schema_text(selected_dbs)
     if schema_text:
         base += schema_text

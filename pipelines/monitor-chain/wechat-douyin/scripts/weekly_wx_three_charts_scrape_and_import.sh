@@ -28,21 +28,52 @@ export WECHAT_DB_BACKUP_DIR="${WECHAT_DB_BACKUP_DIR:-$MONITOR_WEB_ROOT/backups/d
 
 cd "$PROJECT_ROOT"
 
+bootstrap_python_bin() {
+    if [ -n "${WECHAT_DOUYIN_BOOTSTRAP_PYTHON:-}" ]; then
+        printf '%s\n' "$WECHAT_DOUYIN_BOOTSTRAP_PYTHON"
+        return 0
+    fi
+    if command -v python3.11 >/dev/null 2>&1; then
+        command -v python3.11
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        command -v python3
+        return 0
+    fi
+    if command -v python >/dev/null 2>&1; then
+        command -v python
+        return 0
+    fi
+    return 1
+}
+
+if [ -z "${WECHAT_DOUYIN_VENV:-}" ] \
+    && [ "${WECHAT_DOUYIN_AUTO_BOOTSTRAP:-1}" != "0" ] \
+    && [ ! -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+    BOOTSTRAP_PYTHON="$(bootstrap_python_bin)" || {
+        echo "[错误] 未找到可用于创建虚拟环境的 Python。请安装 python3，或设置 WECHAT_DOUYIN_BOOTSTRAP_PYTHON=/path/to/python"
+        exit 127
+    }
+    echo "[*] 未找到微信/抖音 pipeline .venv，自动创建：$PROJECT_ROOT/.venv"
+    "$BOOTSTRAP_PYTHON" -m venv "$PROJECT_ROOT/.venv"
+fi
+
 if [ -n "${WECHAT_DOUYIN_VENV:-}" ] && [ -f "$WECHAT_DOUYIN_VENV/bin/activate" ]; then
     source "$WECHAT_DOUYIN_VENV/bin/activate"
     echo "[*] 已激活虚拟环境: $WECHAT_DOUYIN_VENV"
-elif [ -d "$MONITOR_WEB_ROOT/.venv" ] && [ -f "$MONITOR_WEB_ROOT/.venv/bin/activate" ]; then
-    source "$MONITOR_WEB_ROOT/.venv/bin/activate"
-    echo "[*] 已激活虚拟环境: monitor-web/.venv"
-elif [ -d "$MONITOR_WEB_ROOT/backend/.venv" ] && [ -f "$MONITOR_WEB_ROOT/backend/.venv/bin/activate" ]; then
-    source "$MONITOR_WEB_ROOT/backend/.venv/bin/activate"
-    echo "[*] 已激活虚拟环境: monitor-web/backend/.venv"
 elif [ -d "$PROJECT_ROOT/.venv" ] && [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
     source "$PROJECT_ROOT/.venv/bin/activate"
     echo "[*] 已激活虚拟环境: .venv"
 elif [ -d "$LEGACY_ROOT/.venv" ] && [ -f "$LEGACY_ROOT/.venv/bin/activate" ]; then
     source "$LEGACY_ROOT/.venv/bin/activate"
     echo "[*] 已激活虚拟环境: legacy wechat-douyin .venv"
+elif [ -d "$MONITOR_WEB_ROOT/.venv" ] && [ -f "$MONITOR_WEB_ROOT/.venv/bin/activate" ]; then
+    source "$MONITOR_WEB_ROOT/.venv/bin/activate"
+    echo "[*] 已激活虚拟环境: monitor-web/.venv"
+elif [ -d "$MONITOR_WEB_ROOT/backend/.venv" ] && [ -f "$MONITOR_WEB_ROOT/backend/.venv/bin/activate" ]; then
+    source "$MONITOR_WEB_ROOT/backend/.venv/bin/activate"
+    echo "[*] 已激活虚拟环境: monitor-web/backend/.venv"
 elif [ -d "$PROJECT_ROOT/venv" ] && [ -f "$PROJECT_ROOT/venv/bin/activate" ]; then
     source "$PROJECT_ROOT/venv/bin/activate"
     echo "[*] 已激活虚拟环境: venv"
@@ -72,6 +103,50 @@ PYTHON_BIN="$(resolve_python_bin)" || {
     exit 127
 }
 echo "[*] Python: $("$PYTHON_BIN" --version 2>&1)"
+
+ensure_runtime_dependencies() {
+    if "$PYTHON_BIN" - <<'PY' >/dev/null 2>&1
+from pathlib import Path
+
+import pandas  # noqa: F401
+import requests  # noqa: F401
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    chromium_path = Path(p.chromium.executable_path)
+    if not chromium_path.exists():
+        raise SystemExit(f"missing chromium executable: {chromium_path}")
+PY
+    then
+        return 0
+    fi
+
+    if [ "${WECHAT_DOUYIN_AUTO_INSTALL_DEPS:-1}" = "0" ]; then
+        echo "[错误] 微信/抖音运行依赖不完整。请执行："
+        echo "  cd $PROJECT_ROOT && $PYTHON_BIN -m pip install -r requirements.txt && $PYTHON_BIN -m playwright install chromium"
+        return 1
+    fi
+
+    echo "[*] 微信/抖音运行依赖不完整，自动安装 requirements.txt 与 Playwright Chromium。"
+    "$PYTHON_BIN" -m pip install -r requirements.txt
+    "$PYTHON_BIN" -m playwright install chromium
+
+    "$PYTHON_BIN" - <<'PY'
+from pathlib import Path
+
+import pandas  # noqa: F401
+import requests  # noqa: F401
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    chromium_path = Path(p.chromium.executable_path)
+    if not chromium_path.exists():
+        raise SystemExit(f"missing chromium executable after install: {chromium_path}")
+print("[*] 微信/抖音运行依赖检查通过")
+PY
+}
+
+ensure_runtime_dependencies
 
 IMPORT_DB="${RANKING_IMPORT_DB:-}"
 IMPORT_CMD=("$PYTHON_BIN" scripts/tools/import_ranking_csv_to_tables.py)

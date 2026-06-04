@@ -92,6 +92,7 @@ function main() {
     ? (path.isAbsolute(dbArg) ? dbArg : path.join(ROOT, dbArg))
     : DB_FILE;
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+  fs.mkdirSync(path.join(ROOT, 'output'), { recursive: true });
 
   if (!fs.existsSync(path.join(ROOT, '.env'))) {
     console.error('请先在项目根目录配置 .env，包含 SENSORTOWER_API_TOKEN');

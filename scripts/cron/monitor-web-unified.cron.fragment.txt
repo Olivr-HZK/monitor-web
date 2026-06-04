@@ -3,11 +3,6 @@
 # Logs: __REPO_ROOT__/logs/jobs/<job-id>.log
 PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 
-# Xiaohei AI news automation
-30 7 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_prepare
-20 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_prepare_if_needed
-0 9 * * * __REPO_ROOT__/scripts/cron/run_job.sh xiaohei_ainews_push
-
 # Monitor chain upstreams
 30 7 * * * __REPO_ROOT__/scripts/cron/run_job.sh competitor_daily_scraper
 40 7 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh competitor_weekly_period
@@ -17,35 +12,8 @@ PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 30 7 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh sensortower_weekly
 30 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh sensortower_us_free_daily
 0 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh sensortower_arrow_madness_daily
-45 8 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh monitor_chain_checked_push
+35 10 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh monitor_chain_checked_push
 
-# trustmrr Feishu push
-0 0 * * * __REPO_ROOT__/scripts/cron/run_job.sh trustmrr_daily
-0 9 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh trustmrr_weekly_generate
-10 9 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh trustmrr_weekly_push
-
-# AI tools competitor monitor
-0 3 * * 0 __REPO_ROOT__/scripts/cron/run_job.sh aitools_cleanup_logs
-0 2 * * * __REPO_ROOT__/scripts/cron/run_job.sh aitools_backup_db
-0 10 * * * __REPO_ROOT__/scripts/cron/run_job.sh aitools_daily_scraper
-0 10 * * 5 __REPO_ROOT__/scripts/cron/run_job.sh aitools_weekly_period
-
-# Game overseas weekly report
-0 0 * * * __REPO_ROOT__/scripts/cron/run_job.sh gaming_daily
-0 7 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh gaming_weekly_generate
-0 10 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh gaming_weekly_push
-
-# AI UA workflows
-20 5 * * * __REPO_ROOT__/scripts/cron/run_job.sh ai_video_enhancer_daily
-40 9 * * * __REPO_ROOT__/scripts/cron/run_job.sh ai_ve_feedback_training_daily
-10 11 * * * __REPO_ROOT__/scripts/cron/run_job.sh ai_arrow2_latest_daily
-20 14 * * 3,6 __REPO_ROOT__/scripts/cron/run_job.sh ai_arrow2_exposure_wed_sat
-
-# Festivals marketing automation
-0 9 * * * __REPO_ROOT__/scripts/cron/run_job.sh festivals_daily_bitable
-10 9 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh festivals_weekly_push
-
-# Task butler project reports
-30-59/10 5 * * * __REPO_ROOT__/scripts/cron/run_job.sh task_butler_watch_send
-*/10 6-15 * * * __REPO_ROOT__/scripts/cron/run_job.sh task_butler_watch_send
+# monitor-web daily reports
+30 10 * * * __REPO_ROOT__/scripts/cron/run_job.sh monitor_reports_daily
 # END MONITOR_WEB_UNIFIED_CRON

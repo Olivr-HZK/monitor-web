@@ -89,6 +89,8 @@ mkdir -p "$LOG_ROOT" "$LOCK_ROOT"
 LOG_FILE="$LOG_ROOT/${JOB_ID}.log"
 STATUS_FILE="$LOG_ROOT/${JOB_ID}.last_status"
 LOCK_DIR="$LOCK_ROOT/${JOB_ID}.lock"
+JOB_STATUS_KIND="ok"
+JOB_STATUS_NOTE=""
 
 exec >> "$LOG_FILE" 2>&1
 
@@ -125,6 +127,44 @@ run_in() {
   )
 }
 
+run_in_timeout() {
+  local cwd="$1"
+  local timeout_sec="$2"
+  shift 2
+
+  if [[ ! -d "$cwd" ]]; then
+    log "ERROR: working directory not found: $cwd"
+    exit 66
+  fi
+
+  describe_cmd "$cwd" "$@"
+
+  if [[ "${JOB_DRY_RUN:-}" == "1" ]]; then
+    return 0
+  fi
+
+  (
+    cd "$cwd"
+    "$@" &
+    local child=$!
+    (
+      sleep "$timeout_sec"
+      if kill -0 "$child" 2>/dev/null; then
+        log "TIMEOUT: killing $JOB_ID after ${timeout_sec}s"
+        kill "$child" 2>/dev/null || true
+        sleep 5
+        kill -9 "$child" 2>/dev/null || true
+      fi
+    ) &
+    local watchdog=$!
+    local code=0
+    wait "$child" || code=$?
+    kill "$watchdog" 2>/dev/null || true
+    wait "$watchdog" 2>/dev/null || true
+    return "$code"
+  )
+}
+
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   log "SKIP: job is already running: $JOB_ID"
   printf 'status=locked\njob=%s\ntime=%s\nlog=%s\n' "$JOB_ID" "$(date '+%Y-%m-%d %H:%M:%S')" "$LOG_FILE" > "$STATUS_FILE"
@@ -135,9 +175,19 @@ on_exit() {
   local code=$?
   set +e
   rmdir "$LOCK_DIR" 2>/dev/null || true
+  if [[ "${JOB_DRY_RUN:-}" == "1" ]]; then
+    log "DRY_RUN_DONE: $JOB_ID exit_code=$code"
+    exit "$code"
+  fi
   if [[ $code -eq 0 ]]; then
+    local status_kind="${JOB_STATUS_KIND:-ok}"
     log "DONE: $JOB_ID"
-    printf 'status=ok\njob=%s\ntime=%s\nlog=%s\n' "$JOB_ID" "$(date '+%Y-%m-%d %H:%M:%S')" "$LOG_FILE" > "$STATUS_FILE"
+    {
+      printf 'status=%s\njob=%s\ntime=%s\nlog=%s\n' "$status_kind" "$JOB_ID" "$(date '+%Y-%m-%d %H:%M:%S')" "$LOG_FILE"
+      if [[ -n "${JOB_STATUS_NOTE:-}" ]]; then
+        printf 'note=%s\n' "$JOB_STATUS_NOTE"
+      fi
+    } > "$STATUS_FILE"
   else
     log "FAILED: $JOB_ID exit_code=$code"
     printf 'status=failed\njob=%s\nexit_code=%s\ntime=%s\nlog=%s\n' "$JOB_ID" "$code" "$(date '+%Y-%m-%d %H:%M:%S')" "$LOG_FILE" > "$STATUS_FILE"
@@ -160,13 +210,13 @@ case "$JOB_ID" in
     run_in "$LYB_ROOT/TrendRadar-deployment-20260316-134108" ./run_ainews_top20_daily.sh push "$@"
     ;;
   xiaohei_ainews_prepare)
-    run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh prepare "$@"
+    run_in_timeout "$LYB_ROOT/xiaohei-agent" "${XIAOHEI_JOB_TIMEOUT_SEC:-1800}" /bin/bash ./scripts/run_daily_cron.sh prepare --audit-profile auto "$@"
     ;;
   xiaohei_ainews_prepare_if_needed)
-    run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh guarded-prepare "$@"
+    run_in_timeout "$LYB_ROOT/xiaohei-agent" "${XIAOHEI_JOB_TIMEOUT_SEC:-1800}" /bin/bash ./scripts/run_daily_cron.sh guarded-prepare --audit-profile auto "$@"
     ;;
   xiaohei_ainews_push)
-    run_in "$LYB_ROOT/xiaohei-agent" /bin/bash ./scripts/run_daily_cron.sh guarded-push "$@"
+    run_in_timeout "$LYB_ROOT/xiaohei-agent" "${XIAOHEI_JOB_TIMEOUT_SEC:-1800}" /bin/bash ./scripts/run_daily_cron.sh guarded-push --audit-profile auto "$@"
     ;;
   competitor_daily_scraper)
     run_in "$REPO_ROOT/pipelines/monitor-chain/competitor-social" /bin/bash ./run-daily-scraper.sh "$@"
@@ -225,10 +275,12 @@ case "$JOB_ID" in
     run_in "$LYB_ROOT/gaming-daily-report2" ./run_gaming_daily.sh "$@"
     ;;
   gaming_weekly_generate)
-    run_in "$LYB_ROOT/gaming-daily-report2" ./.venv/bin/python3 send_gaming_weekly.py --phase generate "$@"
+    run_in_timeout "$LYB_ROOT/gaming-daily-report2" "${GAMING_WEEKLY_GENERATE_TIMEOUT_SEC:-3600}" ./.venv/bin/python3 send_gaming_weekly.py --phase generate "$@"
     ;;
   gaming_weekly_push)
-    run_in "$LYB_ROOT/gaming-daily-report2" ./run_gaming_weekly_push_cron.sh "$@"
+    JOB_STATUS_KIND="disabled"
+    JOB_STATUS_NOTE="Local gaming weekly push is disabled; production push is owned by the server cron under /opt/gaming-daily-report2."
+    log "DISABLED: local gaming_weekly_push will not send Feishu/WeCom messages or write push ok markers."
     ;;
   ai_video_enhancer_daily)
     run_in "$OLIVER_ROOT/ai-" /bin/bash ./scripts/cron_ai_video_enhancer_daily.sh "$@"

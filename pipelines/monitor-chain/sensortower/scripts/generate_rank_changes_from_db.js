@@ -220,6 +220,7 @@ function escapeCsvCell(s) {
 }
 
 function writeCsv(filePath, rows, headers) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const lines = [headers.map(escapeCsvCell).join(',')];
   for (const row of rows) {
     lines.push(headers.map((h) => escapeCsvCell(row[h])).join(','));

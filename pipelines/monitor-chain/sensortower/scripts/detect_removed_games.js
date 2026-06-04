@@ -4,7 +4,8 @@
  *
  * 设计：
  *   - 只关心「下架」，不关心是否掉出 Top100。
- *   - 以某个周一 rank_date 为一周标识，读取这一天在 apple_top100 / android_top100 中的全部 Top100。
+ *   - 以某个周一 rank_date 为一周标识，只读取这一天 US 免费榜：
+ *       iOS topfreeapplications Top100 + Android topselling_free Top100，共 200 个。
  *   - 为每条记录构造商店链接（iOS App Store / Google Play），对该 URL 发起多次 HTTP 请求（默认 3 次，间隔 2 秒）：
  *       - 任一次返回 2xx / 3xx：视为仍可访问，不写入表。
  *       - 多次尝试均返回 4xx / 5xx 或网络错误：才视为疑似下架（removed = 1），写入 weekly_removed_games。
@@ -46,9 +47,17 @@ const DB_FILE = process.env.SENSORTOWER_DB_FILE
       : path.join(__dirname, '..', process.env.SENSORTOWER_DB_FILE))
   : path.join(__dirname, '..', 'data', 'sensortower_top100.db');
 
+function envInt(name, fallback, min = 1) {
+  const raw = String(process.env[name] || '').trim();
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value < min) return fallback;
+  return value;
+}
+
 // 多次请求均失败才记为「疑似下架」，减少偶发网络/超时误判
-const REMOVED_CHECK_RETRIES = 3;
-const RETRY_DELAY_MS = 2000;
+const REMOVED_CHECK_RETRIES = envInt('REMOVED_CHECK_RETRIES', 3);
+const RETRY_DELAY_MS = envInt('REMOVED_CHECK_RETRY_DELAY_MS', 2000, 0);
+const REMOVED_CHECK_CONCURRENCY = envInt('REMOVED_CHECK_CONCURRENCY', 12);
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -123,12 +132,16 @@ function loadTargets(rankDate) {
   const safeDate = rankDate.replace(/'/g, "''");
   const targets = [];
 
-  // iOS Top100
+  // iOS US 免费榜 Top100
   const iosOut = runSqlReturn(`
     SELECT country, chart_type, app_id,
            COALESCE(NULLIF(TRIM(app_name), ''), app_id) AS app_name
     FROM apple_top100
-    WHERE rank_date = '${safeDate}';
+    WHERE rank_date = '${safeDate}'
+      AND country = 'US'
+      AND chart_type = 'topfreeapplications'
+      AND rank BETWEEN 1 AND 100
+    ORDER BY rank ASC;
   `);
   for (const line of (iosOut || '').trim().split('\n')) {
     if (!line) continue;
@@ -143,12 +156,16 @@ function loadTargets(rankDate) {
     });
   }
 
-  // Android Top100
+  // Android US 免费榜 Top100
   const andOut = runSqlReturn(`
     SELECT country, chart_type, app_id,
            COALESCE(NULLIF(TRIM(app_name), ''), app_id) AS app_name
     FROM android_top100
-    WHERE rank_date = '${safeDate}';
+    WHERE rank_date = '${safeDate}'
+      AND country = 'US'
+      AND chart_type = 'topselling_free'
+      AND rank BETWEEN 1 AND 100
+    ORDER BY rank ASC;
   `);
   for (const line of (andOut || '').trim().split('\n')) {
     if (!line) continue;
@@ -241,9 +258,44 @@ async function main() {
     return;
   }
   console.log('需要检测的应用数量：', targets.length);
+  console.log('并发数：', REMOVED_CHECK_CONCURRENCY);
+
+  let processed = 0;
+  const removedRows = await mapWithConcurrency(targets, REMOVED_CHECK_CONCURRENCY, async (t) => {
+    const row = await checkTarget(rankDate, t);
+    processed++;
+    if (processed % 20 === 0 || processed === targets.length) {
+      console.log('已检测应用', processed, '/', targets.length);
+    }
+    return row;
+  });
 
   let checked = 0;
-  for (const t of targets) {
+  for (const row of removedRows) {
+    if (!row) continue;
+    runSql(`
+      INSERT OR REPLACE INTO weekly_removed_games
+        (rank_date, os, country, chart_type, app_id, app_name, store_url, http_status, removed, reason)
+      VALUES (
+        ${escapeSqlValue(row.rankDate)},
+        ${escapeSqlValue(row.os)},
+        ${escapeSqlValue(row.country)},
+        ${escapeSqlValue(row.chartType)},
+        ${escapeSqlValue(row.appId)},
+        ${escapeSqlValue(row.appName)},
+        ${escapeSqlValue(row.storeUrl)},
+        ${row.status || 0},
+        1,
+        ${escapeSqlValue(row.reason)}
+      );
+    `);
+    checked++;
+  }
+
+  console.log('检测完成，共写入 weekly_removed_games（疑似下架）记录条数：', checked);
+}
+
+async function checkTarget(rankDate, t) {
     const url = buildStoreUrl(t);
     let status = 0;
     let reason = '';
@@ -274,33 +326,32 @@ async function main() {
       }
     }
 
-    // 只在「多次尝试均失败」时写入表，任一次 2xx/3xx 则不写
-    if (removed) {
-      runSql(`
-        INSERT OR REPLACE INTO weekly_removed_games
-          (rank_date, os, country, chart_type, app_id, app_name, store_url, http_status, removed, reason)
-        VALUES (
-          ${escapeSqlValue(rankDate)},
-          ${escapeSqlValue(t.os)},
-          ${escapeSqlValue(t.country)},
-          ${escapeSqlValue(t.chart_type)},
-          ${escapeSqlValue(t.app_id)},
-          ${escapeSqlValue(t.app_name)},
-          ${escapeSqlValue(url)},
-          ${status || 0},
-          1,
-          ${escapeSqlValue(reason)}
-        );
-      `);
+  // 只在「多次尝试均失败」时写入表，任一次 2xx/3xx 则不写
+  if (!removed) return null;
+  return {
+    rankDate,
+    os: t.os,
+    country: t.country,
+    chartType: t.chart_type,
+    appId: t.app_id,
+    appName: t.app_name,
+    storeUrl: url,
+    status,
+    reason,
+  };
+}
 
-      checked++;
-      if (checked % 20 === 0) {
-        console.log('已记录疑似下架应用', checked, '/', targets.length);
-      }
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const current = nextIndex++;
+      results[current] = await fn(items[current], current);
     }
-  }
-
-  console.log('检测完成，共写入 weekly_removed_games（疑似下架）记录条数：', checked);
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 main().catch((e) => {

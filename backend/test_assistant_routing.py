@@ -415,3 +415,17 @@ def test_web_search_intent_is_injected_into_system_prompt():
     system, _ = build_system_content(prompt, channel="feishu_casual_dm")
     assert "web_search" in system
     assert "联网资料" in system
+
+
+def test_casual_sensortower_prompt_includes_semantic_tool_guidance():
+    system, selected = build_system_content(
+        "SensorTower 最新美国免费榜 Top20",
+        None,
+        channel="feishu_casual_group",
+    )
+
+    assert "sensortower_top100.db" in selected
+    assert "sensortower_applist.db" in selected
+    assert "sensortower_query" in system
+    assert "飞书群消息卡片表格" in system
+    assert "只读 SQL 兜底" in system

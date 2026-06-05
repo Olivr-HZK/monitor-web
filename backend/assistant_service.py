@@ -38,6 +38,7 @@ _agent_knowledge_cache: str | None = None
 class AssistantResult:
     answer: str
     charts: list[dict[str, Any]] = field(default_factory=list)
+    tables: list[dict[str, Any]] = field(default_factory=list)
     selected_dbs: list[str] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
 
@@ -90,7 +91,7 @@ def _has_any(text: str, words: tuple[str, ...]) -> bool:
 
 CASUAL_SOURCE_DBS: dict[str, tuple[str, ...]] = {
     "wechat_douyin": ("wechatdouyin.db",),
-    "sensortower": ("sensortower_top100.db",),
+    "sensortower": ("sensortower_top100.db", "sensortower_applist.db"),
     "competitor": ("competitor_data.db",),
     "our_product": ("us_free_appid_weekly.db",),
 }
@@ -98,9 +99,15 @@ CASUAL_SOURCE_ORDER: tuple[str, ...] = ("wechat_douyin", "sensortower", "competi
 GLOBAL_FALLBACK_DBS: tuple[str, ...] = (
     "wechatdouyin.db",
     "sensortower_top100.db",
+    "sensortower_applist.db",
     "competitor_data.db",
     "ai_products_ua.db",
     "us_free_appid_weekly.db",
+)
+KNOWN_ROUTE_DBS: frozenset[str] = frozenset(
+    GLOBAL_FALLBACK_DBS
+    + tuple(db for dbs in CASUAL_SOURCE_DBS.values() for db in dbs)
+    + ("video_enhancer_pipeline.db",)
 )
 
 
@@ -300,7 +307,7 @@ def select_relevant_databases(
     source_intents = detect_data_source_intents(user_text, page_context, channel=channel)
 
     def add_exact(name: str) -> None:
-        if name in names and name not in selected:
+        if (name in names or name in KNOWN_ROUTE_DBS) and name not in selected:
             selected.append(name)
 
     def add_contains(fragment: str, *, max_items: int = 1) -> None:
@@ -400,10 +407,13 @@ def build_system_content(
         base += (
             "\n\n【休闲游戏站内四源路由】"
             "\n- 微信/抖音小游戏榜、Top20、玩法、新游戏：查 wechatdouyin.db。"
-            "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db。"
+            "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db 和 sensortower_applist.db。"
             "\n- 竞品动态、社媒、Facebook、Instagram、TikTok、小红书、竞品 UA/素材/投放：查 competitor_data.db。"
             "\n- 我方产品、自家产品、US Free、appid、按产品追溯：查 us_free_appid_weekly.db。"
             "\n- 休闲飞书入口不要主动使用 AI 产品 UA 库；除非用户明确跳出休闲范围，否则围绕上述四源回答。"
+            "\n- SensorTower 问题优先调用 sensortower_query；它是受控 SQL 模板 + 参数/输出策略，不是实时外部抓取。"
+            "\n- SensorTower 表格形结果会作为飞书群消息卡片表格发送；趋势/对比结果会作为 PNG 图表发送。"
+            "\n- sensortower_query 的 fallback_sql 是只读 SQL 兜底，仅用于数据库支持但未封装的问题；不要暴露 SQL、表名、库名或内部路径。"
             "\n\n【休闲 GM 语气】"
             "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
             "\n- 问趋势/最近/变化：务必 query_and_chart 画折线图（系统会把图发到飞书），文字像解说一样讲清楚「看到了什么、意味着什么」。"
@@ -514,7 +524,13 @@ async def chat_via_openrouter(
         extra_headers=_openrouter_extra_headers() or None,
         on_tool_call=wrapped_tool_call,
     )
-    return AssistantResult(answer=answer, charts=dispatcher.chart_payloads, selected_dbs=selected_dbs, tool_calls=tool_calls)
+    return AssistantResult(
+        answer=answer,
+        charts=dispatcher.chart_payloads,
+        tables=dispatcher.table_payloads,
+        selected_dbs=selected_dbs,
+        tool_calls=tool_calls,
+    )
 
 
 async def chat_via_openai(

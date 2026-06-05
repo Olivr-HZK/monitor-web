@@ -294,6 +294,7 @@ class AgentToolDispatcher:
         self.enable_db_tool = enable_db_tool
         self.enable_web_search_tool = enable_web_search_tool
         self.chart_payloads: list[dict[str, Any]] = []
+        self.table_payloads: list[dict[str, Any]] = []
         if AgentToolDispatcher._schema_cache is None:
             AgentToolDispatcher._schema_cache = _build_db_schema_cache(self.public_dir)
 
@@ -318,6 +319,8 @@ class AgentToolDispatcher:
         cls._schema_cache = None
 
     async def dispatch(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
+        if tool_name == "sensortower_query" and self.enable_db_tool:
+            return self.sensortower_query(args)
         if tool_name == "query_and_chart" and self.enable_db_tool:
             return self.query_and_chart(args)
         if tool_name == "query_sqlite" and self.enable_db_tool:
@@ -484,6 +487,21 @@ class AgentToolDispatcher:
             "columns": cols,
             "rows": out_rows,
         }
+
+    def sensortower_query(self, args: dict[str, Any]) -> dict[str, Any]:
+        from sensortower_tools import SensorTowerQueryTools
+
+        result = SensorTowerQueryTools(self).run(args)
+        if result.get("output") == "table_card":
+            self.table_payloads.append({
+                "title": result.get("title") or "SensorTower 查询结果",
+                "cutoff": result.get("cutoff") or "",
+                "comparisonPeriod": result.get("comparisonPeriod") or "",
+                "columns": result.get("columns") or [],
+                "rows": result.get("rows") or [],
+                "truncated": bool(result.get("truncated")),
+            })
+        return result
 
     # ------------------------------------------------------------------
     #  web_search
@@ -653,6 +671,75 @@ def openai_style_tools_schema(
         }
     )
     if enable_db:
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "sensortower_query",
+                    "description": (
+                        "SensorTower 语义查询工具，优先用于 SensorTower/Top100/App Store/Google Play/美国免费榜问题。"
+                        "当前支持操作：top_ranking、rank_changes、weekly_sales_trend、removed_games、top5_overview、fallback_sql。"
+                        "使用受控 SQL 模板与参数/输出策略；fallback_sql 仅作为只读 SQL 兜底，不要向用户暴露 SQL、表名或内部路径。"
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "operation": {
+                                "type": "string",
+                                "enum": [
+                                    "top_ranking",
+                                    "rank_changes",
+                                    "weekly_sales_trend",
+                                    "removed_games",
+                                    "top5_overview",
+                                    "fallback_sql",
+                                ],
+                                "description": "SensorTower 查询类型",
+                            },
+                            "platform": {
+                                "type": "string",
+                                "enum": ["ios", "android"],
+                                "description": "平台，iOS 用 ios，Google Play 用 android",
+                            },
+                            "country": {
+                                "type": "string",
+                                "description": "国家/地区代码，如 US",
+                            },
+                            "chartType": {
+                                "type": "string",
+                                "description": "榜单类型，如 free",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "最多返回行数，默认由工具按操作决定",
+                            },
+                            "direction": {
+                                "type": "string",
+                                "description": "rank_changes 可选：rise/fall/new/removed 等方向",
+                            },
+                            "appId": {
+                                "type": "string",
+                                "description": "weekly_sales_trend 使用的 app_id",
+                            },
+                            "metric": {
+                                "type": "string",
+                                "enum": ["downloads", "revenue"],
+                                "description": "weekly_sales_trend 指标",
+                            },
+                            "db": {
+                                "type": "string",
+                                "description": "fallback_sql 专用，只允许 SensorTower 数据库文件名",
+                            },
+                            "sql": {
+                                "type": "string",
+                                "description": "fallback_sql 专用，只读 SELECT/WITH SQL",
+                            },
+                        },
+                        "required": ["operation"],
+                    },
+                },
+            }
+        )
         tools.append(
             {
                 "type": "function",

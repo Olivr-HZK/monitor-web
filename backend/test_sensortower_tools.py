@@ -295,3 +295,16 @@ def test_fallback_sql_is_sensor_tower_only_and_hides_sql(tools: SensorTowerQuery
 def test_fallback_sql_rejects_non_sensortower_database(tools: SensorTowerQueryTools):
     with pytest.raises(ValueError, match="仅允许查询 SensorTower"):
         tools.run({"operation": "fallback_sql", "db": "wechatdouyin.db", "sql": "SELECT 1"})
+
+
+def test_dispatcher_routes_sensortower_query_and_collects_table(sensortower_public_dir: Path):
+    AgentToolDispatcher.invalidate_schema_cache()
+    dispatcher = AgentToolDispatcher(sensortower_public_dir, "", True, False)
+
+    result = dispatcher.sensortower_query(
+        {"operation": "top_ranking", "platform": "ios", "country": "US", "limit": 2}
+    )
+
+    assert result["output"] == "table_card"
+    assert dispatcher.table_payloads[-1]["title"] == result["title"]
+    AgentToolDispatcher.invalidate_schema_cache()

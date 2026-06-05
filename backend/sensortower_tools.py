@@ -88,7 +88,6 @@ class SensorTowerQueryTools:
     def _rank_changes(self, args: dict[str, Any]) -> dict[str, Any]:
         platform = _normalize_platform(args.get("platform"))
         country = _normalize_country(args.get("country"))
-        chart_type = _normalize_chart_type(args.get("chartType"))
         limit_int = _normalize_limit(args.get("limit"), default=20, maximum=100)
         db_path = self._db_path(TOP100_DB)
         country_values = _country_values(country)
@@ -127,7 +126,7 @@ class SensorTowerQueryTools:
         for row in rows:
             row.pop("rank_date_last", None)
         return _table_envelope(
-            title=f"SensorTower {platform} {country} {chart_type} rank changes",
+            title=f"SensorTower {platform} {country} rank changes summary",
             cutoff=cutoff,
             rows=rows,
             columns=[

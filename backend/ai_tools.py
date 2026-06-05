@@ -230,7 +230,14 @@ def _prepare_readonly_sql(sql_raw: str, *, allow_pragma_table_info: bool = False
     return sql, pragma_table_info
 
 
-def _execute_readonly_query(db_path: Path, sql: str, limit_int: int, *, timeout_sec: float = 5.0) -> tuple[list[dict[str, Any]], list[str]]:
+def _execute_readonly_query(
+    db_path: Path,
+    sql: str,
+    limit_int: int,
+    *,
+    params: tuple[Any, ...] = (),
+    timeout_sec: float = 5.0,
+) -> tuple[list[dict[str, Any]], list[str]]:
     started = time.monotonic()
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=timeout_sec)
     try:
@@ -242,7 +249,7 @@ def _execute_readonly_query(db_path: Path, sql: str, limit_int: int, *, timeout_
 
         conn.set_progress_handler(_progress, 2000)
         cur = conn.cursor()
-        cur.execute(sql)
+        cur.execute(sql, params)
         rows = cur.fetchmany(limit_int)
         out_rows: list[dict[str, Any]] = [dict(row) for row in rows]
         cols = list(out_rows[0].keys()) if out_rows else [d[0] for d in (cur.description or [])]

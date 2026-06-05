@@ -98,8 +98,9 @@ class SensorTowerQueryTools:
         direction_clause = ""
         params: tuple[Any, ...] = (cutoff, platform, *country_values)
         if direction:
-            direction_clause = " AND change_type = ?"
-            params = (cutoff, platform, *country_values, direction)
+            direction_values = _direction_values(direction)
+            direction_clause = f" AND {_in_clause('change_type', len(direction_values))}"
+            params = (cutoff, platform, *country_values, *direction_values)
         rows, _ = _execute_readonly_query(
             db_path,
             f"""
@@ -326,6 +327,21 @@ def _country_values(country: str) -> tuple[str, ...]:
     if country in aliases:
         values.append(aliases[country])
     return tuple(dict.fromkeys(values))
+
+
+def _direction_values(direction: str) -> tuple[str, ...]:
+    aliases = {
+        "rise": ("rise", "📈 排名上升", "🚀 排名飙升"),
+        "up": ("rise", "📈 排名上升", "🚀 排名飙升"),
+        "upward": ("rise", "📈 排名上升", "🚀 排名飙升"),
+        "fall": ("fall", "📉 排名下跌"),
+        "down": ("fall", "📉 排名下跌"),
+        "downward": ("fall", "📉 排名下跌"),
+        "new": ("new", "🆕 新进榜单"),
+        "new_entry": ("new", "🆕 新进榜单"),
+        "new-entry": ("new", "🆕 新进榜单"),
+    }
+    return aliases.get(direction, (direction,))
 
 
 def _in_clause(column: str, count: int) -> str:

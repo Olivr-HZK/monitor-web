@@ -141,6 +141,11 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
                 2, "1", "-1", "fall", "Hungry Studio", "https://apps.apple.com/app/ios_b",
                 900, 450, "2026-06-02",
             ),
+            (
+                "2026-06-01", "2026-05-25", "rise", "Localized Rise", "ios_localized", "🇺🇸 美国", "IOS",
+                3, "9", "+6", "📈 排名上升", "Localized Publisher", "https://apps.apple.com/app/ios_localized",
+                850, 425, "2026-06-02",
+            ),
         ],
     )
     conn.execute(
@@ -234,6 +239,14 @@ def test_rank_changes_latest_returns_table_envelope(tools: SensorTowerQueryTools
     assert result["comparisonPeriod"] == "2026-05-25"
     assert result["rows"][0]["app_name"] == "Royal Match"
     assert result["rows"][0]["change_type"] == "rise"
+
+
+def test_rank_changes_direction_rise_matches_localized_change_type(tools: SensorTowerQueryTools):
+    result = tools.run({"operation": "rank_changes", "platform": "ios", "country": "US", "direction": "rise"})
+
+    assert result["output"] == "table_card"
+    assert [row["app_name"] for row in result["rows"]] == ["Royal Match", "Localized Rise"]
+    assert result["rows"][1]["change_type"] == "📈 排名上升"
 
 
 def test_weekly_sales_trend_returns_chart_envelope_and_registers_chart(tools: SensorTowerQueryTools):

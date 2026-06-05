@@ -15,6 +15,7 @@ from assistant_service import (
     is_trend_query,
     select_relevant_databases,
     should_use_web_search,
+    tool_display_name,
 )
 from config import PUBLIC_DIR
 from feishu_format import strip_markdown_for_feishu
@@ -429,3 +430,7 @@ def test_casual_sensortower_prompt_includes_semantic_tool_guidance():
     assert "sensortower_query" in system
     assert "飞书群消息卡片表格" in system
     assert "只读 SQL 兜底" in system
+
+
+def test_sensortower_query_tool_has_friendly_display_name():
+    assert tool_display_name("sensortower_query") == "正在查询 SensorTower 数据…"

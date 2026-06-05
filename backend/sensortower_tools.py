@@ -32,6 +32,14 @@ class SensorTowerQueryTools:
             return self._removed_games(args)
         if operation == "top5_overview":
             return self._top5_overview(args)
+        if operation == "game_lookup":
+            return self._game_lookup(args)
+        if operation == "store_changes":
+            return self._store_changes(args)
+        if operation == "metadata_changes":
+            return self._metadata_changes(args)
+        if operation == "applist_summary":
+            return self._applist_summary(args)
         if operation == "fallback_sql":
             return self._fallback_sql(args)
         raise ValueError(f"unknown SensorTower operation: {operation}")
@@ -248,6 +256,150 @@ class SensorTowerQueryTools:
             "truncated": False,
         }
 
+    def _game_lookup(self, args: dict[str, Any]) -> dict[str, Any]:
+        app_id = _required_app_id(args)
+        platform = _normalize_platform(args.get("platform"))
+        db_path = self._db_path(TOP100_DB)
+        rows, _ = _execute_readonly_query(
+            db_path,
+            """
+            SELECT
+                app_id,
+                os,
+                name,
+                publisher_name,
+                rating,
+                humanized_worldwide_last_month_downloads,
+                humanized_worldwide_last_month_revenue
+            FROM app_metadata
+            WHERE app_id = ? AND lower(os) = ?
+            ORDER BY app_id ASC
+            """,
+            1,
+            params=(app_id, platform),
+        )
+        return _table_envelope(
+            title=f"SensorTower game lookup {app_id}",
+            cutoff=None,
+            rows=rows,
+            columns=[
+                {"key": "app_id", "label": "App ID"},
+                {"key": "os", "label": "平台"},
+                {"key": "name", "label": "App"},
+                {"key": "publisher_name", "label": "发行商"},
+                {"key": "rating", "label": "评分"},
+                {"key": "humanized_worldwide_last_month_downloads", "label": "上月下载"},
+                {"key": "humanized_worldwide_last_month_revenue", "label": "上月收入"},
+            ],
+            limit=2,
+        )
+
+    def _store_changes(self, args: dict[str, Any]) -> dict[str, Any]:
+        platform = _normalize_platform(args.get("platform"))
+        app_id = str(args.get("appId") or args.get("app_id") or "").strip()
+        limit_int = _normalize_limit(args.get("limit"), default=20, maximum=100)
+        table = "appstoreinfo_changes" if platform == "ios" else "gamestoreinfo_changes"
+        db_path = self._db_path(TOP100_DB)
+        where_clause = ""
+        params: tuple[Any, ...] = ()
+        if app_id:
+            where_clause = "WHERE app_id = ?"
+            params = (app_id,)
+        rows, _ = _execute_readonly_query(
+            db_path,
+            f"""
+            SELECT rank_date, app_id, changed_at, changes_json
+            FROM {table}
+            {where_clause}
+            ORDER BY COALESCE(rank_date, changed_at) DESC
+            """,
+            limit_int,
+            params=params,
+        )
+        cutoff = None
+        if rows:
+            cutoff = rows[0].get("rank_date") or rows[0].get("changed_at")
+        return _table_envelope(
+            title=f"SensorTower store changes {platform}",
+            cutoff=cutoff,
+            rows=rows,
+            columns=[
+                {"key": "rank_date", "label": "榜单日期"},
+                {"key": "app_id", "label": "App ID"},
+                {"key": "changed_at", "label": "变更时间"},
+                {"key": "changes_json", "label": "变更"},
+            ],
+            limit=limit_int,
+        )
+
+    def _metadata_changes(self, args: dict[str, Any]) -> dict[str, Any]:
+        platform = _normalize_platform(args.get("platform"))
+        app_id = str(args.get("appId") or args.get("app_id") or "").strip()
+        limit_int = _normalize_limit(args.get("limit"), default=20, maximum=100)
+        db_path = self._db_path(TOP100_DB)
+        where_clause = "WHERE lower(os) = ?"
+        params: tuple[Any, ...] = (platform,)
+        if app_id:
+            where_clause += " AND app_id = ?"
+            params = (platform, app_id)
+        rows, _ = _execute_readonly_query(
+            db_path,
+            f"""
+            SELECT rank_date, app_name, app_id, os, changed_fields, old_values, new_values
+            FROM weekly_metadata_changes
+            {where_clause}
+            ORDER BY rank_date DESC
+            """,
+            limit_int,
+            params=params,
+        )
+        cutoff = rows[0].get("rank_date") if rows else None
+        return _table_envelope(
+            title=f"SensorTower metadata changes {platform}",
+            cutoff=cutoff,
+            rows=rows,
+            columns=[
+                {"key": "rank_date", "label": "榜单日期"},
+                {"key": "app_name", "label": "App"},
+                {"key": "app_id", "label": "App ID"},
+                {"key": "os", "label": "平台"},
+                {"key": "changed_fields", "label": "变更字段"},
+                {"key": "old_values", "label": "旧值"},
+                {"key": "new_values", "label": "新值"},
+            ],
+            limit=limit_int,
+        )
+
+    def _applist_summary(self, args: dict[str, Any]) -> dict[str, Any]:
+        app_id = _required_app_id(args)
+        platform = _normalize_platform(args.get("platform"))
+        db_path = self._db_path(APPLIST_DB)
+        rows, _ = _execute_readonly_query(
+            db_path,
+            """
+            SELECT week_start, app_id, platform, summary_md
+            FROM applist_ai_summary
+            WHERE app_id = ? AND lower(platform) = ?
+            ORDER BY week_start DESC
+            """,
+            5,
+            params=(app_id, platform),
+        )
+        return {
+            "output": "text_only",
+            "title": f"SensorTower applist summary {app_id}",
+            "cutoff": rows[0].get("week_start") if rows else None,
+            "rows": rows,
+            "columns": [
+                {"key": "week_start", "label": "周"},
+                {"key": "app_id", "label": "App ID"},
+                {"key": "platform", "label": "平台"},
+                {"key": "summary_md", "label": "摘要"},
+            ],
+            "statement": rows[0].get("summary_md", "") if rows else "",
+            "truncated": len(rows) >= 5,
+        }
+
     def _fallback_sql(self, args: dict[str, Any]) -> dict[str, Any]:
         db_raw = str(args.get("db") or "").strip()
         db = Path(db_raw).name.strip()
@@ -289,6 +441,13 @@ def _normalize_platform(value: Any) -> str:
     if platform in {"android", "google", "googleplay", "google_play"}:
         return "android"
     raise ValueError("platform 仅支持 ios / android")
+
+
+def _required_app_id(args: dict[str, Any]) -> str:
+    app_id = str(args.get("appId") or args.get("app_id") or "").strip()
+    if not app_id:
+        raise ValueError("appId 不能为空")
+    return app_id
 
 
 def _normalize_country(value: Any) -> str:

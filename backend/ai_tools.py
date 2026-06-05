@@ -678,7 +678,8 @@ def openai_style_tools_schema(
                     "name": "sensortower_query",
                     "description": (
                         "SensorTower 语义查询工具，优先用于 SensorTower/Top100/App Store/Google Play/美国免费榜问题。"
-                        "当前支持操作：top_ranking、rank_changes、weekly_sales_trend、removed_games、top5_overview、fallback_sql。"
+                        "当前支持操作：top_ranking、rank_changes、weekly_sales_trend、removed_games、top5_overview、"
+                        "game_lookup、store_changes、metadata_changes、applist_summary、fallback_sql。"
                         "使用受控 SQL 模板与参数/输出策略；fallback_sql 仅作为只读 SQL 兜底，不要向用户暴露 SQL、表名或内部路径。"
                     ),
                     "parameters": {
@@ -692,6 +693,10 @@ def openai_style_tools_schema(
                                     "weekly_sales_trend",
                                     "removed_games",
                                     "top5_overview",
+                                    "game_lookup",
+                                    "store_changes",
+                                    "metadata_changes",
+                                    "applist_summary",
                                     "fallback_sql",
                                 ],
                                 "description": "SensorTower 查询类型",
@@ -719,7 +724,7 @@ def openai_style_tools_schema(
                             },
                             "appId": {
                                 "type": "string",
-                                "description": "weekly_sales_trend 使用的 app_id",
+                                "description": "app_id，供 weekly_sales_trend、game_lookup、store_changes、metadata_changes、applist_summary 使用",
                             },
                             "metric": {
                                 "type": "string",

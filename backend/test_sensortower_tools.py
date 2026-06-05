@@ -104,6 +104,61 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE app_metadata (
+            app_id TEXT,
+            os TEXT,
+            name TEXT,
+            publisher_name TEXT,
+            rating TEXT,
+            humanized_worldwide_last_month_downloads TEXT,
+            humanized_worldwide_last_month_revenue TEXT,
+            PRIMARY KEY (app_id, os)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE appstoreinfo_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_id TEXT,
+            rank_date TEXT,
+            changed_at TEXT,
+            changes_json TEXT,
+            old_data_json TEXT,
+            new_data_json TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE gamestoreinfo_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_id TEXT,
+            rank_date TEXT,
+            changed_at TEXT,
+            changes_json TEXT,
+            old_data_json TEXT,
+            new_data_json TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE weekly_metadata_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rank_date TEXT,
+            app_id TEXT,
+            os TEXT,
+            app_name TEXT,
+            changed_fields TEXT,
+            old_values TEXT,
+            new_values TEXT,
+            detected_at TEXT
+        )
+        """
+    )
     conn.executemany(
         """
         INSERT INTO apple_top100
@@ -162,6 +217,31 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
         VALUES ('2026-06-01', 'Top5 remained puzzle-heavy this week.', '{}', 'test-model', '2026-06-02')
         """
     )
+    conn.execute(
+        """
+        INSERT INTO app_metadata
+            (
+                app_id, os, name, publisher_name, rating,
+                humanized_worldwide_last_month_downloads,
+                humanized_worldwide_last_month_revenue
+            )
+        VALUES ('ios_a', 'ios', 'Block Blast', 'Hungry', '4.8', '10M', '$100k')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO appstoreinfo_changes
+            (app_id, rank_date, changed_at, changes_json, old_data_json, new_data_json)
+        VALUES ('ios_a', '2026-06-01', '2026-06-02', '{"subtitle": true}', '{"subtitle": "old"}', '{"subtitle": "new"}')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO weekly_metadata_changes
+            (rank_date, app_id, os, app_name, changed_fields, old_values, new_values, detected_at)
+        VALUES ('2026-06-01', 'ios_a', 'ios', 'Block Blast', 'subtitle', '{"subtitle": "old"}', '{"subtitle": "new"}', '2026-06-02')
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -206,6 +286,13 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
             ("2026-05-25", "ios_a", "ios", "US", 1050, 110),
             ("2026-06-01", "ios_a", "ios", "US", 1100, 120),
         ],
+    )
+    conn.execute(
+        """
+        INSERT INTO applist_ai_summary
+            (week_start, app_id, platform, summary_md, created_at)
+        VALUES ('2026-06-01', 'ios_a', 'ios', 'Block Blast summary', '2026-06-02')
+        """
     )
     conn.commit()
     conn.close()
@@ -276,6 +363,22 @@ def test_removed_games_and_top5_overview_surfaces_are_supported(tools: SensorTow
     assert removed["rows"][0]["app_name"] == "Gone Game"
     assert overview["output"] == "text_only"
     assert "Top5" in overview["statement"]
+
+
+def test_game_lookup_store_changes_metadata_changes_and_ai_summary(tools: SensorTowerQueryTools):
+    lookup = tools.run({"operation": "game_lookup", "appId": "ios_a", "platform": "ios"})
+    store_changes = tools.run({"operation": "store_changes", "appId": "ios_a", "platform": "ios", "limit": 5})
+    metadata_changes = tools.run({"operation": "metadata_changes", "appId": "ios_a", "platform": "ios", "limit": 5})
+    summary = tools.run({"operation": "applist_summary", "appId": "ios_a", "platform": "ios"})
+
+    assert lookup["output"] == "table_card"
+    assert lookup["rows"][0]["name"] == "Block Blast"
+    assert store_changes["output"] == "table_card"
+    assert store_changes["rows"][0]["app_id"] == "ios_a"
+    assert metadata_changes["output"] == "table_card"
+    assert metadata_changes["rows"][0]["changed_fields"] == "subtitle"
+    assert summary["output"] == "text_only"
+    assert summary["rows"][0]["summary_md"] == "Block Blast summary"
 
 
 def test_fallback_sql_is_sensor_tower_only_and_hides_sql(tools: SensorTowerQueryTools):

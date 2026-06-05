@@ -42,23 +42,25 @@ class SensorTowerQueryTools:
         chart_type = _normalize_chart_type(args.get("chartType"))
         limit_int = _normalize_limit(args.get("limit"), default=20, maximum=100)
         table = "apple_top100" if platform == "ios" else "android_top100"
+        chart_types = _chart_type_values(platform, chart_type)
+        chart_clause = _in_clause("chart_type", len(chart_types))
         db_path = self._db_path(TOP100_DB)
 
         cutoff = self._latest_value(
             db_path,
-            f"SELECT MAX(rank_date) AS cutoff FROM {table} WHERE country = ? AND chart_type = ?",
-            (country, chart_type),
+            f"SELECT MAX(rank_date) AS cutoff FROM {table} WHERE country = ? AND {chart_clause}",
+            (country, *chart_types),
         )
         rows, _ = _execute_readonly_query(
             db_path,
             f"""
-            SELECT rank, app_name, app_id, publisher_name
+            SELECT rank, app_name, app_id, downloads, revenue
             FROM {table}
-            WHERE rank_date = ? AND country = ? AND chart_type = ?
+            WHERE rank_date = ? AND country = ? AND {chart_clause}
             ORDER BY rank ASC
             """,
             limit_int,
-            params=(cutoff, country, chart_type),
+            params=(cutoff, country, *chart_types),
         )
         display_platform = "iOS" if platform == "ios" else "Android"
         return _table_envelope(
@@ -69,7 +71,8 @@ class SensorTowerQueryTools:
                 {"key": "rank", "label": "排名"},
                 {"key": "app_name", "label": "App"},
                 {"key": "app_id", "label": "App ID"},
-                {"key": "publisher_name", "label": "发行商"},
+                {"key": "downloads", "label": "下载"},
+                {"key": "revenue", "label": "收入"},
             ],
             limit=limit_int,
         )
@@ -80,32 +83,40 @@ class SensorTowerQueryTools:
         chart_type = _normalize_chart_type(args.get("chartType"))
         limit_int = _normalize_limit(args.get("limit"), default=20, maximum=100)
         db_path = self._db_path(TOP100_DB)
+        country_values = _country_values(country)
 
         cutoff = self._latest_value(
             db_path,
-            """
+            f"""
             SELECT MAX(rank_date_current) AS cutoff
             FROM rank_changes
-            WHERE platform = ? AND country = ? AND chart_type = ?
+            WHERE lower(platform) = ? AND {_in_clause("country", len(country_values))}
             """,
-            (platform, country, chart_type),
+            (platform, *country_values),
         )
+        direction = str(args.get("direction") or args.get("changeType") or "").strip().lower()
+        direction_clause = ""
+        params: tuple[Any, ...] = (cutoff, platform, *country_values)
+        if direction:
+            direction_clause = " AND change_type = ?"
+            params = (cutoff, platform, *country_values, direction)
         rows, _ = _execute_readonly_query(
             db_path,
-            """
+            f"""
             SELECT
-                app_name, app_id, current_rank, previous_rank, rank_delta, change_type,
-                rank_date_previous
+                app_name, current_rank, last_week_rank, change, change_type,
+                publisher_name, downloads, revenue, rank_date_last
             FROM rank_changes
-            WHERE rank_date_current = ? AND platform = ? AND country = ? AND chart_type = ?
-            ORDER BY ABS(rank_delta) DESC, current_rank ASC
+            WHERE rank_date_current = ? AND lower(platform) = ?
+              AND {_in_clause("country", len(country_values))}{direction_clause}
+            ORDER BY current_rank ASC
             """,
             limit_int,
-            params=(cutoff, platform, country, chart_type),
+            params=params,
         )
-        comparison = rows[0].get("rank_date_previous") if rows else None
+        comparison = rows[0].get("rank_date_last") if rows else None
         for row in rows:
-            row.pop("rank_date_previous", None)
+            row.pop("rank_date_last", None)
         return _table_envelope(
             title=f"SensorTower {platform} {country} {chart_type} rank changes",
             cutoff=cutoff,
@@ -113,9 +124,12 @@ class SensorTowerQueryTools:
             columns=[
                 {"key": "app_name", "label": "App"},
                 {"key": "current_rank", "label": "当前排名"},
-                {"key": "previous_rank", "label": "上期排名"},
-                {"key": "rank_delta", "label": "变化"},
+                {"key": "last_week_rank", "label": "上期排名"},
+                {"key": "change", "label": "变化"},
                 {"key": "change_type", "label": "类型"},
+                {"key": "publisher_name", "label": "发行商"},
+                {"key": "downloads", "label": "下载"},
+                {"key": "revenue", "label": "收入"},
             ],
             limit=limit_int,
             comparison_period=comparison,
@@ -177,19 +191,19 @@ class SensorTowerQueryTools:
         cutoff = self._latest_value(
             db_path,
             """
-            SELECT MAX(week_start) AS cutoff
+            SELECT MAX(rank_date) AS cutoff
             FROM weekly_removed_games
-            WHERE platform = ? AND country = ? AND chart_type = ?
+            WHERE lower(os) = ? AND country = ? AND chart_type = ? AND removed = 1
             """,
             (platform, country, chart_type),
         )
         rows, _ = _execute_readonly_query(
             db_path,
             """
-            SELECT app_name, app_id, previous_rank
+            SELECT app_name, app_id, http_status, reason, store_url
             FROM weekly_removed_games
-            WHERE week_start = ? AND platform = ? AND country = ? AND chart_type = ?
-            ORDER BY previous_rank ASC
+            WHERE rank_date = ? AND lower(os) = ? AND country = ? AND chart_type = ? AND removed = 1
+            ORDER BY app_name ASC
             """,
             limit_int,
             params=(cutoff, platform, country, chart_type),
@@ -200,7 +214,10 @@ class SensorTowerQueryTools:
             rows=rows,
             columns=[
                 {"key": "app_name", "label": "App"},
-                {"key": "previous_rank", "label": "上期排名"},
+                {"key": "app_id", "label": "App ID"},
+                {"key": "http_status", "label": "HTTP"},
+                {"key": "reason", "label": "原因"},
+                {"key": "store_url", "label": "链接"},
             ],
             limit=limit_int,
         )
@@ -213,19 +230,17 @@ class SensorTowerQueryTools:
         rows, _ = _execute_readonly_query(
             db_path,
             """
-            SELECT week_start, statement
+            SELECT rank_date, statement, trend_json
             FROM weekly_top5_overview
-            WHERE platform = ? AND country = ? AND chart_type = ?
-            ORDER BY week_start DESC
+            ORDER BY rank_date DESC
             """,
             1,
-            params=(platform, country, chart_type),
         )
         row = rows[0] if rows else {}
         return {
             "output": "text_only",
             "title": f"SensorTower Top5 overview {country} {chart_type}",
-            "cutoff": row.get("week_start"),
+            "cutoff": row.get("rank_date"),
             "statement": row.get("statement", ""),
             "rows": rows,
             "columns": [{"key": "statement", "label": "摘要"}],
@@ -287,6 +302,35 @@ def _normalize_chart_type(value: Any) -> str:
     if not chart_type:
         raise ValueError("chartType 不能为空")
     return chart_type
+
+
+def _chart_type_values(platform: str, chart_type: str) -> tuple[str, ...]:
+    aliases = [chart_type]
+    if chart_type == "free":
+        aliases.append("topfreeapplications" if platform == "ios" else "topselling_free")
+    elif chart_type in {"grossing", "revenue"}:
+        aliases.append("topgrossingapplications" if platform == "ios" else "topgrossing")
+    return tuple(dict.fromkeys(aliases))
+
+
+def _country_values(country: str) -> tuple[str, ...]:
+    aliases = {
+        "US": "🇺🇸 美国",
+        "GB": "🇬🇧 英国",
+        "UK": "🇬🇧 英国",
+        "DE": "🇩🇪 德国",
+        "IN": "🇮🇳 印度",
+        "JP": "🇯🇵 日本",
+    }
+    values = [country]
+    if country in aliases:
+        values.append(aliases[country])
+    return tuple(dict.fromkeys(values))
+
+
+def _in_clause(column: str, count: int) -> str:
+    placeholders = ", ".join("?" for _ in range(count))
+    return f"{column} IN ({placeholders})"
 
 
 def _normalize_limit(value: Any, *, default: int, maximum: int) -> int:

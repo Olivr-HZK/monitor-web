@@ -20,26 +20,36 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
     conn.execute(
         """
         CREATE TABLE apple_top100 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             rank_date TEXT,
             country TEXT,
             chart_type TEXT,
             rank INTEGER,
             app_id TEXT,
             app_name TEXT,
-            publisher_name TEXT
+            created_at TEXT,
+            country_display TEXT,
+            chart_type_display TEXT,
+            downloads REAL,
+            revenue REAL
         )
         """
     )
     conn.execute(
         """
         CREATE TABLE android_top100 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             rank_date TEXT,
             country TEXT,
             chart_type TEXT,
             rank INTEGER,
             app_id TEXT,
             app_name TEXT,
-            publisher_name TEXT
+            created_at TEXT,
+            country_display TEXT,
+            chart_type_display TEXT,
+            downloads REAL,
+            revenue REAL
         )
         """
     )
@@ -47,82 +57,104 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
         """
         CREATE TABLE rank_changes (
             rank_date_current TEXT,
-            rank_date_previous TEXT,
-            platform TEXT,
-            country TEXT,
-            chart_type TEXT,
-            app_id TEXT,
+            rank_date_last TEXT,
+            signal TEXT,
             app_name TEXT,
+            app_id TEXT,
+            country TEXT,
+            platform TEXT,
             current_rank INTEGER,
-            previous_rank INTEGER,
-            rank_delta INTEGER,
-            change_type TEXT
+            last_week_rank TEXT,
+            change TEXT,
+            change_type TEXT,
+            publisher_name TEXT,
+            store_url TEXT,
+            downloads REAL,
+            revenue REAL,
+            created_at TEXT
         )
         """
     )
     conn.execute(
         """
         CREATE TABLE weekly_removed_games (
-            week_start TEXT,
-            platform TEXT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rank_date TEXT,
+            os TEXT,
             country TEXT,
             chart_type TEXT,
             app_id TEXT,
             app_name TEXT,
-            previous_rank INTEGER
+            store_url TEXT,
+            http_status INTEGER,
+            removed INTEGER,
+            reason TEXT,
+            checked_at TEXT
         )
         """
     )
     conn.execute(
         """
         CREATE TABLE weekly_top5_overview (
-            week_start TEXT,
-            platform TEXT,
-            country TEXT,
-            chart_type TEXT,
-            statement TEXT
+            rank_date TEXT,
+            statement TEXT,
+            trend_json TEXT,
+            model_used TEXT,
+            created_at TEXT
         )
         """
     )
     conn.executemany(
         """
         INSERT INTO apple_top100
-            (rank_date, country, chart_type, rank, app_id, app_name, publisher_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (
+                rank_date, country, chart_type, rank, app_id, app_name,
+                created_at, country_display, chart_type_display, downloads, revenue
+            )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
-            ("2026-06-01", "US", "free", 1, "ios_a", "Royal Match", "Dream Games"),
-            ("2026-06-01", "US", "free", 2, "ios_b", "Block Blast", "Hungry Studio"),
-            ("2026-06-01", "US", "free", 3, "ios_c", "Whiteout Survival", "Century"),
-            ("2026-06-01", "US", "free", 4, "ios_d", "Township", "Playrix"),
+            ("2026-06-01", "US", "free", 1, "ios_a", "Royal Match", "2026-06-02", "United States", "Free", 1000, 500),
+            ("2026-06-01", "US", "free", 2, "ios_b", "Block Blast", "2026-06-02", "United States", "Free", 900, 450),
+            ("2026-06-01", "US", "free", 3, "ios_c", "Whiteout Survival", "2026-06-02", "United States", "Free", 800, 400),
+            ("2026-06-01", "US", "free", 4, "ios_d", "Township", "2026-06-02", "United States", "Free", 700, 350),
         ],
     )
     conn.executemany(
         """
         INSERT INTO rank_changes
             (
-                rank_date_current, rank_date_previous, platform, country, chart_type,
-                app_id, app_name, current_rank, previous_rank, rank_delta, change_type
+                rank_date_current, rank_date_last, signal, app_name, app_id, country, platform,
+                current_rank, last_week_rank, change, change_type, publisher_name, store_url,
+                downloads, revenue, created_at
             )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
-            ("2026-06-01", "2026-05-25", "ios", "US", "free", "ios_a", "Royal Match", 1, 3, 2, "rise"),
-            ("2026-06-01", "2026-05-25", "ios", "US", "free", "ios_b", "Block Blast", 2, 1, -1, "fall"),
+            (
+                "2026-06-01", "2026-05-25", "rise", "Royal Match", "ios_a", "🇺🇸 美国", "IOS",
+                1, "3", "+2", "rise", "Dream Games", "https://apps.apple.com/app/ios_a",
+                1000, 500, "2026-06-02",
+            ),
+            (
+                "2026-06-01", "2026-05-25", "fall", "Block Blast", "ios_b", "🇺🇸 美国", "IOS",
+                2, "1", "-1", "fall", "Hungry Studio", "https://apps.apple.com/app/ios_b",
+                900, 450, "2026-06-02",
+            ),
         ],
     )
     conn.execute(
         """
         INSERT INTO weekly_removed_games
-            (week_start, platform, country, chart_type, app_id, app_name, previous_rank)
-        VALUES ('2026-06-01', 'ios', 'US', 'free', 'ios_gone', 'Gone Game', 88)
+            (rank_date, os, country, chart_type, app_id, app_name, store_url, http_status, removed, reason, checked_at)
+        VALUES ('2026-06-01', 'ios', 'US', 'free', 'ios_gone', 'Gone Game', 'https://apps.apple.com/app/ios_gone', 404, 1, 'not_found', '2026-06-02')
         """
     )
     conn.execute(
         """
         INSERT INTO weekly_top5_overview
-            (week_start, platform, country, chart_type, statement)
-        VALUES ('2026-06-01', 'ios', 'US', 'free', 'Top5 remained puzzle-heavy this week.')
+            (rank_date, statement, trend_json, model_used, created_at)
+        VALUES ('2026-06-01', 'Top5 remained puzzle-heavy this week.', '{}', 'test-model', '2026-06-02')
         """
     )
     conn.commit()
@@ -148,8 +180,8 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
             week_start TEXT,
             app_id TEXT,
             platform TEXT,
-            country TEXT,
-            summary TEXT
+            summary_md TEXT,
+            created_at TEXT
         )
         """
     )

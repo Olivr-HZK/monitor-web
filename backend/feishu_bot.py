@@ -108,6 +108,34 @@ class FeishuBotClient:
                 if data.get("code") != 0:
                     raise FeishuEventError(f"飞书回复失败: code={data.get('code')} msg={data.get('msg')}")
 
+    async def reply_interactive_card(
+        self,
+        message_id: str,
+        card: dict[str, Any],
+        *,
+        uuid_prefix: str | None = None,
+    ) -> None:
+        token = await self.tenant_access_token()
+        prefix = uuid_prefix or message_id or str(uuid.uuid4())
+        card_seed = json.dumps(card, ensure_ascii=False, sort_keys=True)[:120]
+        payload = {
+            "msg_type": "interactive",
+            "content": json.dumps(card, ensure_ascii=False),
+            "reply_in_thread": True,
+            "uuid": _stable_uuid(f"{prefix}:interactive:{card_seed}"),
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}/reply",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+        if r.status_code >= 400:
+            raise FeishuEventError(f"飞书卡片回复 HTTP {r.status_code}: {r.text[:1000]}")
+        data = r.json()
+        if data.get("code") != 0:
+            raise FeishuEventError(f"飞书卡片回复失败: code={data.get('code')} msg={data.get('msg')}")
+
     async def upload_image(self, image_bytes: bytes, *, filename: str = "chart.png") -> str:
         token = await self.tenant_access_token()
         async with httpx.AsyncClient(timeout=30.0) as client:

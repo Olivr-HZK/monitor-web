@@ -267,6 +267,62 @@ def test_casual_feishu_group_mention_runs_with_group_channel(monkeypatch, tmp_pa
     assert replies[-1] == "SensorTower 榜单摘要"
 
 
+def test_casual_feishu_sends_table_cards_after_text(monkeypatch, tmp_path):
+    main = load_main(
+        monkeypatch,
+        tmp_path,
+        CASUAL_FEISHU_BOT_ENABLED="true",
+        CASUAL_FEISHU_VERIFICATION_TOKEN="verify-token",
+        CASUAL_FEISHU_BOT_MENTION_NAMES="休闲监测助手",
+        CASUAL_FEISHU_ASSISTANT_SEND_THINKING="false",
+        OPENAI_API_KEY="test-key",
+    )
+    replies: list[str] = []
+    cards: list[dict[str, Any]] = []
+
+    class Result:
+        answer = "最新榜单已经回收完毕。"
+        charts = []
+        tables = [
+            {
+                "title": "SensorTower iOS US free Top 2",
+                "cutoff": "2026-06-01",
+                "columns": [{"key": "rank", "label": "排名"}, {"key": "app_name", "label": "游戏"}],
+                "rows": [{"rank": 1, "app_name": "Royal Match"}],
+            }
+        ]
+
+    async def fake_run(user_text, history=None, page_context=None, *, channel="web", on_tool_call=None):
+        return Result()
+
+    async def fake_reply(message_id: str, text: str, *, uuid_prefix: str | None = None) -> None:
+        replies.append(text)
+
+    async def fake_card(message_id: str, card: dict[str, Any], *, uuid_prefix: str | None = None) -> None:
+        cards.append(card)
+
+    pending = _patch_immediate_create_task(monkeypatch, main)
+    monkeypatch.setattr(main, "run_monitor_assistant", fake_run)
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_text", fake_reply)
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_interactive_card", fake_card)
+    client = TestClient(main.app)
+
+    response = client.post(
+        "/api/feishu/casual-agent/events",
+        json=event_payload(
+            chat_type="group",
+            text="@休闲监测助手 SensorTower 最新美国 iOS 免费榜 Top2",
+            mentions=[{"key": "@_user_1", "name": "休闲监测助手"}],
+        ),
+    )
+    _run_pending_tasks(pending)
+
+    assert response.status_code == 200
+    assert replies[-1] == "最新榜单已经回收完毕。"
+    assert cards
+    assert cards[0]["elements"][1]["tag"] == "table"
+
+
 def test_casual_feishu_group_mention_matches_bot_open_id(monkeypatch, tmp_path):
     main = load_main(
         monkeypatch,

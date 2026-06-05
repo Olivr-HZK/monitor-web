@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from assistant_service import AssistantResult
 from chart_image import render_chart_png
+from feishu_cards import build_table_card
 from feishu_bot import (
     AssistantSessionStore,
     FeishuBotClient,
@@ -151,6 +152,32 @@ class CasualFeishuAgent:
             answer,
             uuid_prefix=f"{uuid_prefix}:casual-answer",
         )
+
+        table_count = 0
+        table_errors = 0
+        tables = getattr(result, "tables", []) or []
+        for idx, table_payload in enumerate(tables):
+            if not isinstance(table_payload, dict):
+                continue
+            try:
+                await self.bot_client.reply_interactive_card(
+                    event.message_id,
+                    build_table_card(table_payload),
+                    uuid_prefix=f"{uuid_prefix}:casual-table:{idx}",
+                )
+                table_count += 1
+            except Exception as table_err:
+                table_errors += 1
+                print("[casual-feishu-table]", str(table_err)[:500])
+
+        if tables and table_count == 0:
+            await self.bot_client.reply_text(
+                event.message_id,
+                "📋 表格卡带这次没能成功上屏，我先把文字结论交给你。需要的话换个范围，本神再回收一局。",
+                uuid_prefix=f"{uuid_prefix}:casual-table-fallback",
+            )
+        elif table_errors:
+            print("[casual-feishu-table]", {"sent": table_count, "failed": table_errors})
 
         chart_count = 0
         upload_errors = 0

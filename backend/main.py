@@ -80,8 +80,14 @@ from auth import (
 from ai_tools import AgentToolDispatcher
 from assistant_service import (
     build_messages_for_request as assistant_build_messages_for_request,
+    build_system_content,
+    detect_data_source_intents,
     get_agent_knowledge,
+    is_overseas_casual_query,
+    is_trend_query,
     run_monitor_assistant,
+    select_relevant_databases,
+    should_use_web_search,
     stream_openai_text_chunks as assistant_stream_openai_text_chunks,
     tool_display_name,
 )
@@ -578,6 +584,75 @@ class AIChatBody(BaseModel):
     message: str = ""
     history: list[dict] | None = None
     pageContext: dict[str, Any] | None = None
+
+
+class PromptLabInspectBody(BaseModel):
+    message: str = ""
+    pageContext: dict[str, Any] | None = None
+    channel: str = "web"
+
+
+@app.post("/api/ai/prompt-lab/inspect")
+async def prompt_lab_inspect(body: PromptLabInspectBody, request: Request):
+    await require_user_for_ai(request)
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="缺少提问内容")
+    channel = (body.channel or "web").strip() or "web"
+    page_context = body.pageContext if isinstance(body.pageContext, dict) else None
+    system_content, selected_dbs = build_system_content(text, page_context, channel=channel)
+    source_intents = detect_data_source_intents(text, page_context, channel=channel)
+    return {
+        "channel": channel,
+        "selectedDbs": selected_dbs,
+        "sourceIntents": source_intents,
+        "flags": {
+            "trend": is_trend_query(text, page_context),
+            "overseas": is_overseas_casual_query(text, page_context),
+            "webSearch": should_use_web_search(text, page_context),
+        },
+        "hints": {
+            "sensortowerQuery": "sensortower_query" in system_content,
+            "readPublicReport": "read_public_report" in system_content,
+            "feishuTableCards": "飞书群消息卡片表格" in system_content,
+            "fallbackSql": "只读 SQL 兜底" in system_content,
+            "webSearch": "web_search" in system_content,
+        },
+        "systemPreview": system_content[:1600],
+    }
+
+
+@app.post("/api/ai/prompt-lab/run")
+async def prompt_lab_run(body: PromptLabInspectBody, request: Request):
+    await require_user_for_ai(request)
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="缺少提问内容")
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="AI 服务未配置，请先在 backend/.env 中配置 OPENAI_API_KEY")
+    if not _ai_rate_limiter.allow(_client_rate_key(request, "prompt-lab")):
+        raise HTTPException(status_code=429, detail="提问太频繁了，请稍后再试。")
+    channel = (body.channel or "web").strip() or "web"
+    page_context = body.pageContext if isinstance(body.pageContext, dict) else None
+    try:
+        result = await run_monitor_assistant(text, [], page_context, channel=channel)
+        payload: dict[str, Any] = {
+            "answer": result.answer,
+            "selectedDbs": result.selected_dbs,
+            "toolCalls": result.tool_calls,
+        }
+        if result.charts:
+            payload["charts"] = result.charts
+        if result.tables:
+            payload["tables"] = result.tables
+        return payload
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)[:1000]) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("[prompt-lab-run]", e)
+        raise HTTPException(status_code=500, detail="Prompt Lab 运行异常，请稍后重试。") from e
 
 
 @app.post("/api/ai/chat/stream")

@@ -323,6 +323,87 @@ def test_casual_feishu_sends_table_cards_after_text(monkeypatch, tmp_path):
     assert cards[0]["elements"][1]["tag"] == "table"
 
 
+def test_casual_feishu_sends_chart_images_after_text(monkeypatch, tmp_path):
+    main = load_main(
+        monkeypatch,
+        tmp_path,
+        CASUAL_FEISHU_BOT_ENABLED="true",
+        CASUAL_FEISHU_VERIFICATION_TOKEN="verify-token",
+        CASUAL_FEISHU_BOT_MENTION_NAMES="休闲监测助手",
+        CASUAL_FEISHU_ASSISTANT_SEND_THINKING="false",
+        OPENAI_API_KEY="test-key",
+    )
+    casual_feishu_agent = importlib.import_module("casual_feishu_agent")
+    replies: list[str] = []
+    images: list[dict[str, Any]] = []
+
+    class Result:
+        answer = "Royal Kingdom 近 8 周趋势已经回收完毕。"
+        tables = []
+        charts = [
+            {
+                "type": "line",
+                "title": "Royal Kingdom 美国 iOS 免费榜近 8 周趋势",
+                "xKey": "week",
+                "series": [{"key": "downloads", "name": "下载量"}],
+                "data": [
+                    {"week": "2026-04-19", "downloads": 120000},
+                    {"week": "2026-04-26", "downloads": 148000},
+                ],
+            }
+        ]
+
+    async def fake_run(user_text, history=None, page_context=None, *, channel="web", on_tool_call=None):
+        return Result()
+
+    async def fake_reply(message_id: str, text: str, *, uuid_prefix: str | None = None) -> None:
+        replies.append(text)
+
+    async def fake_image(
+        message_id: str,
+        image_bytes: bytes,
+        *,
+        uuid_prefix: str | None = None,
+        filename: str = "chart.png",
+    ) -> None:
+        images.append(
+            {
+                "message_id": message_id,
+                "image_bytes": image_bytes,
+                "uuid_prefix": uuid_prefix,
+                "filename": filename,
+            }
+        )
+
+    pending = _patch_immediate_create_task(monkeypatch, main)
+    monkeypatch.setattr(main, "run_monitor_assistant", fake_run)
+    monkeypatch.setattr(casual_feishu_agent, "render_chart_png", lambda chart: b"png-bytes")
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_text", fake_reply)
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_image", fake_image)
+    client = TestClient(main.app)
+
+    response = client.post(
+        "/api/feishu/casual-agent/events",
+        json=event_payload(
+            chat_type="group",
+            text="@休闲监测助手 看一下 SensorTower 里 app id 1606549505 在美国 iOS 的近 8 周下载趋势。",
+            mentions=[{"key": "@_user_1", "name": "休闲监测助手"}],
+        ),
+    )
+    _run_pending_tasks(pending)
+
+    assert response.status_code == 200
+    assert replies[-1] == "Royal Kingdom 近 8 周趋势已经回收完毕。"
+    assert images == [
+        {
+            "message_id": "msg_1",
+            "image_bytes": b"png-bytes",
+            "uuid_prefix": "evt_1:casual-chart:0",
+            "filename": "chart_1.png",
+        }
+    ]
+
+
 def test_casual_feishu_group_mention_matches_bot_open_id(monkeypatch, tmp_path):
     main = load_main(
         monkeypatch,

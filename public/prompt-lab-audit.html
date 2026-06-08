@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Prompt 测试</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin:0; background:#f6f7f3; color:#172018; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+      main { width:min(1180px,100%); margin:0 auto; padding:24px; }
+      h1 { margin:0; font-size:32px; line-height:1.2; }
+      h2 { margin:0; font-size:18px; }
+      p { margin:0; }
+      .sub { margin-top:8px; color:#687064; line-height:1.6; }
+      .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:18px; }
+      .metric { background:#fff; border:1px solid #d7ddd3; border-radius:8px; padding:12px; }
+      .metric b { display:block; font-size:22px; }
+      .metric span { color:#687064; font-size:13px; }
+      .tester { margin-top:18px; background:#fff; border:1px solid #d7ddd3; border-radius:8px; padding:14px; }
+      .chart-preview { margin-top:18px; background:#fff; border:1px solid #d7ddd3; border-radius:8px; padding:14px; }
+      .chart-preview img { display:block; width:100%; height:auto; margin-top:10px; border:1px solid #e0e5dc; border-radius:6px; background:#fffaf0; }
+      .delivery { display:grid; gap:8px; margin-top:12px; padding:12px; background:#f4f5f1; border-radius:6px; line-height:1.55; }
+      .delivery b { color:#18351f; }
+      .test-row { display:grid; grid-template-columns:minmax(0,1fr) 120px; gap:10px; margin-top:10px; }
+      textarea { width:100%; min-height:72px; padding:10px; border:1px solid #cbd3c7; border-radius:6px; font:inherit; resize:vertical; }
+      button { border:0; border-radius:6px; background:#18351f; color:white; font-weight:700; cursor:pointer; }
+      #result { margin-top:10px; min-height:82px; background:#f4f5f1; border-radius:6px; padding:10px; white-space:pre-wrap; line-height:1.55; }
+      .cards { display:grid; gap:12px; margin-top:18px; }
+      .card { background:#fff; border:1px solid #d7ddd3; border-radius:8px; padding:14px; }
+      .head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:10px; }
+      .badge { border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700; white-space:nowrap; }
+      .ok { background:#dbf2df; color:#126127; }
+      .warn { background:#fff1bf; color:#705200; }
+      .bad { background:#ffd9d2; color:#8a1d10; }
+      .line { display:grid; gap:4px; margin-top:10px; }
+      .label { color:#6f766b; font-size:12px; font-weight:700; }
+      .value { line-height:1.55; }
+      .tool { font-family:"SFMono-Regular",Consolas,monospace; font-size:13px; color:#333; }
+      .meta { color:#6f766b; font-size:13px; margin-top:8px; }
+      @media (max-width:780px) { .summary,.test-row { grid-template-columns:1fr; } button { min-height:42px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Agent 支持能力和测试结果</h1>
+      <p class="sub">已按飞书休闲游戏群消息场景真实跑了 11 条 prompt。下面只保留：支持功能、测试 prompt、实际调用、结果和是否需要优化。</p>
+      <section class="summary">
+        <div class="metric"><b>11</b><span>真实 prompt</span></div>
+        <div class="metric"><b>8</b><span>直接通过</span></div>
+        <div class="metric"><b>3</b><span>可用但要优化</span></div>
+        <div class="metric"><b>0</b><span>失败</span></div>
+      </section>
+      <section class="tester">
+        <h2>自己测一个 Prompt</h2>
+        <p class="sub">输入一句话，点运行。默认按飞书休闲游戏群消息场景测试。</p>
+        <div class="test-row">
+          <textarea id="prompt">SensorTower 美国 iOS 免费榜最近有哪些排名异动？取前 10 个。</textarea>
+          <button id="run">运行</button>
+        </div>
+        <div id="result">等待输入</div>
+      </section>
+      <section class="chart-preview">
+        <h2>趋势图返回到飞书的方式</h2>
+        <p class="sub">来自测试 prompt：看一下 SensorTower 里 app id 1606549505 在美国 iOS 的近 8 周下载趋势。</p>
+        <div class="delivery">
+          <div><b>群里最终返回：</b>文字结论 + PNG 趋势图图片消息，不是把这个网页 SVG 发给飞书。</div>
+          <div><b>后端链路：</b>agent 产出 chart payload → render_chart_png 渲染 PNG → Feishu reply_image 上传并回复图片。</div>
+          <div><b>已补测试：</b>模拟趋势图结果后，断言飞书群入口会调用 reply_image，文件名 chart_1.png。</div>
+          <div><b>注意：</b>休闲游戏飞书入口支持发图；普通 /api/feishu/events 入口目前只回文字。</div>
+        </div>
+        <img src="/monitor-web/royal-kingdom-us-ios-trend.svg" alt="Royal Kingdom 美国 iOS 免费榜近 8 周趋势图" />
+      </section>
+      <section class="cards" id="cards"></section>
+    </main>
+    <script>
+      const cases = [
+        {
+                "id": "st_top5",
+                "feature": "SensorTower 榜单查询",
+                "prompt": "SensorTower 最新美国 iOS 免费榜 Top5 是什么？请用站内数据回答。",
+                "tools": "sensortower_query.top_ranking | query_sqlite -> sensortower_top100.db | query_sqlite -> sensortower_top100.db",
+                "result": "SensorTower 美国 iOS 免费榜最新 Top5 来啦（数据截止 2026-04-13）： 1. Magic Sort! — 下载 40.7 万，收入 9383 万美元 2. Block Blast！— 下载 28.8 万，免费榜常客了 3. Arrows – Puzzle Escape — 下载 23.2 万 4. Jewel Coloring — 下载 30.8 万 5. Royal Kingdom — 下载 19.2 万，但收入高达 2.9 亿美元，吸金能力很强 能看到休闲解谜类还是占主导，Bloc",
+                "note": "可用，但有冗余 query_sqlite，需要后续收紧。",
+                "tone": "warn",
+                "charts": 0,
+                "tables": 1,
+                "elapsed": 24.8
+        },
+        {
+                "id": "st_rank_changes",
+                "feature": "SensorTower 排名异动",
+                "prompt": "SensorTower 美国 iOS 免费榜最近有哪些排名异动？取前 10 个。",
+                "tools": "sensortower_query.rank_changes",
+                "result": "先说重点：美国 iOS 免费榜最近一周（对比 4 月 6 日那周，数据截止到 4 月 13 日）异动挺活跃的，10 个位置里有 2 个是新进榜，其余都是大幅上升，没有掉榜的。 几个值得注意的点： **新进榜的两款** - GOODROID 的新品直接冲到第 7 名，首周下载 6.8 万，收入还是 0，典型的冲榜打法 - Gimica GmbH 那款排第 17，下载量 1.8 万，也是免费冲量 **飙升最猛的** - Moon Active 的老游戏（app_id 406889139）从 76 名一口气跳到 36 名",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 1,
+                "elapsed": 15.7
+        },
+        {
+                "id": "st_removed",
+                "feature": "SensorTower 下架/消失游戏",
+                "prompt": "SensorTower 美国 iOS 免费榜最新有哪些下架或者消失的游戏？",
+                "tools": "sensortower_query.removed_games",
+                "result": "目前查询结果显示，SensorTower 美国 iOS 免费榜在现有数据周期内**没有记录到下架或消失的游戏**。 这个结果可能有两种情况： 1. 近期确实没有头部休闲游戏从免费榜移除 2. 数据更新有延迟 需要说明的是，站内 SensorTower 数据最新截止到 **2026 年 4 月 14 日**，不是实时数据。如果你需要确认某款具体游戏是否还在榜上，可以告诉我游戏名，我帮你查一下它当前的排名状态。 另外，如果你想看的是「排名大幅下滑」而非完全下架的游戏，我也可以帮你拉一份排名跌幅最大的榜单，看看哪些游戏正",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 1,
+                "elapsed": 10.4
+        },
+        {
+                "id": "st_top5_overview",
+                "feature": "SensorTower Top5 概览",
+                "prompt": "SensorTower 最新 Top5 概览讲了什么？",
+                "tools": "sensortower_query.top5_overview",
+                "result": "SensorTower 最新 Top5 概览（数据截止 2026-04-13）讲了这么几件事： **新王登基** 这周有好几款休闲游戏冲上榜首：Magic Sort! 直接在 iOS 美国免费榜登顶，Jewel Coloring 在 Android 日本畅销榜首次夺冠，Bus Rush Fever! 和 Golden Card Pact 分别在 iOS 英国免费榜、Android 印度畅销榜实现登顶。 **老将波动** 一些头部产品出现下滑：Block Blast! 从 iOS 德国免费榜第 1 滑落，Gossip",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 0,
+                "elapsed": 15.8
+        },
+        {
+                "id": "st_game_lookup",
+                "feature": "SensorTower 单游戏画像",
+                "prompt": "查一下 SensorTower 里 app id 1606549505 的单游戏画像。",
+                "tools": "sensortower_query.game_lookup | sensortower_query.metadata_changes",
+                "result": "好的，App ID 1606549505 的游戏画像来了： **Royal Kingdom** — Dream Games 出品，iOS 平台 核心数据（上月全球）： - 评分：4.71 - 下载量：约 200 万 - 收入：约 2600 万美元 游戏定位：这是 Royal Match 原班团队推出的新三消冒险，主打「皇室家族」IP 延伸，玩法围绕解谜闯关 + 王国建造。剧情线引入新角色如 King Richard（King Robert 的弟弟）、Princess Bella 和 Wizard，目标是击败 Dar",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 2,
+                "elapsed": 17.9
+        },
+        {
+                "id": "st_weekly_trend",
+                "feature": "SensorTower 单游戏下载趋势",
+                "prompt": "看一下 SensorTower 里 app id 1606549505 在美国 iOS 的近 8 周下载趋势。",
+                "tools": "sensortower_query.weekly_sales_trend | query_and_chart -> sensortower_applist.db | query_and_chart -> sensortower_top100.db | query_sqlite -> sensortower_top100.db | query_sqlite -> sensortower_applist.db | sensortower_query.game_lookup | sensortower_query.fallback_sql | query_sqlite -> sensortower_top100.db | query_sqlite -> sensortower_top100.db | query_sqlite -> sensortower_top100.db | query_and_chart -> sensortower_top100.db | query_and_chart -> sensortower_top100.db",
+                "result": "好的，已经帮你拉出 Royal Kingdom（Dream Games 出品）在美国 iOS 免费榜的近 8 周下载趋势图了。 **一眼看趋势：V 型反转，最近 4 周爆发式增长** 从图里能清楚看到，这款游戏的下载量在 3 月中旬触底（约 7.2 万），之后一路反弹，到 4 月 13 日这周已经冲到 19 万+，**几乎翻了 2.6 倍**。排名也同步从 17 名左右一路飙升到第 5 名，3 月 30 日那周甚至摸到过第 4 名。 **几个关键节点：** - 2/23→3/16：下滑期，下载量从 10 万+ 跌到",
+                "note": "可用，能出趋势图，但调用过多且有 fallback，优先优化。",
+                "tone": "warn",
+                "charts": 2,
+                "tables": 2,
+                "elapsed": 68.9
+        },
+        {
+                "id": "st_metadata_changes",
+                "feature": "SensorTower 元数据变化",
+                "prompt": "SensorTower 里 app id 1606549505 最近标题、副标题、图标这些元数据有什么变化？",
+                "tools": "sensortower_query.metadata_changes",
+                "result": "好嘞，帮你查了 Royal Kingdom（app_id 1606549505）最近的元数据变动。数据截止到 2026-04-13。 **核心结论**：标题和副标题近期没动，图标也没变。变化主要集中在 应用描述 和 应用截图 两块。 **描述（description）的变化** 从 3 月初开始，描述内容本身没变，但格式做了优化——从一大段连续文字改成了带换行的结构化排版，每个功能模块（比如 MASTER MATCH 3 PUZZLES、BUILD AND EXPLORE KINGDOMS 等）都独立成段，阅读体验",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 1,
+                "elapsed": 28.7
+        },
+        {
+                "id": "st_store_changes",
+                "feature": "SensorTower 商店页变化",
+                "prompt": "SensorTower 里 app id 1606549505 最近商店页有什么变化？",
+                "tools": "sensortower_query.store_changes | sensortower_query.metadata_changes",
+                "result": "查到啦！app id 1606549505 是 **Royal Kingdom**（Dream Games 的三消新品），最近商店页确实有几次调整。数据截止到 2026-04-13。 **主要变化集中在两块：** 1. **描述文案格式优化** 从 3 月中旬开始，description 从一坨连续文本改成了带换行分段的可读格式，把「MASTER MATCH 3 PUZZLES」「BUILD AND EXPLORE KINGDOMS」「CONQUER THE DARK KING」等模块分开呈现，视觉上更清晰。文案内",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 2,
+                "elapsed": 21.9
+        },
+        {
+                "id": "wechat_rank",
+                "feature": "微信小游戏排名趋势",
+                "prompt": "微信小游戏本周排名变化，取最新几条概括。",
+                "tools": "query_and_chart -> wechatdouyin.db | query_and_chart -> wechatdouyin.db | query_sqlite -> wechatdouyin.db | query_and_chart -> wechatdouyin.db",
+                "result": "微信小游戏这周（4 月 6 日 -4 月 12 日）的榜单出来了，数据截止到 4 月 14 日，给你划几个重点： **人气榜头部挺稳的** - 羊了个羊：星球继续坐稳第 1，北京简游这款还是顶流 - 抓大鹅升到第 2（↑1），青岛蓝飞互娱这款势头不错 **有几款游戏蹿得很快** - 这就是功夫直接从后面冲到第 12 名，一口气上了 22 位，广州三狼网络这款有点猛 - 我强到爆表（↑16）和每天过一关（↑17）也都是大幅上升的新面孔 **畅销榜这边** - 向僵尸开炮拿到第 1（↑1），海南盛昌这款变现能力很强 -",
+                "note": "可用，但这次生成的是表格图；趋势问题最好稳定成折线图。",
+                "tone": "warn",
+                "charts": 1,
+                "tables": 0,
+                "elapsed": 30.0
+        },
+        {
+                "id": "competitor_ua",
+                "feature": "竞品 UA / 社媒变化",
+                "prompt": "竞品 UA 素材最近有什么变化？",
+                "tools": "query_and_chart -> competitor_data.db | query_sqlite -> competitor_data.db",
+                "result": "最近一周（4/6-4/12）竞品 UA 素材变化挺有意思的，几家动作差异很大： **King 这周最猛**，直接上了组合拳。Candy Crush 推出「侏罗纪赛季」新内容，同时搞了个 NBA 线下大动作——把洛杉矶快船队主场改造成沉浸式 Candy Crush 体验场，还请了 Anna Faris 站台。素材方向上还在测试 ASMR 感官营销，这类视听素材如果互动率跑得好，很可能被大规模复用。 **Voodoo 在搞赛季更迭**。Mob Control 的 Troopers 赛季快结束了，正在预热新机制「Stac",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 1,
+                "tables": 0,
+                "elapsed": 27.3
+        },
+        {
+                "id": "overseas_report",
+                "feature": "休闲游戏出海周报",
+                "prompt": "最新一期休闲游戏出海周报的重点内容是什么？",
+                "tools": "read_public_report.latest",
+                "result": "这期周报是截至 2026 年 6 月 3 日的最新一期，一共跟踪了 260 条出海游戏资讯，我帮你拎出几个最值得关注的点： **最炸的三件事** 第一，Saga 把 AI 网红智能体直接塞进了三消游戏 Diamond Jewels 里，这是 AI 在休闲游戏 LiveOps 和外部社交 UA 里的直接落地，算是个新玩法。 第二，Monopoly Go 搞了个大动作，联动辛普森一家做 LiveOps 和营销攻势，再次证明顶级 IP 联动对休闲游戏用户参与度的杀伤力。 第三，越南的益智、模拟和街机游戏在 2025 年拿",
+                "note": "通过，路由和结果符合预期。",
+                "tone": "ok",
+                "charts": 0,
+                "tables": 0,
+                "elapsed": 20.4
+        }
+];
+      const cards = document.getElementById('cards');
+      cards.innerHTML = cases.map((item) => `
+        <article class="card">
+          <div class="head">
+            <h2>${item.feature}</h2>
+            <span class="badge ${item.tone}">${item.tone === 'ok' ? '通过' : item.tone === 'warn' ? '可用但需优化' : '失败'}</span>
+          </div>
+          <div class="line"><div class="label">测试 prompt</div><div class="value">${item.prompt}</div></div>
+          <div class="line"><div class="label">实际调用</div><div class="value tool">${item.tools}</div></div>
+          <div class="line"><div class="label">结果</div><div class="value">${item.result}</div></div>
+          <div class="line"><div class="label">判断</div><div class="value">${item.note}</div></div>
+          <div class="meta">图表 ${item.charts} 个，表格 ${item.tables} 个，用时 ${item.elapsed} 秒</div>
+        </article>
+      `).join('');
+
+      function contextFor(prompt) {
+        if (prompt.includes('微信') || prompt.includes('抖音')) return { monitorType:'休闲游戏监测', rankingSection:'wechat_douyin' };
+        if (prompt.includes('出海')) return { monitorType:'休闲游戏监测', casualGameCategory:'出海周报' };
+        if (prompt.includes('竞品')) return { monitorType:'休闲游戏监测' };
+        return { monitorType:'休闲游戏监测', rankingSection:'sensortower' };
+      }
+
+      function summarize(data) {
+        const calls = (data.toolCalls || []).map((call) => {
+          const a = call.args || {};
+          if (a.operation) return `${call.name}.${a.operation}`;
+          if (a.db) return `${call.name} -> ${a.db}`;
+          if (a.path) return `${call.name}.${a.path}`;
+          return call.name;
+        }).join('\n');
+        return `实际调用：
+${calls || '无'}
+
+结果：
+${(data.answer || '').slice(0, 800)}
+
+图表：${(data.charts || []).length} 个；表格：${(data.tables || []).length} 个`;
+      }
+
+      document.getElementById('run').addEventListener('click', async () => {
+        const prompt = document.getElementById('prompt').value.trim();
+        const result = document.getElementById('result');
+        if (!prompt) { result.textContent = '先输入 prompt'; return; }
+        result.textContent = '运行中...';
+        try {
+          const res = await fetch('/api/ai/prompt-lab/run', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ message:prompt, channel:'feishu_casual_group', pageContext:contextFor(prompt) })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+          result.textContent = summarize(data);
+        } catch (err) {
+          result.textContent = `运行失败：${err.message}`;
+        }
+      });
+    </script>
+  </body>
+</html>

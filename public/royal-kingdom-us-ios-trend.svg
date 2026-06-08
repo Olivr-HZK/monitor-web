@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="430" viewBox="0 0 940 430">
+  <rect width="940" height="430" fill="#fffaf0"/>
+  <text x="78" y="34" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#172018">Royal Kingdom 美国 iOS 免费榜近 8 周趋势</text>
+  <text x="78" y="56" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#687064">下载量左轴；排名右轴，排名越靠上越好。数据截至 2026-04-13。</text>
+
+  <g stroke="#e1ded2" stroke-width="1">
+    <line x1="78" y1="56" x2="862" y2="56"/>
+    <line x1="78" y1="130.5" x2="862" y2="130.5"/>
+    <line x1="78" y1="205" x2="862" y2="205"/>
+    <line x1="78" y1="279.5" x2="862" y2="279.5"/>
+    <line x1="78" y1="354" x2="862" y2="354"/>
+  </g>
+
+  <g font-family="SFMono-Regular, Consolas, monospace" font-size="12" fill="#6f766b">
+    <text x="34" y="60">20万</text>
+    <text x="34" y="135">16.8万</text>
+    <text x="34" y="209">13.5万</text>
+    <text x="34" y="284">10.3万</text>
+    <text x="34" y="358">7万</text>
+    <text x="880" y="60">#1</text>
+    <text x="880" y="135">#6</text>
+    <text x="880" y="209">#11</text>
+    <text x="880" y="284">#16</text>
+    <text x="880" y="358">#20</text>
+  </g>
+
+  <polyline fill="none" stroke="#2563eb" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" points="78.0,277.7 190.0,326.3 302.0,342.0 414.0,348.3 526.0,282.7 638.0,236.5 750.0,163.4 862.0,75.3"/>
+  <polyline fill="none" stroke="#ef4444" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" points="78.0,259.9 190.0,291.3 302.0,291.3 414.0,306.9 526.0,259.9 638.0,103.1 750.0,118.7 862.0,118.7"/>
+
+  <g fill="#2563eb" stroke="#fffaf0" stroke-width="3">
+    <circle cx="78.0" cy="277.7" r="6"/><circle cx="190.0" cy="326.3" r="6"/><circle cx="302.0" cy="342.0" r="6"/><circle cx="414.0" cy="348.3" r="6"/><circle cx="526.0" cy="282.7" r="6"/><circle cx="638.0" cy="236.5" r="6"/><circle cx="750.0" cy="163.4" r="6"/><circle cx="862.0" cy="75.3" r="6"/>
+  </g>
+  <g fill="#ef4444" stroke="#fffaf0" stroke-width="3">
+    <circle cx="78.0" cy="259.9" r="6"/><circle cx="190.0" cy="291.3" r="6"/><circle cx="302.0" cy="291.3" r="6"/><circle cx="414.0" cy="306.9" r="6"/><circle cx="526.0" cy="259.9" r="6"/><circle cx="638.0" cy="103.1" r="6"/><circle cx="750.0" cy="118.7" r="6"/><circle cx="862.0" cy="118.7" r="6"/>
+  </g>
+
+  <g font-family="SFMono-Regular, Consolas, monospace" font-size="11" fill="#172018">
+    <text x="54" y="379">02-23</text>
+    <text x="166" y="379">03-02</text>
+    <text x="278" y="379">03-09</text>
+    <text x="390" y="379">03-16</text>
+    <text x="502" y="379">03-23</text>
+    <text x="614" y="379">03-30</text>
+    <text x="726" y="379">04-06</text>
+    <text x="838" y="379">04-13</text>
+  </g>
+
+  <g font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#172018">
+    <rect x="78" y="396" width="14" height="4" fill="#2563eb" rx="2"/>
+    <text x="100" y="402">下载量：10.3万 → 19.2万，3 月中旬触底后强反弹</text>
+    <rect x="462" y="396" width="14" height="4" fill="#ef4444" rx="2"/>
+    <text x="484" y="402">免费榜排名：#14 → #5，3/30 冲进 Top5</text>
+  </g>
+</svg>

@@ -192,7 +192,7 @@ def is_overseas_casual_query(text: str, page_context: dict[str, Any] | None = No
 def should_use_web_search(user_text: str, page_context: dict[str, Any] | None = None) -> bool:
     """识别需要站外/实时信息的问法；工具是否可用由 dispatcher 决定。"""
     blob = _intent_blob(user_text, page_context)
-    return _has_any(
+    explicit_external_lookup = _has_any(
         blob,
         (
             "联网",
@@ -213,6 +213,40 @@ def should_use_web_search(user_text: str, page_context: dict[str, Any] | None = 
             "twitter",
             "x.com",
             "reddit",
+        ),
+    )
+    if explicit_external_lookup:
+        return True
+
+    causal_or_reference_lookup = _has_any(
+        blob,
+        (
+            "为什么",
+            "为何",
+            "原因",
+            "背后",
+            "怎么回事",
+            "可能和什么有关",
+            "和什么有关",
+            "相关信息",
+            "相关资料",
+            "相关动作",
+            "有没有相关",
+        ),
+    )
+    if causal_or_reference_lookup:
+        return True
+
+    return _has_any(
+        blob,
+        (
+            "做了什么",
+            "产品动作",
+            "版本更新",
+            "更新了什么",
+            "活动",
+            "联动",
+            "上线了什么",
         ),
     )
 
@@ -384,11 +418,12 @@ def build_system_content(
     )
     if CODEX_ENABLE_WEB_SEARCH_TOOL:
         base += (
-            "\n- 用户明确问站外/公开网页/新闻/官网/实时/今天刚发布的信息，或站内数据不足以回答时，必须调用 web_search。"
-            "\n- web_search 结果只能作为联网资料；回复时要和站内监测数据分开说，并直接贴来源 URL。"
+            "\n- 排名/趋势/表现类问题默认先用站内数据库，不要因为「最近/今天/排名」本身就联网。"
+            "\n- 用户明确问站外/公开网页/新闻/官网/实时/今天刚发布的信息，或追问「为什么/原因/相关动作/产品动作/版本更新/活动/联动」时，必须调用 web_search。"
+            "\n- web_search 结果只能作为联网资料、实效性和相关性参考；回复时要和站内监测数据分开说，贴来源 URL，并说明公开动作不能证明因果。"
         )
         if web_intent:
-            base += "\n- 当前问题已识别为站外/实时意图：先用站内数据定边界，再调用 web_search 补最新公开信息。"
+            base += "\n- 当前问题已识别为原因/相关动作/站外资料意图：先用站内数据定边界，再调用 web_search 补最新公开信息，最后把相关性判断标成参考而非因果结论。"
     if is_overseas_casual_query(user_text, page_context):
         overseas_block = build_overseas_weekly_prompt_block(PUBLIC_DIR)
         if overseas_block:

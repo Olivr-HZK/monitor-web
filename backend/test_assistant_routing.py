@@ -418,6 +418,30 @@ def test_web_search_intent_is_injected_into_system_prompt():
     assert "联网资料" in system
 
 
+def test_product_ranking_query_does_not_trigger_web_search_by_default():
+    prompt = "Block Blast 最近在 SensorTower 美国 iOS 免费榜排名怎么样？"
+    assert not should_use_web_search(prompt)
+    system, _ = build_system_content(prompt, channel="feishu_casual_group")
+    assert "当前问题已识别为站外/实时意图" not in system
+
+
+def test_product_reason_query_triggers_web_search_for_related_actions():
+    prompt = "Block Blast 最近排名为什么涨了？有没有相关动作可以参考？"
+    assert should_use_web_search(prompt)
+    system, _ = build_system_content(prompt, channel="feishu_casual_group")
+    assert "web_search" in system
+    assert "相关动作" in system
+    assert "不能证明因果" in system
+
+
+def test_product_recent_actions_query_triggers_web_search():
+    prompt = "Royal Kingdom 最近做了什么产品动作、版本更新或者活动？"
+    assert should_use_web_search(prompt)
+    system, _ = build_system_content(prompt, channel="feishu_casual_group")
+    assert "web_search" in system
+    assert "站内监测" in system
+
+
 def test_casual_sensortower_prompt_includes_semantic_tool_guidance():
     system, selected = build_system_content(
         "SensorTower 最新美国免费榜 Top20",

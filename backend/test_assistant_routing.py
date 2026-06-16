@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+import assistant_service
 from ai_tools import AgentToolDispatcher, build_overseas_weekly_prompt_block
 from assistant_service import (
     build_system_content,
@@ -447,29 +448,37 @@ def test_product_recent_actions_query_triggers_web_search():
     assert "不要直接粘贴搜索结果原文" in system
 
 
-def test_casual_gameplay_question_goes_directly_to_web_search_without_station_db():
+def test_casual_gameplay_question_uses_video_attachment_without_text_guide(monkeypatch):
+    monkeypatch.setattr(assistant_service, "DAJIALA_API_KEY", "test-key")
     prompt = "羊了个羊怎么玩？帮我总结一下玩法亮点"
 
-    assert should_use_web_search(prompt)
+    assert not should_use_web_search(prompt)
     system, selected = build_system_content(prompt, channel="feishu_casual_group")
 
     assert selected == []
     assert "wechatdouyin.db" not in system
-    assert "公众号" in system
-    assert "site:mp.weixin.qq.com" in system
+    assert "web_search" not in system
+    assert "微信公众号" not in system
+    assert "site:mp.weixin.qq.com" not in system
+    assert "wechat_video_search" in system
+    assert "不要写文字版攻略" in system
+    assert "不要编玩法" in system
     assert "不要先查站内榜单" in system
 
 
-def test_casual_wechat_article_gameplay_question_uses_web_search_only():
+def test_casual_wechat_article_gameplay_question_does_not_summarize_text_guide(monkeypatch):
+    monkeypatch.setattr(assistant_service, "DAJIALA_API_KEY", "test-key")
     prompt = "搜微信公众号文章，总结一下羊了个羊的玩法攻略"
 
-    assert should_use_web_search(prompt)
+    assert not should_use_web_search(prompt)
     system, selected = build_system_content(prompt, channel="feishu_casual_group")
 
     assert selected == []
     assert "wechatdouyin.db" not in system
-    assert "web_search" in system
-    assert "微信公众号" in system
+    assert "web_search" not in system
+    assert "微信公众号" not in system
+    assert "wechat_video_search" in system
+    assert "不要写文字版攻略" in system
 
 
 def test_casual_sensortower_prompt_includes_semantic_tool_guidance():

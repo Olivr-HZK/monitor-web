@@ -94,7 +94,7 @@ def _has_any(text: str, words: tuple[str, ...]) -> bool:
 
 
 def _is_gameplay_reference_lookup(user_text: str, page_context: dict[str, Any] | None = None) -> bool:
-    """用户要了解游戏怎么玩/玩法攻略时，直接走站外资料搜索。"""
+    """用户要了解游戏怎么玩/玩法攻略时，走视频号查看链路，不写文字攻略。"""
     blob = _intent_blob(user_text, page_context)
     return _has_any(
         blob,
@@ -217,7 +217,7 @@ def should_use_web_search(user_text: str, page_context: dict[str, Any] | None = 
     """识别需要站外/实时信息的问法；工具是否可用由 dispatcher 决定。"""
     blob = _intent_blob(user_text, page_context)
     if _is_gameplay_reference_lookup(user_text, page_context):
-        return True
+        return False
 
     explicit_external_lookup = _has_any(
         blob,
@@ -448,7 +448,7 @@ def build_system_content(
         "\n- 当问题使用「最新/最近/本周/今天」等词时，先看站内数据新鲜度，不要编造实时数据。"
         "\n- 图表生成后，文字只做口头解读，不要逐条复读表格数据。"
     )
-    if CODEX_ENABLE_WEB_SEARCH_TOOL:
+    if CODEX_ENABLE_WEB_SEARCH_TOOL and not casual_gameplay_lookup:
         base += (
             "\n- 排名/趋势/表现类问题默认先用站内数据库，不要因为「最近/今天/排名」本身就联网。"
             "\n- 用户明确问站外/公开网页/新闻/官网/实时/今天刚发布的信息，或追问「为什么/原因/相关动作/产品动作/版本更新/活动/联动」时，必须调用 web_search。"
@@ -458,22 +458,7 @@ def build_system_content(
             "\n- 来源格式用飞书可读纯文本：来源 1：标题 URL；来源 2：标题 URL。不要使用 Markdown 链接。"
         )
         if web_intent:
-            if casual_gameplay_lookup:
-                if DAJIALA_API_KEY:
-                    base += (
-                        "\n- 当前问题已识别为小游戏玩法/视频资料意图：用户要「看一下/给我看/视频/视频号」时调用 wechat_video_search；否则直接调用 web_search 搜索公开玩法资料。"
-                        "\n- 调用 wechat_video_search 时 gameName 只填游戏名，不要追加「玩法」「攻略」「怎么玩」。"
-                        "\n- 调用 web_search 时优先组合游戏名与「微信小游戏 玩法」「攻略」「微信公众号」「site:mp.weixin.qq.com」。"
-                        "\n- wechat_video_search 会排队发送飞书视频附件；文字回复只简短说明视频已发，不要把 videoUrl 贴进正文。"
-                    )
-                else:
-                    base += (
-                        "\n- 当前问题已识别为小游戏玩法资料意图：不要先查站内榜单，直接调用 web_search 搜索公开玩法资料。"
-                        "\n- 搜索时优先组合游戏名与「微信小游戏 玩法」「攻略」「微信公众号」「site:mp.weixin.qq.com」。"
-                        "\n- 回答时总结核心玩法、操作方式、关卡/胜负目标、爽点、可借鉴点，并附来源 URL；不要复制公众号文章原文。"
-                    )
-            else:
-                base += "\n- 当前问题已识别为原因/相关动作/站外资料意图：先用站内数据定边界，再调用 web_search 补最新公开信息，最后把相关性判断标成参考而非因果结论。"
+            base += "\n- 当前问题已识别为原因/相关动作/站外资料意图：先用站内数据定边界，再调用 web_search 补最新公开信息，最后把相关性判断标成参考而非因果结论。"
     if is_overseas_casual_query(user_text, page_context):
         overseas_block = build_overseas_weekly_prompt_block(PUBLIC_DIR)
         if overseas_block:
@@ -491,25 +476,29 @@ def build_system_content(
     if "feishu_casual" in channel:
         if casual_gameplay_lookup:
             base += (
-                "\n\n【休闲游戏玩法搜索模式】"
-                "\n- 本题是小游戏玩法/攻略/怎么玩/公众号文章/视频类问题：不要先查站内榜单。"
-                "\n- 用户要文字玩法总结时，直接调用 web_search；优先搜索微信公众号公开文章，推荐 query 形如：游戏名 微信小游戏 玩法 site:mp.weixin.qq.com；也可以补搜 游戏名 小游戏 攻略。"
-                "\n- web_search 结果里如果公众号资料不足，再用普通公开网页兜底；回答必须直接贴来源 URL。"
-                "\n- 摘要只提炼玩法，不复制文章原文：核心玩法、操作方式、目标/失败条件、爽点、差异点、可借鉴点。"
+                "\n\n【休闲游戏视频查看模式】"
+                "\n- 本题是小游戏玩法/攻略/怎么玩/公众号文章/视频类问题：不要先查站内榜单，也不要写文字版攻略。"
+                "\n- 你没有亲眼看过这个游戏，不要编玩法，禁止用公众号或网页资料拼凑玩法摘要。"
+                "\n- 如果用户问「怎么玩」「玩法」「攻略」「公众号文章」这类问题，默认理解为想看真实玩法画面；优先找视频给用户自己看。"
                 "\n\n【休闲 GM 语气】"
                 "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
             )
             if DAJIALA_API_KEY:
                 base += (
-                    "\n- 用户说「看一下」「给我看」「视频」「视频号」或明显想亲眼看时，优先调用 wechat_video_search，不需要再先 web_search。"
+                    "\n- 直接调用 wechat_video_search，不需要先进行网页搜索。"
                     "\n- 调用 wechat_video_search 时 gameName 只填游戏名，不要追加「玩法」「攻略」「怎么玩」。"
                     "\n- wechat_video_search 会排队发送飞书视频附件；文字回复只简短说明视频已发，不要把 videoUrl 贴进正文。"
+                    "\n- 如果没有找到视频，直接说这局没检索到可看的视频，建议换一个准确游戏名；不要改写成文字版攻略。"
+                )
+            else:
+                base += (
+                    "\n- 视频号搜索未配置，直接说明暂时不能发视频；不要退而求其次写文字版攻略。"
                 )
         else:
             base += (
                 "\n\n【休闲游戏站内四源路由】"
                 "\n- 微信/抖音小游戏榜、Top20、新游戏：查 wechatdouyin.db。"
-                "\n- 小游戏玩法、怎么玩、攻略、微信公众号文章类问题：不要先查站内榜单，直接调用 web_search；公众号文章优先，普通网页兜底。"
+                "\n- 小游戏玩法、怎么玩、攻略、微信公众号文章类问题：不要写文字版攻略；优先用视频号搜索发视频附件，没视频就直说没找到。"
                 "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db 和 sensortower_applist.db。"
                 "\n- 竞品动态、社媒、Facebook、Instagram、TikTok、小红书、竞品 UA/素材/投放：查 competitor_data.db。"
                 "\n- 我方产品、自家产品、US Free、appid、按产品追溯：查 us_free_appid_weekly.db。"

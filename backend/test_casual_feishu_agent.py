@@ -23,6 +23,10 @@ def load_main(monkeypatch, tmp_path, **env: str):
         "CASUAL_FEISHU_BOT_OPEN_ID",
         "CASUAL_FEISHU_ASSISTANT_SEND_THINKING",
         "OPENAI_API_KEY",
+        "DAJIALA_API_KEY",
+        "DAJIALA_VERIFYCODE",
+        "JIZHILIA_API_KEY",
+        "JIZHILIA_VERIFYCODE",
     ]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
@@ -400,6 +404,83 @@ def test_casual_feishu_sends_chart_images_after_text(monkeypatch, tmp_path):
             "image_bytes": b"png-bytes",
             "uuid_prefix": "evt_1:casual-chart:0",
             "filename": "chart_1.png",
+        }
+    ]
+
+
+def test_casual_feishu_sends_video_url_attachments_after_text(monkeypatch, tmp_path):
+    main = load_main(
+        monkeypatch,
+        tmp_path,
+        CASUAL_FEISHU_BOT_ENABLED="true",
+        CASUAL_FEISHU_VERIFICATION_TOKEN="verify-token",
+        CASUAL_FEISHU_BOT_MENTION_NAMES="休闲监测助手",
+        CASUAL_FEISHU_ASSISTANT_SEND_THINKING="false",
+        OPENAI_API_KEY="test-key",
+    )
+    replies: list[str] = []
+    videos: list[dict[str, Any]] = []
+
+    class Result:
+        answer = "脑筋抖一抖的视频卡带已经上屏。"
+        tables = []
+        charts = []
+        cards = []
+        attachments = [
+            {
+                "type": "video_url",
+                "url": "https://cdn.example.com/brain.mp4",
+                "title": "脑筋抖一抖",
+                "filename": "脑筋抖一抖.mp4",
+            }
+        ]
+
+    async def fake_run(user_text, history=None, page_context=None, *, channel="web", on_tool_call=None):
+        return Result()
+
+    async def fake_reply(message_id: str, text: str, *, uuid_prefix: str | None = None) -> None:
+        replies.append(text)
+
+    async def fake_video_url(
+        message_id: str,
+        video_url: str,
+        *,
+        filename: str = "video.mp4",
+        uuid_prefix: str | None = None,
+    ) -> None:
+        videos.append(
+            {
+                "message_id": message_id,
+                "video_url": video_url,
+                "filename": filename,
+                "uuid_prefix": uuid_prefix,
+            }
+        )
+
+    pending = _patch_immediate_create_task(monkeypatch, main)
+    monkeypatch.setattr(main, "run_monitor_assistant", fake_run)
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_text", fake_reply)
+    monkeypatch.setattr(main._casual_feishu_bot_client, "reply_video_url", fake_video_url)
+    client = TestClient(main.app)
+
+    response = client.post(
+        "/api/feishu/casual-agent/events",
+        json=event_payload(
+            chat_type="group",
+            text="@休闲监测助手 脑筋抖一抖给我看一下视频",
+            mentions=[{"key": "@_user_1", "name": "休闲监测助手"}],
+        ),
+    )
+    _run_pending_tasks(pending)
+
+    assert response.status_code == 200
+    assert replies[-1] == "脑筋抖一抖的视频卡带已经上屏。"
+    assert videos == [
+        {
+            "message_id": "msg_1",
+            "video_url": "https://cdn.example.com/brain.mp4",
+            "filename": "脑筋抖一抖.mp4",
+            "uuid_prefix": "evt_1:casual-attachment:0",
         }
     ]
 

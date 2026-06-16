@@ -153,6 +153,38 @@ class CasualFeishuAgent:
             uuid_prefix=f"{uuid_prefix}:casual-answer",
         )
 
+        attachment_count = 0
+        attachment_errors = 0
+        attachments = getattr(result, "attachments", []) or []
+        for idx, attachment in enumerate(attachments):
+            if not isinstance(attachment, dict):
+                continue
+            if attachment.get("type") != "video_url":
+                continue
+            video_url = str(attachment.get("url") or "").strip()
+            if not video_url:
+                continue
+            try:
+                await self.bot_client.reply_video_url(
+                    event.message_id,
+                    video_url,
+                    filename=str(attachment.get("filename") or "video.mp4"),
+                    uuid_prefix=f"{uuid_prefix}:casual-attachment:{idx}",
+                )
+                attachment_count += 1
+            except Exception as attachment_err:
+                attachment_errors += 1
+                print("[casual-feishu-attachment]", str(attachment_err)[:500])
+
+        if attachments and attachment_count == 0 and attachment_errors:
+            await self.bot_client.reply_text(
+                event.message_id,
+                "🎮 视频卡带这次没能成功上屏，我先把文字结论交给你。换个游戏名，本神再回收一局。",
+                uuid_prefix=f"{uuid_prefix}:casual-attachment-fallback",
+            )
+        elif attachment_errors:
+            print("[casual-feishu-attachment]", {"sent": attachment_count, "failed": attachment_errors})
+
         table_count = 0
         table_errors = 0
         tables = getattr(result, "tables", []) or []
@@ -285,6 +317,7 @@ class CasualFeishuAgent:
             result = await self.run_assistant(_casual_prompt(event.text), history, context)
             answer = await self._reply_result(event, result, uuid_prefix=event.event_id)
             charts = getattr(result, "charts", []) or []
+            attachments = getattr(result, "attachments", []) or []
             selected_dbs = getattr(result, "selected_dbs", []) or []
             tool_calls = getattr(result, "tool_calls", []) or []
             self.append_audit({
@@ -298,6 +331,7 @@ class CasualFeishuAgent:
                 "selectedDbs": selected_dbs,
                 "toolCallCount": len(tool_calls),
                 "chartCount": len(charts),
+                "attachmentCount": len(attachments),
                 "elapsedMs": int((time.monotonic() - started) * 1000),
             })
             self.session_store.append_message(

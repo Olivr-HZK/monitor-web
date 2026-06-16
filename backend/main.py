@@ -67,6 +67,8 @@ from config import (
     AI_PROVIDER,
     CODEX_ENABLE_DB_TOOL,
     CODEX_ENABLE_WEB_SEARCH_TOOL,
+    DAJIALA_API_KEY,
+    DAJIALA_VERIFYCODE,
     TAVILY_API_KEY,
     ASSISTANT_MAX_HISTORY_TURNS,
 )
@@ -365,6 +367,8 @@ async def ai_health(request: Request):
         TAVILY_API_KEY,
         CODEX_ENABLE_DB_TOOL,
         CODEX_ENABLE_WEB_SEARCH_TOOL,
+        dajiala_api_key=DAJIALA_API_KEY,
+        dajiala_verifycode=DAJIALA_VERIFYCODE,
     )
     db_names = AgentToolDispatcher.list_db_names()
     latest_db_mtime = None
@@ -382,6 +386,7 @@ async def ai_health(request: Request):
         "openaiConfigured": bool(OPENAI_API_KEY),
         "dbToolEnabled": dispatcher.enable_db_tool,
         "webSearchEnabled": dispatcher.enable_web_search_tool,
+        "wechatVideoSearchEnabled": dispatcher.enable_wechat_video_search_tool,
         "databaseCount": len(db_names),
         "latestDatabaseUpdatedAt": datetime.fromtimestamp(latest_db_mtime).isoformat() if latest_db_mtime else "",
         "knowledgeChars": len(get_agent_knowledge()),

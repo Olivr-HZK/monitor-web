@@ -98,6 +98,8 @@ CODEX_TURN_TIMEOUT_SEC = _int(os.environ.get("CODEX_TURN_TIMEOUT_SEC"), 180)
 CODEX_ENABLE_DB_TOOL = _bool(os.environ.get("CODEX_ENABLE_DB_TOOL") or "1")
 CODEX_ENABLE_WEB_SEARCH_TOOL = _bool(os.environ.get("CODEX_ENABLE_WEB_SEARCH_TOOL") or "1")
 TAVILY_API_KEY = _str(os.environ.get("TAVILY_API_KEY"))
+DAJIALA_API_KEY = _str(os.environ.get("DAJIALA_API_KEY") or os.environ.get("JIZHILIA_API_KEY"))
+DAJIALA_VERIFYCODE = _str(os.environ.get("DAJIALA_VERIFYCODE") or os.environ.get("JIZHILIA_VERIFYCODE"))
 ASSISTANT_MAX_HISTORY_TURNS = _int(os.environ.get("ASSISTANT_MAX_HISTORY_TURNS"), 10)
 # 生产且未显式关闭时，AI 对话需要登录
 AI_CHAT_REQUIRE_AUTH = os.environ.get("NODE_ENV") == "production" and os.environ.get("AI_CHAT_REQUIRE_AUTH", "true").lower() not in ("0", "false")

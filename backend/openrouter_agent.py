@@ -30,6 +30,7 @@ _TOOL_DISPLAY_NAMES: dict[str, str] = {
     "read_public_report": "正在读取周报报告…",
     "render_chart": "正在生成图表…",
     "web_search": "正在联网搜索…",
+    "wechat_video_search": "正在搜索视频号视频…",
 }
 
 
@@ -50,7 +51,11 @@ async def run_openrouter_agent_chat(
     on_tool_call: 可选回调，每次工具调用时触发，参数为 (tool_name, args)
     """
     base = base_url.rstrip("/")
-    tools = openai_style_tools_schema(dispatcher.enable_db_tool, dispatcher.enable_web_search_tool)
+    tools = openai_style_tools_schema(
+        dispatcher.enable_db_tool,
+        dispatcher.enable_web_search_tool,
+        dispatcher.enable_wechat_video_search_tool,
+    )
 
     headers: dict[str, str] = {
         "Authorization": f"Bearer {api_key}",

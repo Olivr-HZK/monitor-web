@@ -440,6 +440,36 @@ def test_product_recent_actions_query_triggers_web_search():
     system, _ = build_system_content(prompt, channel="feishu_casual_group")
     assert "web_search" in system
     assert "站内监测" in system
+    assert "联网资料" in system
+    assert "来源 1" in system
+    assert "GPT 原生联网" in system
+    assert "自己归纳" in system
+    assert "不要直接粘贴搜索结果原文" in system
+
+
+def test_casual_gameplay_question_goes_directly_to_web_search_without_station_db():
+    prompt = "羊了个羊怎么玩？帮我总结一下玩法亮点"
+
+    assert should_use_web_search(prompt)
+    system, selected = build_system_content(prompt, channel="feishu_casual_group")
+
+    assert selected == []
+    assert "wechatdouyin.db" not in system
+    assert "公众号" in system
+    assert "site:mp.weixin.qq.com" in system
+    assert "不要先查站内榜单" in system
+
+
+def test_casual_wechat_article_gameplay_question_uses_web_search_only():
+    prompt = "搜微信公众号文章，总结一下羊了个羊的玩法攻略"
+
+    assert should_use_web_search(prompt)
+    system, selected = build_system_content(prompt, channel="feishu_casual_group")
+
+    assert selected == []
+    assert "wechatdouyin.db" not in system
+    assert "web_search" in system
+    assert "微信公众号" in system
 
 
 def test_casual_sensortower_prompt_includes_semantic_tool_guidance():
@@ -456,5 +486,23 @@ def test_casual_sensortower_prompt_includes_semantic_tool_guidance():
     assert "只读 SQL 兜底" in system
 
 
+def test_casual_game_profile_prompt_includes_single_game_tool_guidance():
+    system, selected = build_system_content(
+        "帮我看看 Block Blast 这个游戏",
+        None,
+        channel="feishu_casual_group",
+    )
+
+    assert "sensortower_top100.db" in selected
+    assert "sensortower_applist.db" in selected
+    assert "sensortower_game_profile" in system
+    assert "只传游戏名" in system
+    assert "画像卡片" in system
+
+
 def test_sensortower_query_tool_has_friendly_display_name():
     assert tool_display_name("sensortower_query") == "正在查询 SensorTower 数据…"
+
+
+def test_sensortower_game_profile_tool_has_friendly_display_name():
+    assert tool_display_name("sensortower_game_profile") == "正在生成 SensorTower 单游戏画像…"

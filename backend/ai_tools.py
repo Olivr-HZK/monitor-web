@@ -6,8 +6,10 @@ import os
 import re
 import sqlite3
 import time
+from html import unescape
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlparse
 
 OVERSEAS_WEEKLY_DIR = "休闲游戏检测/出海周报"
 ALLOWED_PUBLIC_REPORT_PREFIXES = (
@@ -82,6 +84,146 @@ def _normalize_db_filter(db_names: list[str] | tuple[str, ...] | set[str] | None
         return None
     out = {Path(str(name)).name.strip() for name in db_names if str(name).strip()}
     return out or None
+
+
+def _clean_html_text(raw: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", raw or "")
+    text = unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalize_duckduckgo_result_url(raw_href: str) -> str:
+    href = unescape((raw_href or "").strip())
+    if href.startswith("//"):
+        href = "https:" + href
+    parsed = urlparse(href)
+    if parsed.netloc.endswith("duckduckgo.com") and parsed.path == "/l/":
+        qs = parse_qs(parsed.query)
+        uddg = (qs.get("uddg") or [""])[0]
+        if uddg:
+            return unquote(uddg)
+    return href
+
+
+def _parse_duckduckgo_html_results(html: str, limit: int) -> list[dict[str, Any]]:
+    """Parse DuckDuckGo HTML search rows from https://duckduckgo.com/html/."""
+    matches = list(
+        re.finditer(
+            r'<a\b[^>]*class="[^"]*\bresult__a\b[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+            html or "",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+    )
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for idx, match in enumerate(matches):
+        if len(results) >= limit:
+            break
+        href, title_raw = match.group(1), match.group(2)
+        title = _clean_html_text(title_raw)
+        url = _normalize_duckduckgo_result_url(href)
+        if not title or not url or url in seen:
+            continue
+        next_start = matches[idx + 1].start() if idx + 1 < len(matches) else len(html or "")
+        block = (html or "")[match.end():next_start]
+        snippet = ""
+        snippet_match = re.search(
+            r'<(?:a|div)\b[^>]*class="[^"]*\bresult__snippet\b[^"]*"[^>]*>(.*?)</(?:a|div)>',
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if snippet_match:
+            snippet = _clean_html_text(snippet_match.group(1))
+        seen.add(url)
+        results.append(
+            {
+                "sourceId": len(results) + 1,
+                "title": title,
+                "url": url,
+                "content": snippet,
+            }
+        )
+    return results
+
+
+_GAME_VIDEO_QUERY_TRAILING_TERMS = (
+    "怎么玩",
+    "怎么通关",
+    "玩法攻略",
+    "玩法分析",
+    "玩法",
+    "攻略",
+    "通关",
+    "视频号",
+    "视频",
+    "看看",
+    "看一下",
+)
+
+
+def _clean_wechat_video_game_name(raw: str) -> str:
+    """Keep the paid video search keyword to the game name only."""
+    text = re.sub(r"\s+", " ", (raw or "").strip())
+    for term in _GAME_VIDEO_QUERY_TRAILING_TERMS:
+        text = text.replace(term, " ")
+    text = re.sub(r"\s+", " ", text).strip(" -_，,。:：")
+    return text
+
+
+def _safe_video_filename(raw: str) -> str:
+    stem = re.sub(r"[\\/:*?\"<>|\r\n\t]+", "_", (raw or "").strip())
+    stem = re.sub(r"\s+", " ", stem).strip(" ._")[:80] or "wechat_video"
+    return stem if stem.lower().endswith(".mp4") else f"{stem}.mp4"
+
+
+def _extract_wechat_video_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for data_item in payload.get("data") or []:
+        if not isinstance(data_item, dict):
+            continue
+        for sub_box in data_item.get("subBoxes") or []:
+            if not isinstance(sub_box, dict):
+                continue
+            for item in sub_box.get("items") or []:
+                if isinstance(item, dict):
+                    items.append(item)
+    return items
+
+
+def _wechat_video_source_title(item: dict[str, Any]) -> str:
+    source = item.get("source")
+    if isinstance(source, dict):
+        return str(source.get("title") or "").strip()
+    return ""
+
+
+def _score_wechat_video_item(item: dict[str, Any], game_name: str) -> int:
+    title = str(item.get("title") or "").strip()
+    source = _wechat_video_source_title(item)
+    score = 0
+    if item.get("videoUrl"):
+        score += 100
+    if game_name and game_name in title:
+        score += 80
+    if game_name and game_name in source:
+        score += 20
+    if title == game_name:
+        score += 15
+    return score
+
+
+def _wechat_video_item_to_public_candidate(item: dict[str, Any], idx: int, game_name: str) -> dict[str, Any]:
+    return {
+        "sourceId": idx,
+        "title": str(item.get("title") or "").strip(),
+        "videoUrl": str(item.get("videoUrl") or "").strip(),
+        "dateTime": str(item.get("dateTime") or "").strip(),
+        "duration": str(item.get("duration") or "").strip(),
+        "image": str(item.get("image") or "").strip(),
+        "source": _wechat_video_source_title(item),
+        "likeNum": item.get("likeNum"),
+        "score": _score_wechat_video_item(item, game_name),
+    }
 
 
 def build_data_freshness_text(public_dir: Path) -> str:
@@ -288,13 +430,21 @@ class AgentToolDispatcher:
         tavily_api_key: str = "",
         enable_db_tool: bool = True,
         enable_web_search_tool: bool = True,
+        *,
+        dajiala_api_key: str = "",
+        dajiala_verifycode: str = "",
     ) -> None:
         self.public_dir = public_dir.resolve()
         self.tavily_api_key = (tavily_api_key or "").strip()
+        self.dajiala_api_key = (dajiala_api_key or "").strip()
+        self.dajiala_verifycode = (dajiala_verifycode or "").strip()
         self.enable_db_tool = enable_db_tool
         self.enable_web_search_tool = enable_web_search_tool
+        self.enable_wechat_video_search_tool = bool(self.dajiala_api_key)
         self.chart_payloads: list[dict[str, Any]] = []
         self.table_payloads: list[dict[str, Any]] = []
+        self.card_payloads: list[dict[str, Any]] = []
+        self.attachment_payloads: list[dict[str, Any]] = []
         if AgentToolDispatcher._schema_cache is None:
             AgentToolDispatcher._schema_cache = _build_db_schema_cache(self.public_dir)
 
@@ -319,6 +469,8 @@ class AgentToolDispatcher:
         cls._schema_cache = None
 
     async def dispatch(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
+        if tool_name == "sensortower_game_profile" and self.enable_db_tool:
+            return self.sensortower_game_profile(args)
         if tool_name == "sensortower_query" and self.enable_db_tool:
             return self.sensortower_query(args)
         if tool_name == "query_and_chart" and self.enable_db_tool:
@@ -329,6 +481,8 @@ class AgentToolDispatcher:
             return self.read_public_report(args)
         if tool_name == "web_search" and self.enable_web_search_tool:
             return await self.web_search(args)
+        if tool_name == "wechat_video_search" and self.enable_wechat_video_search_tool:
+            return await self.wechat_video_search(args)
         if tool_name == "render_chart":
             return self.render_chart(args)
         raise ValueError(f"unknown or disabled tool: {tool_name}")
@@ -503,6 +657,43 @@ class AgentToolDispatcher:
             })
         return result
 
+    def sensortower_game_profile(self, args: dict[str, Any]) -> dict[str, Any]:
+        from sensortower_game_profile import run_single_game_profile
+
+        game_name = str(args.get("gameName") or args.get("game") or args.get("name") or "").strip()
+        if not game_name:
+            raise ValueError("gameName 不能为空")
+        country = str(args.get("country") or "WW").strip().upper() or "WW"
+        start_date = str(args.get("startDate") or args.get("start_date") or "").strip() or None
+        end_date = str(args.get("endDate") or args.get("end_date") or "").strip() or None
+
+        result = run_single_game_profile(
+            game_name,
+            country=country,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        card = result.get("card")
+        if isinstance(card, dict):
+            self.card_payloads.append(card)
+        charts = result.get("charts")
+        if isinstance(charts, list):
+            self.chart_payloads.extend(chart for chart in charts if isinstance(chart, dict))
+        if not result.get("canonicalName") and isinstance(result.get("profile"), dict):
+            identity = result["profile"].get("identity") if isinstance(result["profile"].get("identity"), dict) else {}
+            result["canonicalName"] = identity.get("canonicalName") or identity.get("query") or game_name
+        return {
+            "output": result.get("output") or "profile_card",
+            "title": result.get("title") or "",
+            "canonicalName": result.get("canonicalName") or game_name,
+            "publisher": result.get("publisher") or "",
+            "period": result.get("period") or {},
+            "summary": result.get("summary") or {},
+            "rankings": result.get("rankings") or [],
+            "chartCount": len(charts) if isinstance(charts, list) else 0,
+            "hint": "画像卡片和趋势图已生成；回复用户时只简短解读关键指标，不要提 API 调用数、内部路径或 warning。",
+        }
+
     # ------------------------------------------------------------------
     #  web_search
     # ------------------------------------------------------------------
@@ -536,11 +727,13 @@ class AgentToolDispatcher:
                     "answer": data.get("answer") or "",
                     "results": [
                         {
+                            "sourceId": idx + 1,
                             "title": x.get("title"),
                             "url": x.get("url"),
                             "content": x.get("content"),
+                            "publishedDate": x.get("published_date") or x.get("publishedDate") or "",
                         }
-                        for x in results[:n]
+                        for idx, x in enumerate(results[:n])
                     ],
                 }
 
@@ -560,6 +753,7 @@ class AgentToolDispatcher:
             if isinstance(it, dict) and isinstance(it.get("Text"), str):
                 items.append(
                     {
+                        "sourceId": len(items) + 1,
                         "title": it.get("Text"),
                         "url": it.get("FirstURL") or "",
                     }
@@ -569,12 +763,119 @@ class AgentToolDispatcher:
                     if len(items) >= n:
                         break
                     if isinstance(sub, dict) and isinstance(sub.get("Text"), str):
-                        items.append({"title": sub.get("Text"), "url": sub.get("FirstURL") or ""})
+                        items.append(
+                            {
+                                "sourceId": len(items) + 1,
+                                "title": sub.get("Text"),
+                                "url": sub.get("FirstURL") or "",
+                            }
+                        )
+
+            if not items:
+                html_resp = await client.get(
+                    "https://duckduckgo.com/html/",
+                    params={"q": query},
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/125.0 Safari/537.36"
+                        )
+                    },
+                    follow_redirects=True,
+                )
+                html_resp.raise_for_status()
+                items = _parse_duckduckgo_html_results(html_resp.text, n)
 
         return {
             "query": query,
             "answer": data.get("AbstractText") or "",
             "results": items,
+        }
+
+    async def wechat_video_search(self, args: dict[str, Any]) -> dict[str, Any]:
+        raw_game_name = str(args.get("gameName") or args.get("keyword") or "").strip()
+        game_name = _clean_wechat_video_game_name(raw_game_name)
+        if not game_name:
+            raise ValueError("gameName 不能为空")
+        if not self.dajiala_api_key:
+            raise ValueError("DAJIALA_API_KEY 未配置，无法搜索视频号")
+
+        try:
+            sort_type = int(args.get("sortType", 0))
+        except Exception:
+            sort_type = 0
+        if sort_type not in (0, 1, 2):
+            sort_type = 0
+
+        try:
+            publish_time_type = int(args.get("publishTimeType", 3))
+        except Exception:
+            publish_time_type = 3
+        if publish_time_type not in (0, 1, 2, 3):
+            publish_time_type = 3
+
+        try:
+            max_candidates = int(args.get("maxCandidates", 5))
+        except Exception:
+            max_candidates = 5
+        max_candidates = max(1, min(max_candidates, 10))
+
+        request_body = {
+            "mode": 1,
+            "keyword": game_name,
+            "search_type": 2,
+            "publish_time_type": publish_time_type,
+            "sort_type": sort_type,
+            "currentPage": 1,
+            "offset": 0,
+            "cookies_buffer": "",
+            "key": self.dajiala_api_key,
+            "verifycode": self.dajiala_verifycode,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                "https://www.dajiala.com/fbmain/monitor/v3/web_search",
+                json=request_body,
+            )
+            r.raise_for_status()
+            payload = r.json()
+
+        if isinstance(payload, dict) and payload.get("code") not in (None, 0):
+            raise ValueError(f"视频号搜索失败: code={payload.get('code')} msg={payload.get('msg') or payload}")
+        if not isinstance(payload, dict):
+            raise ValueError("视频号搜索返回非 JSON 对象")
+
+        raw_items = _extract_wechat_video_items(payload)
+        candidates = [
+            _wechat_video_item_to_public_candidate(item, idx + 1, game_name)
+            for idx, item in enumerate(raw_items)
+        ]
+        candidates.sort(key=lambda item: item.get("score") or 0, reverse=True)
+        candidates = candidates[:max_candidates]
+        best = next((item for item in candidates if item.get("videoUrl")), None)
+
+        if best:
+            attachment = {
+                "type": "video_url",
+                "url": best["videoUrl"],
+                "title": best.get("title") or game_name,
+                "source": best.get("source") or "",
+                "filename": _safe_video_filename(best.get("title") or game_name),
+                "contentType": "video/mp4",
+                "expiresIn": "1 day",
+            }
+            self.attachment_payloads.append(attachment)
+
+        public_request = {key: value for key, value in request_body.items() if key != "key"}
+        return {
+            "query": game_name,
+            "request": public_request,
+            "best": best,
+            "candidates": candidates,
+            "costHint": "mode=1 按接口文档为 0.5 元/次；本工具固定只查第一页，不自动翻页。",
+            "attachmentQueued": bool(best),
         }
 
     # ------------------------------------------------------------------
@@ -640,6 +941,7 @@ class AgentToolDispatcher:
 def openai_style_tools_schema(
     enable_db: bool,
     enable_web: bool,
+    enable_wechat_video: bool = False,
 ) -> list[dict[str, Any]]:
     """OpenAI / OpenRouter `tools` 列表（function calling）。"""
     tools: list[dict[str, Any]] = []
@@ -671,6 +973,42 @@ def openai_style_tools_schema(
         }
     )
     if enable_db:
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "sensortower_game_profile",
+                    "description": (
+                        "SensorTower 单游戏画像工具。用户说“帮我看看/分析/查一下/看一下某个具体游戏”时优先使用。"
+                        "只传游戏名即可，工具会自动解析 iOS/Android app id，调用 SensorTower App Analysis API，"
+                        "获取下载量、收入、RPD、平均 DAU、ARPDAU、类别排名等，并生成一张飞书画像卡片。"
+                        "不要自己向用户询问 app id，除非工具返回无法识别。"
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "gameName": {
+                                "type": "string",
+                                "description": "用户提到的游戏名原文，如 Block Blast、Royal Match",
+                            },
+                            "country": {
+                                "type": "string",
+                                "description": "国家/地区代码，默认 WW；用户说美国时填 US",
+                            },
+                            "startDate": {
+                                "type": "string",
+                                "description": "可选，YYYY-MM-DD；不填则工具取最近完整 30 天",
+                            },
+                            "endDate": {
+                                "type": "string",
+                                "description": "可选，YYYY-MM-DD；不填则工具取最近完整 30 天",
+                            },
+                        },
+                        "required": ["gameName"],
+                    },
+                },
+            }
+        )
         tools.append(
             {
                 "type": "function",
@@ -832,6 +1170,41 @@ def openai_style_tools_schema(
                             "maxResults": {"type": "integer", "description": "1–10，默认 5"},
                         },
                         "required": ["query"],
+                    },
+                },
+            }
+        )
+    if enable_wechat_video:
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "wechat_video_search",
+                    "description": (
+                        "搜索微信视频号视频，找到最匹配的小游戏视频并排队为飞书视频附件。"
+                        "只传游戏名，不要追加“玩法/攻略/怎么玩”等词；工具固定只查第一页以控制成本。"
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "gameName": {
+                                "type": "string",
+                                "description": "游戏名原文，只填游戏名，例如 脑筋抖一抖",
+                            },
+                            "sortType": {
+                                "type": "integer",
+                                "description": "0 综合，1 最新，2 最热；默认 0",
+                            },
+                            "publishTimeType": {
+                                "type": "integer",
+                                "description": "0 不限，1 最近1天，2 最近7天，3 最近半年；默认 3",
+                            },
+                            "maxCandidates": {
+                                "type": "integer",
+                                "description": "最多返回候选，默认 5，最大 10；不影响 API 只请求第一页",
+                            },
+                        },
+                        "required": ["gameName"],
                     },
                 },
             }

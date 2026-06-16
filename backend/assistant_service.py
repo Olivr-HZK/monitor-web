@@ -24,6 +24,8 @@ from config import (
     OPENAI_MODEL,
     OPENROUTER_HTTP_REFERER,
     PUBLIC_DIR,
+    DAJIALA_API_KEY,
+    DAJIALA_VERIFYCODE,
     TAVILY_API_KEY,
 )
 from knowledge_loader import load_agent_knowledge_text
@@ -39,6 +41,8 @@ class AssistantResult:
     answer: str
     charts: list[dict[str, Any]] = field(default_factory=list)
     tables: list[dict[str, Any]] = field(default_factory=list)
+    cards: list[dict[str, Any]] = field(default_factory=list)
+    attachments: list[dict[str, Any]] = field(default_factory=list)
     selected_dbs: list[str] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
 
@@ -87,6 +91,26 @@ def public_db_catalog_for_prompt(db_names: list[str] | tuple[str, ...] | set[str
 
 def _has_any(text: str, words: tuple[str, ...]) -> bool:
     return any(w.lower() in text for w in words)
+
+
+def _is_gameplay_reference_lookup(user_text: str, page_context: dict[str, Any] | None = None) -> bool:
+    """用户要了解游戏怎么玩/玩法攻略时，直接走站外资料搜索。"""
+    blob = _intent_blob(user_text, page_context)
+    return _has_any(
+        blob,
+        (
+            "怎么玩",
+            "怎么通关",
+            "玩法",
+            "玩法分析",
+            "玩法攻略",
+            "攻略",
+            "教程",
+            "公众号",
+            "微信公众号",
+            "微信文章",
+        ),
+    )
 
 
 CASUAL_SOURCE_DBS: dict[str, tuple[str, ...]] = {
@@ -192,6 +216,9 @@ def is_overseas_casual_query(text: str, page_context: dict[str, Any] | None = No
 def should_use_web_search(user_text: str, page_context: dict[str, Any] | None = None) -> bool:
     """识别需要站外/实时信息的问法；工具是否可用由 dispatcher 决定。"""
     blob = _intent_blob(user_text, page_context)
+    if _is_gameplay_reference_lookup(user_text, page_context):
+        return True
+
     explicit_external_lookup = _has_any(
         blob,
         (
@@ -275,7 +302,7 @@ def detect_data_source_intents(
 
     if _has_any(text, ("微信", "抖音", "小游戏", "小程序", "top20", "rank_changes", "周报简要", "新游戏")):
         add("wechat_douyin")
-    if _has_any(text, ("玩法", "玩法分析", "新玩法")) and not overseas_intent:
+    if _has_any(text, ("玩法", "玩法分析", "新玩法")) and not overseas_intent and not _is_gameplay_reference_lookup(user_text, page_context):
         add("wechat_douyin")
 
     if _has_any(text, ("竞品", "社媒", "小红书", "facebook", "instagram", "tiktok", "线下活动", "social")):
@@ -338,7 +365,11 @@ def select_relevant_databases(
     overseas_intent = is_overseas_casual_query(text, page_context)
     trend_intent = is_trend_query(text, page_context)
     casual_scope = _is_casual_context(page_context, channel=channel)
+    gameplay_reference_lookup = casual_scope and _is_gameplay_reference_lookup(user_text, page_context)
     source_intents = detect_data_source_intents(user_text, page_context, channel=channel)
+
+    if gameplay_reference_lookup and not trend_intent and not overseas_intent:
+        return []
 
     def add_exact(name: str) -> None:
         if (name in names or name in KNOWN_ROUTE_DBS) and name not in selected:
@@ -403,6 +434,7 @@ def build_system_content(
 ) -> tuple[str, list[str]]:
     selected_dbs = select_relevant_databases(user_text, page_context, channel=channel)
     web_intent = should_use_web_search(user_text, page_context)
+    casual_gameplay_lookup = "feishu_casual" in channel and _is_gameplay_reference_lookup(user_text, page_context)
     base = (
         "你是「监测汇总」内部平台的智能监测 agent，擅长解读 AI 热点、趋势监测、休闲游戏监测和 AI 产品监测相关的数据和周报。"
         "像同事聊天一样回答：先点出用户最关心的，再补依据；不要套模板，不要报告腔。"
@@ -421,9 +453,27 @@ def build_system_content(
             "\n- 排名/趋势/表现类问题默认先用站内数据库，不要因为「最近/今天/排名」本身就联网。"
             "\n- 用户明确问站外/公开网页/新闻/官网/实时/今天刚发布的信息，或追问「为什么/原因/相关动作/产品动作/版本更新/活动/联动」时，必须调用 web_search。"
             "\n- web_search 结果只能作为联网资料、实效性和相关性参考；回复时要和站内监测数据分开说，贴来源 URL，并说明公开动作不能证明因果。"
+            "\n- 联网回答格式尽量对齐 GPT 原生联网：先给简短结论，再分清「站内监测」和「联网资料」，联网资料中的关键断言要带来源编号。"
+            "\n- 联网搜索结果是原始素材，你必须自己归纳成业务判断；不要直接粘贴搜索结果原文、长摘要或网页片段。"
+            "\n- 来源格式用飞书可读纯文本：来源 1：标题 URL；来源 2：标题 URL。不要使用 Markdown 链接。"
         )
         if web_intent:
-            base += "\n- 当前问题已识别为原因/相关动作/站外资料意图：先用站内数据定边界，再调用 web_search 补最新公开信息，最后把相关性判断标成参考而非因果结论。"
+            if casual_gameplay_lookup:
+                if DAJIALA_API_KEY:
+                    base += (
+                        "\n- 当前问题已识别为小游戏玩法/视频资料意图：用户要「看一下/给我看/视频/视频号」时调用 wechat_video_search；否则直接调用 web_search 搜索公开玩法资料。"
+                        "\n- 调用 wechat_video_search 时 gameName 只填游戏名，不要追加「玩法」「攻略」「怎么玩」。"
+                        "\n- 调用 web_search 时优先组合游戏名与「微信小游戏 玩法」「攻略」「微信公众号」「site:mp.weixin.qq.com」。"
+                        "\n- wechat_video_search 会排队发送飞书视频附件；文字回复只简短说明视频已发，不要把 videoUrl 贴进正文。"
+                    )
+                else:
+                    base += (
+                        "\n- 当前问题已识别为小游戏玩法资料意图：不要先查站内榜单，直接调用 web_search 搜索公开玩法资料。"
+                        "\n- 搜索时优先组合游戏名与「微信小游戏 玩法」「攻略」「微信公众号」「site:mp.weixin.qq.com」。"
+                        "\n- 回答时总结核心玩法、操作方式、关卡/胜负目标、爽点、可借鉴点，并附来源 URL；不要复制公众号文章原文。"
+                    )
+            else:
+                base += "\n- 当前问题已识别为原因/相关动作/站外资料意图：先用站内数据定边界，再调用 web_search 补最新公开信息，最后把相关性判断标成参考而非因果结论。"
     if is_overseas_casual_query(user_text, page_context):
         overseas_block = build_overseas_weekly_prompt_block(PUBLIC_DIR)
         if overseas_block:
@@ -439,31 +489,53 @@ def build_system_content(
             "\n- 信息不足时直接说明缺口并建议追问。"
         )
     if "feishu_casual" in channel:
-        base += (
-            "\n\n【休闲游戏站内四源路由】"
-            "\n- 微信/抖音小游戏榜、Top20、玩法、新游戏：查 wechatdouyin.db。"
-            "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db 和 sensortower_applist.db。"
-            "\n- 竞品动态、社媒、Facebook、Instagram、TikTok、小红书、竞品 UA/素材/投放：查 competitor_data.db。"
-            "\n- 我方产品、自家产品、US Free、appid、按产品追溯：查 us_free_appid_weekly.db。"
-            "\n- 休闲飞书入口不要主动使用 AI 产品 UA 库；除非用户明确跳出休闲范围，否则围绕上述四源回答。"
-            "\n- SensorTower 问题优先调用 sensortower_query；它是受控 SQL 模板 + 参数/输出策略，不是实时外部抓取。"
-            "\n- SensorTower 表格形结果会作为飞书群消息卡片表格发送；趋势/对比结果会作为 PNG 图表发送。"
-            "\n- sensortower_query 的 fallback_sql 是只读 SQL 兜底，仅用于数据库支持但未封装的问题；不要暴露 SQL、表名、库名或内部路径。"
-            "\n\n【休闲 GM 语气】"
-            "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
-            "\n- 问趋势/最近/变化：务必 query_and_chart 画折线图（系统会把图发到飞书），文字像解说一样讲清楚「看到了什么、意味着什么」。"
-            "\n- 可同时查微信/抖音榜、SensorTower、竞品动态、我方产品等四源，帮用户把趋势看全。"
-        )
-    knowledge = get_agent_knowledge()
-    if knowledge:
-        base += "\n\n【平台知识库（供回答时参考）】\n" + knowledge
-    freshness = build_data_freshness_text(PUBLIC_DIR)
-    if freshness:
-        base += freshness
-    base += public_db_catalog_for_prompt(selected_dbs)
-    schema_text = AgentToolDispatcher.get_schema_text(selected_dbs)
-    if schema_text:
-        base += schema_text
+        if casual_gameplay_lookup:
+            base += (
+                "\n\n【休闲游戏玩法搜索模式】"
+                "\n- 本题是小游戏玩法/攻略/怎么玩/公众号文章/视频类问题：不要先查站内榜单。"
+                "\n- 用户要文字玩法总结时，直接调用 web_search；优先搜索微信公众号公开文章，推荐 query 形如：游戏名 微信小游戏 玩法 site:mp.weixin.qq.com；也可以补搜 游戏名 小游戏 攻略。"
+                "\n- web_search 结果里如果公众号资料不足，再用普通公开网页兜底；回答必须直接贴来源 URL。"
+                "\n- 摘要只提炼玩法，不复制文章原文：核心玩法、操作方式、目标/失败条件、爽点、差异点、可借鉴点。"
+                "\n\n【休闲 GM 语气】"
+                "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
+            )
+            if DAJIALA_API_KEY:
+                base += (
+                    "\n- 用户说「看一下」「给我看」「视频」「视频号」或明显想亲眼看时，优先调用 wechat_video_search，不需要再先 web_search。"
+                    "\n- 调用 wechat_video_search 时 gameName 只填游戏名，不要追加「玩法」「攻略」「怎么玩」。"
+                    "\n- wechat_video_search 会排队发送飞书视频附件；文字回复只简短说明视频已发，不要把 videoUrl 贴进正文。"
+                )
+        else:
+            base += (
+                "\n\n【休闲游戏站内四源路由】"
+                "\n- 微信/抖音小游戏榜、Top20、新游戏：查 wechatdouyin.db。"
+                "\n- 小游戏玩法、怎么玩、攻略、微信公众号文章类问题：不要先查站内榜单，直接调用 web_search；公众号文章优先，普通网页兜底。"
+                "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db 和 sensortower_applist.db。"
+                "\n- 竞品动态、社媒、Facebook、Instagram、TikTok、小红书、竞品 UA/素材/投放：查 competitor_data.db。"
+                "\n- 我方产品、自家产品、US Free、appid、按产品追溯：查 us_free_appid_weekly.db。"
+                "\n- 休闲飞书入口不要主动使用 AI 产品 UA 库；除非用户明确跳出休闲范围，否则围绕上述四源回答。"
+                "\n- SensorTower 问题优先调用 sensortower_query；它是受控 SQL 模板 + 参数/输出策略，不是实时外部抓取。"
+                "\n- 当用户说「帮我看看/分析/查一下/看一下 + 某个具体游戏」或「某游戏怎么样」时，优先调用 sensortower_game_profile；只传游戏名，不要向用户索要 app id，工具会自动识别 iOS/Android app id。"
+                "\n- sensortower_game_profile 会调用 SensorTower App Analysis API，并生成下载量、收入、RPD、平均 DAU、ARPDAU、类别排名等画像卡片；文字回复只需总结关键点，不要复述整张卡片。"
+                "\n- SensorTower 表格形结果会作为飞书群消息卡片表格发送；趋势/对比结果会作为 PNG 图表发送。"
+                "\n- sensortower_query 的 fallback_sql 是只读 SQL 兜底，仅用于数据库支持但未封装的问题；不要暴露 SQL、表名、库名或内部路径。"
+                "\n\n【休闲 GM 语气】"
+                "\n- 保持 Genm/Game Master 中二傲娇感，但信息准确第一。"
+                "\n- 问趋势/最近/变化：务必 query_and_chart 画折线图（系统会把图发到飞书），文字像解说一样讲清楚「看到了什么、意味着什么」。"
+                "\n- 可同时查微信/抖音榜、SensorTower、竞品动态、我方产品等四源，帮用户把趋势看全。"
+            )
+    if not casual_gameplay_lookup:
+        knowledge = get_agent_knowledge()
+        if knowledge:
+            base += "\n\n【平台知识库（供回答时参考）】\n" + knowledge
+        freshness = build_data_freshness_text(PUBLIC_DIR)
+        if freshness:
+            base += freshness
+    if selected_dbs:
+        base += public_db_catalog_for_prompt(selected_dbs)
+        schema_text = AgentToolDispatcher.get_schema_text(selected_dbs)
+        if schema_text:
+            base += schema_text
     return base, selected_dbs
 
 
@@ -539,7 +611,14 @@ async def chat_via_openrouter(
 ) -> AssistantResult:
     messages, selected_dbs = build_messages_for_request(user_text, history, page_context, channel=channel)
     if dispatcher is None:
-        dispatcher = AgentToolDispatcher(PUBLIC_DIR, TAVILY_API_KEY, CODEX_ENABLE_DB_TOOL, CODEX_ENABLE_WEB_SEARCH_TOOL)
+        dispatcher = AgentToolDispatcher(
+            PUBLIC_DIR,
+            TAVILY_API_KEY,
+            CODEX_ENABLE_DB_TOOL,
+            CODEX_ENABLE_WEB_SEARCH_TOOL,
+            dajiala_api_key=DAJIALA_API_KEY,
+            dajiala_verifycode=DAJIALA_VERIFYCODE,
+        )
     tool_calls: list[dict[str, Any]] = []
 
     def wrapped_tool_call(name: str, args: dict[str, Any]) -> None:
@@ -563,6 +642,8 @@ async def chat_via_openrouter(
         answer=answer,
         charts=dispatcher.chart_payloads,
         tables=dispatcher.table_payloads,
+        cards=dispatcher.card_payloads,
+        attachments=dispatcher.attachment_payloads,
         selected_dbs=selected_dbs,
         tool_calls=tool_calls,
     )

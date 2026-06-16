@@ -155,6 +155,98 @@ class FeishuBotClient:
             raise FeishuEventError("飞书上传图片响应缺少 image_key")
         return image_key
 
+    async def upload_file(
+        self,
+        file_bytes: bytes,
+        *,
+        filename: str,
+        file_type: str = "stream",
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        token = await self.tenant_access_token()
+        safe_filename = filename.strip() or "attachment.bin"
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.post(
+                "https://open.feishu.cn/open-apis/im/v1/files",
+                headers={"Authorization": f"Bearer {token}"},
+                data={"file_type": file_type, "file_name": safe_filename},
+                files={"file": (safe_filename, file_bytes, content_type)},
+            )
+        if r.status_code >= 400:
+            raise FeishuEventError(f"飞书上传文件 HTTP {r.status_code}: {r.text[:1000]}")
+        data = r.json()
+        if data.get("code") != 0:
+            raise FeishuEventError(f"飞书上传文件失败: code={data.get('code')} msg={data.get('msg')}")
+        file_key = str((data.get("data") or {}).get("file_key") or "").strip()
+        if not file_key:
+            raise FeishuEventError("飞书上传文件响应缺少 file_key")
+        return file_key
+
+    async def download_external_file(self, url: str, *, max_bytes: int = 30 * 1024 * 1024) -> bytes:
+        target = (url or "").strip()
+        if not target.startswith(("http://", "https://")):
+            raise FeishuEventError("视频 URL 非法")
+        async with httpx.AsyncClient(timeout=90.0, follow_redirects=True) as client:
+            r = await client.get(target)
+        if r.status_code >= 400:
+            raise FeishuEventError(f"下载视频 HTTP {r.status_code}: {r.text[:500]}")
+        content = r.content or b""
+        if not content:
+            raise FeishuEventError("下载视频为空")
+        if len(content) > max_bytes:
+            raise FeishuEventError(f"视频超过飞书上传上限：{len(content)} bytes")
+        return content
+
+    async def reply_video(
+        self,
+        message_id: str,
+        video_bytes: bytes,
+        *,
+        filename: str = "video.mp4",
+        uuid_prefix: str | None = None,
+    ) -> None:
+        file_key = await self.upload_file(
+            video_bytes,
+            filename=filename,
+            file_type="mp4",
+            content_type="video/mp4",
+        )
+        token = await self.tenant_access_token()
+        prefix = uuid_prefix or message_id or str(uuid.uuid4())
+        payload = {
+            "msg_type": "media",
+            "content": json.dumps({"file_key": file_key}, ensure_ascii=False),
+            "reply_in_thread": True,
+            "uuid": _stable_uuid(f"{prefix}:media:{file_key}"),
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}/reply",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+        if r.status_code >= 400:
+            raise FeishuEventError(f"飞书视频回复 HTTP {r.status_code}: {r.text[:1000]}")
+        data = r.json()
+        if data.get("code") != 0:
+            raise FeishuEventError(f"飞书视频回复失败: code={data.get('code')} msg={data.get('msg')}")
+
+    async def reply_video_url(
+        self,
+        message_id: str,
+        video_url: str,
+        *,
+        filename: str = "video.mp4",
+        uuid_prefix: str | None = None,
+    ) -> None:
+        video_bytes = await self.download_external_file(video_url)
+        await self.reply_video(
+            message_id,
+            video_bytes,
+            filename=filename,
+            uuid_prefix=uuid_prefix,
+        )
+
     async def reply_image(
         self,
         message_id: str,

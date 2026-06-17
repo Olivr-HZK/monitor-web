@@ -27,9 +27,11 @@ _TOOL_DISPLAY_NAMES: dict[str, str] = {
     "query_and_chart": "正在查询数据并生成图表…",
     "query_sqlite": "正在查询数据库…",
     "sensortower_query": "正在查询 SensorTower 数据…",
+    "sensortower_game_profile": "正在生成 SensorTower 单游戏画像…",
     "read_public_report": "正在读取周报报告…",
     "render_chart": "正在生成图表…",
     "web_search": "正在联网搜索…",
+    "wechat_douyin_game_profile": "正在生成微信/抖音小游戏画像…",
     "wechat_video_search": "正在搜索视频号视频…",
 }
 

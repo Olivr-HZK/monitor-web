@@ -498,6 +498,8 @@ def build_system_content(
             base += (
                 "\n\n【休闲游戏站内四源路由】"
                 "\n- 微信/抖音小游戏榜、Top20、新游戏：查 wechatdouyin.db。"
+                "\n- 当用户说「帮我看看/分析/查一下/看一下 + 某个微信/抖音小游戏」或「某小游戏怎么样」时，优先调用 wechat_douyin_game_profile 生成榜单画像；不要误走 sensortower_game_profile。"
+                "\n- wechat_douyin_game_profile 会生成最新上榜、近几周排名走势、异动摘要、公司/类型等榜单画像；它没有下载量、收入、DAU。"
                 "\n- 小游戏玩法、怎么玩、攻略、微信公众号文章类问题：不要写文字版攻略；优先用视频号搜索发视频附件，没视频就直说没找到。"
                 "\n- SensorTower、Top100、App Store、Google Play、商店页变化、美国免费榜：查 sensortower_top100.db 和 sensortower_applist.db。"
                 "\n- 竞品动态、社媒、Facebook、Instagram、TikTok、小红书、竞品 UA/素材/投放：查 competitor_data.db。"

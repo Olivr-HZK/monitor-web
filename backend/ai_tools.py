@@ -426,6 +426,228 @@ def _is_number_like(value: Any) -> bool:
     return False
 
 
+_WECHAT_DOUYIN_PROFILE_COLUMNS = (
+    "week_range",
+    "platform_key",
+    "rank",
+    "game_name",
+    "game_type",
+    "platform",
+    "source",
+    "board_name",
+    "monitor_date",
+    "publish_time",
+    "company",
+    "rank_change",
+    "region",
+    "chart_key",
+)
+
+
+def _to_int_or_none(value: Any) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    m = re.search(r"-?\d+", text)
+    if not m:
+        return None
+    try:
+        return int(m.group(0))
+    except ValueError:
+        return None
+
+
+def _clean_profile_text(value: Any, fallback: str = "") -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if text in {"", "--", "None", "null"}:
+        return fallback
+    return text
+
+
+def _is_loose_name_match(query: str, candidate: str) -> bool:
+    q = re.sub(r"\s+", "", query or "")
+    c = re.sub(r"\s+", "", candidate or "")
+    if not q or not c:
+        return False
+    if q in c or c in q:
+        return True
+    pos = 0
+    for ch in q:
+        found = c.find(ch, pos)
+        if found < 0:
+            return False
+        pos = found + 1
+    return True
+
+
+def _wechat_douyin_row_public(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+    rank = _to_int_or_none(row["rank"])
+    return {
+        "weekRange": _clean_profile_text(row["week_range"]),
+        "platformKey": _clean_profile_text(row["platform_key"]),
+        "rank": rank,
+        "gameName": _clean_profile_text(row["game_name"]),
+        "gameType": _clean_profile_text(row["game_type"], "未知"),
+        "platform": _clean_profile_text(row["platform"], "未知平台"),
+        "source": _clean_profile_text(row["source"]),
+        "boardName": _clean_profile_text(row["board_name"], "未知榜单"),
+        "monitorDate": _clean_profile_text(row["monitor_date"]),
+        "publishTime": _clean_profile_text(row["publish_time"]),
+        "company": _clean_profile_text(row["company"], "未记录"),
+        "rankChange": _clean_profile_text(row["rank_change"], "未记录"),
+        "region": _clean_profile_text(row["region"], "未知"),
+        "chartKey": _clean_profile_text(row["chart_key"]),
+    }
+
+
+def _latest_by_platform(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+    latest_week = max(str(row.get("weekRange") or "") for row in rows)
+    latest_rows = [row for row in rows if row.get("weekRange") == latest_week]
+    latest_rows.sort(key=lambda row: (str(row.get("platform") or ""), row.get("rank") or 9999, str(row.get("boardName") or "")))
+    return latest_rows
+
+
+def _build_wechat_douyin_chart_payload(game_name: str, rows: list[dict[str, Any]], max_weeks: int) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    week_order = sorted({str(row.get("weekRange") or "") for row in rows if row.get("weekRange")})
+    if not week_order:
+        return None
+    week_order = week_order[-max_weeks:]
+    platforms = sorted({str(row.get("platform") or "") for row in rows if row.get("platform")})
+    if not platforms:
+        return None
+
+    data: list[dict[str, Any]] = []
+    for week in week_order:
+        point: dict[str, Any] = {"week_range": week}
+        week_rows = [row for row in rows if row.get("weekRange") == week]
+        for platform in platforms:
+            platform_rows = [
+                row for row in week_rows
+                if row.get("platform") == platform and isinstance(row.get("rank"), int)
+            ]
+            if not platform_rows:
+                continue
+            point[platform] = min(int(row["rank"]) for row in platform_rows)
+        data.append(point)
+
+    series = [{"key": platform, "name": platform} for platform in platforms if any(platform in point for point in data)]
+    if not series:
+        return None
+    return {
+        "type": "line",
+        "title": f"{game_name} 微信/抖音排名走势",
+        "xKey": "week_range",
+        "series": series,
+        "data": data,
+        "invertYAxis": True,
+    }
+
+
+def _build_wechat_douyin_profile_card(profile: dict[str, Any]) -> dict[str, Any]:
+    game_name = _clean_profile_text(profile.get("canonicalName"), "小游戏")
+    summary = profile.get("summary") if isinstance(profile.get("summary"), dict) else {}
+    latest_rows = [row for row in profile.get("latestRankings") or [] if isinstance(row, dict)]
+    signals = [row for row in profile.get("signals") or [] if isinstance(row, dict)]
+
+    intro = (
+        f"最新周：{_clean_profile_text(profile.get('latestWeek'), '暂无')}｜"
+        f"最高排名：{summary.get('bestRank') or '暂无'}｜"
+        f"上榜周数：{summary.get('weeksOnChart') or 0}｜"
+        f"平台：{', '.join(summary.get('platforms') or []) or '暂无'}"
+    )
+    company = _clean_profile_text(summary.get("company"), "未记录")
+    game_type = _clean_profile_text(summary.get("gameType"), "未知")
+
+    elements: list[dict[str, Any]] = [
+        {
+            "tag": "markdown",
+            "content": f"{intro}\n开发公司：{company}｜类型：{game_type}",
+        }
+    ]
+
+    def _table(rows: list[dict[str, Any]], columns: list[tuple[str, str]], empty: str) -> dict[str, Any]:
+        visible_rows = rows[:8]
+        if not visible_rows:
+            return {
+                "tag": "table",
+                "page_size": 1,
+                "row_height": "low",
+                "header_style": {"background_style": "grey", "bold": True},
+                "columns": [{"name": "message", "display_name": "结果", "data_type": "text"}],
+                "rows": [{"message": empty}],
+            }
+        return {
+            "tag": "table",
+            "page_size": len(visible_rows),
+            "row_height": "low",
+            "freeze_first_column": True,
+            "header_style": {"background_style": "grey", "bold": True},
+            "columns": [
+                {"name": key, "display_name": label, "data_type": "text"}
+                for key, label in columns
+            ],
+            "rows": [
+                {
+                    key: _clean_profile_text(row.get(key), "-")
+                    for key, _label in columns
+                }
+                for row in visible_rows
+            ],
+        }
+
+    elements.append({"tag": "markdown", "content": "最新上榜"})
+    elements.append(
+        _table(
+            [
+                {
+                    "platform": row.get("platform"),
+                    "board": row.get("boardName"),
+                    "rank": row.get("rank"),
+                    "change": row.get("rankChange"),
+                    "date": row.get("monitorDate"),
+                }
+                for row in latest_rows
+            ],
+            [("platform", "平台"), ("board", "榜单"), ("rank", "排名"), ("change", "变化"), ("date", "日期")],
+            "暂无上榜记录",
+        )
+    )
+
+    elements.append({"tag": "markdown", "content": "近期异动"})
+    elements.append(
+        _table(
+            [
+                {
+                    "week": row.get("weekRange"),
+                    "platform": row.get("platform"),
+                    "board": row.get("boardName"),
+                    "rank": row.get("rank"),
+                    "change": row.get("rankChange"),
+                }
+                for row in signals
+            ],
+            [("week", "周次"), ("platform", "平台"), ("board", "榜单"), ("rank", "排名"), ("change", "变化")],
+            "暂无异动记录",
+        )
+    )
+
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "template": "blue",
+            "title": {
+                "tag": "plain_text",
+                "content": f"{game_name} 小游戏画像",
+            },
+        },
+        "elements": elements,
+    }
+
+
 class AgentToolDispatcher:
     _schema_cache: dict[str, dict[str, list[str]]] | None = None
 
@@ -476,6 +698,8 @@ class AgentToolDispatcher:
     async def dispatch(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
         if tool_name == "sensortower_game_profile" and self.enable_db_tool:
             return self.sensortower_game_profile(args)
+        if tool_name == "wechat_douyin_game_profile" and self.enable_db_tool:
+            return self.wechat_douyin_game_profile(args)
         if tool_name == "sensortower_query" and self.enable_db_tool:
             return self.sensortower_query(args)
         if tool_name == "query_and_chart" and self.enable_db_tool:
@@ -698,6 +922,146 @@ class AgentToolDispatcher:
             "chartCount": len(charts) if isinstance(charts, list) else 0,
             "hint": "画像卡片和趋势图已生成；回复用户时只简短解读关键指标，不要提 API 调用数、内部路径或 warning。",
         }
+
+    def wechat_douyin_game_profile(self, args: dict[str, Any]) -> dict[str, Any]:
+        game_name = str(args.get("gameName") or args.get("game") or args.get("name") or "").strip()
+        if not game_name:
+            raise ValueError("gameName 不能为空")
+        try:
+            max_weeks = int(args.get("maxWeeks") or 8)
+        except Exception:
+            max_weeks = 8
+        max_weeks = max(2, min(max_weeks, 16))
+
+        _db, db_path = _validate_db_name(self.public_dir, "wechatdouyin.db")
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('top20_ranking', 'rank_changes')")
+            available_tables = {str(row[0]) for row in cur.fetchall()}
+            if "top20_ranking" not in available_tables and "rank_changes" not in available_tables:
+                raise ValueError("微信/抖音小游戏榜单数据暂不可用")
+
+            select_cols = ", ".join(_WECHAT_DOUYIN_PROFILE_COLUMNS)
+            top_rows: list[sqlite3.Row] = []
+            signal_rows: list[sqlite3.Row] = []
+            if "top20_ranking" in available_tables:
+                cur.execute(
+                    f"""
+                    SELECT {select_cols}
+                    FROM top20_ranking
+                    WHERE game_name = ?
+                    ORDER BY monitor_date DESC, week_range DESC, CAST(rank AS INTEGER) ASC
+                    LIMIT 200
+                    """,
+                    (game_name,),
+                )
+                top_rows = list(cur.fetchall())
+            if "rank_changes" in available_tables:
+                cur.execute(
+                    f"""
+                    SELECT {select_cols}
+                    FROM rank_changes
+                    WHERE game_name = ?
+                    ORDER BY monitor_date DESC, week_range DESC, CAST(rank AS INTEGER) ASC
+                    LIMIT 100
+                    """,
+                    (game_name,),
+                )
+                signal_rows = list(cur.fetchall())
+
+            if not top_rows and not signal_rows:
+                candidates: list[str] = []
+                like = f"%{game_name}%"
+                for table in ("top20_ranking", "rank_changes"):
+                    if table not in available_tables:
+                        continue
+                    cur.execute(
+                        f"""
+                        SELECT DISTINCT game_name
+                        FROM {table}
+                        WHERE game_name LIKE ?
+                        ORDER BY game_name
+                        LIMIT 8
+                        """,
+                        (like,),
+                    )
+                    for row in cur.fetchall():
+                        candidate = _clean_profile_text(row[0])
+                        if candidate and candidate not in candidates:
+                            candidates.append(candidate)
+                    if len(candidates) >= 8:
+                        continue
+                    cur.execute(
+                        f"""
+                        SELECT DISTINCT game_name
+                        FROM {table}
+                        WHERE game_name IS NOT NULL AND game_name != ''
+                        ORDER BY game_name
+                        LIMIT 2000
+                        """
+                    )
+                    for row in cur.fetchall():
+                        candidate = _clean_profile_text(row[0])
+                        if (
+                            candidate
+                            and candidate not in candidates
+                            and _is_loose_name_match(game_name, candidate)
+                        ):
+                            candidates.append(candidate)
+                            if len(candidates) >= 8:
+                                break
+                return {
+                    "output": "not_found",
+                    "canonicalName": game_name,
+                    "candidates": candidates[:8],
+                    "hint": "未找到精确游戏名；如有候选，请让用户确认具体游戏名后再查，不要用模糊结果硬凑画像。",
+                }
+
+            ranking_rows = [_wechat_douyin_row_public(row) for row in top_rows]
+            signal_public_rows = [_wechat_douyin_row_public(row) for row in signal_rows]
+            all_rows = ranking_rows or signal_public_rows
+            all_rows_sorted = sorted(
+                all_rows,
+                key=lambda row: (str(row.get("monitorDate") or ""), str(row.get("weekRange") or ""), -(row.get("rank") or 9999)),
+                reverse=True,
+            )
+            latest_week = str(all_rows_sorted[0].get("weekRange") or "") if all_rows_sorted else ""
+            latest_rankings = _latest_by_platform(ranking_rows or signal_public_rows)
+            ranks = [int(row["rank"]) for row in all_rows if isinstance(row.get("rank"), int)]
+            company = next((_clean_profile_text(row.get("company")) for row in all_rows if _clean_profile_text(row.get("company"))), "未记录")
+            game_type = next((_clean_profile_text(row.get("gameType")) for row in all_rows if _clean_profile_text(row.get("gameType"))), "未知")
+            platforms = sorted({str(row.get("platform") or "") for row in all_rows if row.get("platform")})
+            weeks = sorted({str(row.get("weekRange") or "") for row in all_rows if row.get("weekRange")})
+
+            profile = {
+                "output": "minigame_profile_card",
+                "canonicalName": game_name,
+                "latestWeek": latest_week,
+                "latestRankings": latest_rankings,
+                "signals": signal_public_rows[:12],
+                "summary": {
+                    "bestRank": min(ranks) if ranks else None,
+                    "weeksOnChart": len(weeks),
+                    "platforms": platforms,
+                    "company": company,
+                    "gameType": game_type,
+                },
+            }
+            card = _build_wechat_douyin_profile_card(profile)
+            self.card_payloads.append(card)
+            chart = _build_wechat_douyin_chart_payload(game_name, ranking_rows, max_weeks)
+            if chart:
+                self.chart_payloads.append(chart)
+            return {
+                **profile,
+                "signalCount": len(signal_public_rows),
+                "chartCount": 1 if chart else 0,
+                "hint": "微信/抖音小游戏榜单画像已生成；文字回复简短解读最新排名、趋势和异动即可。不要提数据库、SQL 或内部路径；不要承诺下载量/收入/DAU。",
+            }
+        finally:
+            conn.close()
 
     # ------------------------------------------------------------------
     #  web_search
@@ -1010,6 +1374,33 @@ def openai_style_tools_schema(
                             "endDate": {
                                 "type": "string",
                                 "description": "可选，YYYY-MM-DD；不填则工具取最近完整 30 天",
+                            },
+                        },
+                        "required": ["gameName"],
+                    },
+                },
+            }
+        )
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "wechat_douyin_game_profile",
+                    "description": (
+                        "微信/抖音小游戏单游戏榜单画像工具。用户说“帮我看看/分析/查一下/看一下 + 某个微信/抖音小游戏”"
+                        "或“某小游戏怎么样”时优先使用。工具基于站内小游戏榜单历史生成画像卡片和排名趋势图，"
+                        "包含最新上榜、近几周排名走势、异动摘要、公司/类型等；没有下载量、收入、DAU。"
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "gameName": {
+                                "type": "string",
+                                "description": "用户提到的小游戏名原文，如 挪了下车、赵云与阿斗",
+                            },
+                            "maxWeeks": {
+                                "type": "integer",
+                                "description": "排名走势图最多展示周数，默认 8，最大 16",
                             },
                         },
                         "required": ["gameName"],

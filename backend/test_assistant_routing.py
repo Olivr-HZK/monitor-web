@@ -509,9 +509,26 @@ def test_casual_game_profile_prompt_includes_single_game_tool_guidance():
     assert "画像卡片" in system
 
 
+def test_casual_wechat_douyin_single_game_prompt_includes_minigame_profile_tool():
+    system, selected = build_system_content(
+        "帮我看看挪了下车这个微信小游戏",
+        None,
+        channel="feishu_casual_group",
+    )
+
+    assert "wechatdouyin.db" in selected
+    assert "wechat_douyin_game_profile" in system
+    assert "榜单画像" in system
+    assert "误走 sensortower_game_profile" in system
+
+
 def test_sensortower_query_tool_has_friendly_display_name():
     assert tool_display_name("sensortower_query") == "正在查询 SensorTower 数据…"
 
 
 def test_sensortower_game_profile_tool_has_friendly_display_name():
     assert tool_display_name("sensortower_game_profile") == "正在生成 SensorTower 单游戏画像…"
+
+
+def test_wechat_douyin_game_profile_tool_has_friendly_display_name():
+    assert tool_display_name("wechat_douyin_game_profile") == "正在生成微信/抖音小游戏画像…"

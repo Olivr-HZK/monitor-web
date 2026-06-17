@@ -22,7 +22,7 @@ class _FakeResponse:
 
 
 @pytest.mark.anyio
-async def test_wechat_video_search_uses_game_name_only_and_stores_video_attachment(monkeypatch):
+async def test_wechat_video_search_appends_minigame_keyword_and_stores_video_attachment(monkeypatch):
     captured: dict[str, Any] = {}
 
     class _FakeAsyncClient:
@@ -79,7 +79,7 @@ async def test_wechat_video_search_uses_game_name_only_and_stores_video_attachme
     result = await dispatcher.dispatch("wechat_video_search", {"gameName": "脑筋抖一抖 玩法", "maxCandidates": 3})
 
     assert captured["url"] == "https://www.dajiala.com/fbmain/monitor/v3/web_search"
-    assert captured["json"]["keyword"] == "脑筋抖一抖"
+    assert captured["json"]["keyword"] == "脑筋抖一抖 小游戏"
     assert captured["json"]["search_type"] == 2
     assert captured["json"]["mode"] == 1
     assert captured["json"]["currentPage"] == 1

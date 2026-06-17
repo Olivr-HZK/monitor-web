@@ -486,7 +486,7 @@ def build_system_content(
             if DAJIALA_API_KEY:
                 base += (
                     "\n- 直接调用 wechat_video_search，不需要先进行网页搜索。"
-                    "\n- 调用 wechat_video_search 时 gameName 只填游戏名，不要追加「玩法」「攻略」「怎么玩」。"
+                    "\n- 调用 wechat_video_search 时 gameName 只填游戏名，不要追加「玩法」「攻略」「怎么玩」；工具内部会自动用「游戏名 + 小游戏」搜索。"
                     "\n- wechat_video_search 会排队发送飞书视频附件；文字回复只简短说明视频已发，不要把 videoUrl 贴进正文。"
                     "\n- 如果没有找到视频，直接说这局没检索到可看的视频，建议换一个准确游戏名；不要改写成文字版攻略。"
                 )

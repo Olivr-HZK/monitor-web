@@ -147,6 +147,7 @@ def _parse_duckduckgo_html_results(html: str, limit: int) -> list[dict[str, Any]
 
 
 _GAME_VIDEO_QUERY_TRAILING_TERMS = (
+    "小游戏",
     "怎么玩",
     "怎么通关",
     "玩法攻略",
@@ -168,6 +169,10 @@ def _clean_wechat_video_game_name(raw: str) -> str:
         text = text.replace(term, " ")
     text = re.sub(r"\s+", " ", text).strip(" -_，,。:：")
     return text
+
+
+def _build_wechat_video_search_keyword(game_name: str) -> str:
+    return f"{game_name} 小游戏".strip()
 
 
 def _safe_video_filename(raw: str) -> str:
@@ -821,9 +826,11 @@ class AgentToolDispatcher:
             max_candidates = 5
         max_candidates = max(1, min(max_candidates, 10))
 
+        search_keyword = _build_wechat_video_search_keyword(game_name)
+
         request_body = {
             "mode": 1,
-            "keyword": game_name,
+            "keyword": search_keyword,
             "search_type": 2,
             "publish_time_type": publish_time_type,
             "sort_type": sort_type,
@@ -871,6 +878,7 @@ class AgentToolDispatcher:
         public_request = {key: value for key, value in request_body.items() if key != "key"}
         return {
             "query": game_name,
+            "searchKeyword": search_keyword,
             "request": public_request,
             "best": best,
             "candidates": candidates,

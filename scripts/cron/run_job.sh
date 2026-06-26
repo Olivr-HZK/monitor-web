@@ -21,6 +21,7 @@ OPENCLAW_WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
 LOG_ROOT="${MONITOR_WEB_JOB_LOG_DIR:-$REPO_ROOT/logs/jobs}"
 LOCK_ROOT="$LOG_ROOT/locks"
 PATH_VALUE="${MONITOR_WEB_CRON_PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin}"
+DISABLE_FILE="${MONITOR_WEB_CRON_DISABLE_FILE:-$LOG_ROOT/.disable-local-cron}"
 
 export PATH="$PATH_VALUE:${PATH:-}"
 
@@ -98,6 +99,13 @@ exec >> "$LOG_FILE" 2>&1
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
 }
+
+if [[ "${MONITOR_WEB_CRON_DISABLED:-}" == "1" || -f "$DISABLE_FILE" ]]; then
+  log "DISABLED: $JOB_ID skipped by local disable switch: $DISABLE_FILE"
+  printf 'status=disabled\njob=%s\ntime=%s\nlog=%s\nreason=%s\n' \
+    "$JOB_ID" "$(date '+%Y-%m-%d %H:%M:%S')" "$LOG_FILE" "$DISABLE_FILE" > "$STATUS_FILE"
+  exit 0
+fi
 
 describe_cmd() {
   local cwd="$1"

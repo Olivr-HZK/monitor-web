@@ -125,7 +125,7 @@ if [[ "$DEPLOY_INSTALL_PIPELINES" == "1" ]]; then
   fi
   run pipelines/monitor-chain/wechat-douyin/.venv/bin/pip install --cache-dir "$DEPLOY_PIP_CACHE_DIR" -U pip
   run pipelines/monitor-chain/wechat-douyin/.venv/bin/pip install --cache-dir "$DEPLOY_PIP_CACHE_DIR" -r pipelines/monitor-chain/wechat-douyin/requirements.txt
-  run pipelines/monitor-chain/wechat-douyin/.venv/bin/python -m playwright install chromium
+  run pipelines/monitor-chain/wechat-douyin/.venv/bin/python -m playwright install --with-deps chromium
 
   if ! pipelines/monitor-chain/wechat-douyin/.venv/bin/python - <<'PY' >/dev/null 2>&1
 import cv2  # noqa: F401

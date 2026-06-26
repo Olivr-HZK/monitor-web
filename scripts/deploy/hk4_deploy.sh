@@ -133,7 +133,7 @@ PY
   then
     log "cv2 import failed; switching this venv to opencv-python-headless"
     pipelines/monitor-chain/wechat-douyin/.venv/bin/pip uninstall -y opencv-python || true
-    run pipelines/monitor-chain/wechat-douyin/.venv/bin/pip install --cache-dir "$DEPLOY_PIP_CACHE_DIR" "opencv-python-headless>=4.8.0"
+    run pipelines/monitor-chain/wechat-douyin/.venv/bin/pip install --no-cache-dir --force-reinstall "opencv-python-headless>=4.8.0"
   fi
 
   if [[ ! -x pipelines/monitor-chain/gaming-weekly/.venv/bin/python ]]; then

@@ -13,8 +13,8 @@ pandas>=2.0.0
 # AI API（OpenRouter，兼容 OpenAI 接口）
 openai>=1.0.0
 
-# 图像/视频处理
-opencv-python>=4.8.0
+# 图像/视频处理；服务器/cron 环境使用 headless，避免依赖 libGL 等桌面库
+opencv-python-headless>=4.8.0
 Pillow>=10.0.0
 
 # Google API（Drive、Sheets）

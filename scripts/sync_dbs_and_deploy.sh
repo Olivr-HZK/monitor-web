@@ -205,7 +205,11 @@ get_cutoff_epoch() {
 
 file_mtime_epoch() {
   local file="$1"
-  stat -f "%m" "$file" 2>/dev/null || stat -c "%Y" "$file" 2>/dev/null
+  if [[ "${OSTYPE:-}" == "darwin"* ]]; then
+    stat -f "%m" "$file" 2>/dev/null
+  else
+    stat -c "%Y" "$file" 2>/dev/null
+  fi
 }
 
 file_mtime_text() {

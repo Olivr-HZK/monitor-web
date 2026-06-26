@@ -239,7 +239,9 @@ case "$JOB_ID" in
     ;;
   wechat_douyin_weekly_rerun_then_push)
     run_in "$REPO_ROOT/pipelines/monitor-chain/wechat-douyin" /bin/bash ./scripts/rerun_weekly_wx_three_charts_if_needed.sh "$@"
-    if [[ "${MONITOR_CHAIN_PUSH_AFTER_WECHAT_RERUN:-1}" == "1" ]]; then
+    if [[ "${JOB_DRY_RUN:-}" == "1" ]]; then
+      log "DRY_RUN: skipping monitor_chain_checked_push after WeChat/Douyin rerun"
+    elif [[ "${MONITOR_CHAIN_PUSH_AFTER_WECHAT_RERUN:-1}" == "1" ]]; then
       target_week="$(
         python3 - <<'PY'
 from datetime import datetime, timedelta

@@ -93,6 +93,7 @@ else
 fi
 
 run git fetch --prune "$DEPLOY_REMOTE" "$DEPLOY_BRANCH"
+run git checkout -B "$DEPLOY_BRANCH" "$DEPLOY_REMOTE/$DEPLOY_BRANCH"
 run git reset --hard "$DEPLOY_REMOTE/$DEPLOY_BRANCH"
 run git submodule update --init --recursive
 

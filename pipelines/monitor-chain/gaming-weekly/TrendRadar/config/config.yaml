@@ -1,0 +1,322 @@
+# ═══════════════════════════════════════════════════════════════
+#                    游戏行业资讯日报配置文件
+#                    专注出海 Puzzle Game 厂商
+# ═══════════════════════════════════════════════════════════════
+
+# ===============================================================
+# 1. 基础设置
+# ===============================================================
+app:
+  timezone: "Asia/Shanghai"
+  show_version_update: true
+
+# ===============================================================
+# 1.5 调度系统
+# ===============================================================
+schedule:
+  enabled: false                        # 禁用调度系统，立即执行
+  preset: "always_on"                  # TrendRadar 允许的预设模板名
+
+# ===============================================================
+# 2. 数据源 - 热榜平台（禁用，噪音太多）
+# ===============================================================
+platforms:
+  enabled: true                        # 仅为让 TrendRadar 继续运行；各平台 source 仍保持 enabled:false
+  sources:
+    - id: "toutiao"
+      name: "今日头条"
+      enabled: false
+    - id: "baidu"
+      name: "百度热搜"
+      enabled: false
+    - id: "zhihu"
+      name: "知乎"
+      enabled: false
+    - id: "weibo"
+      name: "微博"
+      enabled: false
+    - id: "36kr"
+      name: "36氪"
+      enabled: false
+
+# ===============================================================
+# 3. 数据源 - RSS 订阅（游戏行业专属）
+# ===============================================================
+rss:
+  enabled: true
+  
+  freshness_filter:
+    enabled: true
+    max_age_days: 2                     # 推送2天内的文章
+
+  feeds:
+    # === 游戏专业媒体（中文）- 暂时禁用不可用的源 ===
+    - id: "gamelook"
+      name: "GameLook"
+      url: "https://www.gamelook.com.cn/feed"
+      enabled: false
+      
+    - id: "youxiputao"
+      name: "游戏葡萄"
+      url: "https://youxiputao.com/feed"
+      enabled: false
+      
+    - id: "gameres"
+      name: "游资网"
+      url: "https://www.gameres.com/feed"
+      enabled: false
+      
+    - id: "17173"
+      name: "17173"
+      url: "https://www.17173.com/rss/allnews.xml"
+      enabled: false
+
+    # === 游戏专业媒体（英文）- 只启用可用的源 ===
+    - id: "gamasutra"
+      name: "Game Developer"
+      url: "https://www.gamedeveloper.com/rss.xml"
+      enabled: true
+      
+    - id: "pocketgamer-biz"
+      name: "PocketGamer.biz"
+      url: "https://www.pocketgamer.biz/rss/"
+      enabled: true
+      
+    - id: "mobilegamer"
+      name: "Mobile Gamer"
+      url: "https://mobilegamer.biz/feed/"
+      enabled: true
+      
+    - id: "gamesindustry"
+      name: "GamesIndustry.biz"
+      url: "https://www.gamesindustry.biz/feed"
+      enabled: true
+      
+    - id: "venturebeat-games"
+      name: "VentureBeat Games"
+      url: "https://venturebeat.com/category/games/feed/"
+      enabled: false
+      
+    - id: "polygon"
+      name: "Polygon"
+      url: "https://www.polygon.com/rss/index.xml"
+      enabled: true
+      
+    - id: "ign"
+      name: "IGN"
+      url: "https://feeds.ign.com/ign/all"
+      enabled: true
+      
+    - id: "gamespot"
+      name: "GameSpot"
+      url: "https://www.gamespot.com/feeds/mashup/"
+      enabled: false
+
+    # === 出海与市场分析 ===
+    - id: "sensortower-blog"
+      name: "Sensor Tower Blog"
+      url: "https://sensortower.com/blog/feed"
+      enabled: false
+      
+    - id: "appannie-blog"
+      name: "data.ai Blog"
+      url: "https://www.data.ai/en/insights/feed/"
+      enabled: false
+
+    # === AI 在游戏中的应用 ===
+    - id: "unity-blog"
+      name: "Unity Blog"
+      url: "https://blog.unity.com/feed"
+      enabled: true
+      
+    - id: "unrealengine-blog"
+      name: "Unreal Engine Blog"
+      url: "https://www.unrealengine.com/en-US/feed"
+      enabled: true
+
+    # === 科技媒体（游戏相关）===
+    - id: "36kr"
+      name: "36氪"
+      url: "https://36kr.com/feed"
+      enabled: true
+      
+    - id: "technode"
+      name: "动点科技"
+      url: "https://cn.technode.com/feed/"
+      enabled: true
+
+# ===============================================================
+# 4. 报告模式
+# ===============================================================
+report:
+  mode: "current"                       # 当前模式（立即推送）
+  display_mode: "category"              # 按分类展示
+  sort_by_position_first: true
+  rank_threshold: 5
+  max_news_per_keyword: 3               # 每个关键词最多3条
+  global_news_limit: 20                 # 全局最多20条
+
+# ===============================================================
+# 5. 推送内容控制
+# ===============================================================
+display:
+  region_order:
+    - hotlist                           # 热榜区域
+    - rss                               # RSS 订阅区域
+    - new_items                         # 新增热点
+
+  regions:
+    hotlist: false
+    new_items: false
+    rss: true
+    standalone: false
+    ai_analysis: false                  # 每天不输出 AI 分析
+
+  standalone:
+    platforms: []
+    rss_feeds: []
+    max_items: 5
+
+# ===============================================================
+# 6. 推送通知
+# ===============================================================
+notification:
+  enabled: false
+  
+  channels:
+    feishu:
+      webhook_url: ""
+    
+    dingtalk:
+      webhook_url: ""
+    
+    wework:
+      webhook_url: ""
+      msg_type: "markdown"
+    
+    telegram:
+      bot_token: ""
+      chat_id: ""
+    
+    email:
+      from: ""
+      password: ""
+      to: ""
+      smtp_server: ""
+      smtp_port: ""
+    
+    ntfy:
+      server_url: "https://ntfy.sh"
+      topic: ""
+      token: ""
+    
+    bark:
+      url: ""
+    
+    slack:
+      webhook_url: ""
+    
+    generic_webhook:
+      webhook_url: ""
+      payload_template: ""
+
+# ===============================================================
+# 7. 存储配置
+# ===============================================================
+storage:
+  backend: "local"
+  
+  formats:
+    sqlite: true
+    txt: false
+    html: true
+  
+  local:
+    data_dir: "output"
+    retention_days: 30                  # 保留30天
+  
+  remote:
+    retention_days: 0
+    endpoint_url: ""
+    bucket_name: ""
+    access_key_id: ""
+    secret_access_key: ""
+    region: ""
+  
+  pull:
+    enabled: false
+    days: 7
+
+# ===============================================================
+# 8. AI 模型配置
+# ===============================================================
+ai:
+  model: "openrouter/qwen/qwen3.7-max"
+  api_key: ""
+  api_base: "https://openrouter.ai/api/v1"
+  timeout: 120
+  temperature: 1.0
+  max_tokens: 5000
+  num_retries: 1
+  fallback_models: []
+  fallback:
+    model: "openrouter/qwen/qwen3.7-max"
+    api_key: ""
+    api_base: "https://openrouter.ai/api/v1"
+
+# ===============================================================
+# 9. AI 分析功能
+# ===============================================================
+ai_analysis:
+  enabled: false                        # 每天只做爬取入库；周报在 send_gaming_weekly.py 里做 AI
+  language: "Chinese"
+  prompt_file: "ai_analysis_prompt_gaming_v2.txt"
+  mode: "daily"                         # 分析当天所有新闻
+  max_news_for_analysis: 100            # 最多分析100条
+  include_rss: true                     # 包含 RSS 内容
+  include_standalone: false
+  include_rank_timeline: true           # 包含排名时间线
+
+# ===============================================================
+# 10. AI 翻译功能
+# ===============================================================
+ai_translation:
+  enabled: false
+  language: "中文"
+  prompt_file: "ai_translation_prompt.txt"
+
+# ===============================================================
+# 11. 高级设置
+# ===============================================================
+advanced:
+  debug: false
+  version_check_url: "https://raw.githubusercontent.com/sansan0/TrendRadar/refs/heads/master/version"
+  mcp_version_check_url: "https://raw.githubusercontent.com/sansan0/TrendRadar/refs/heads/master/version_mcp"
+  configs_version_check_url: "https://raw.githubusercontent.com/sansan0/TrendRadar/refs/heads/master/version_configs"
+  
+  crawler:
+    request_interval: 2000
+    use_proxy: false
+    default_proxy: "http://127.0.0.1:10801"
+  
+  rss:
+    request_interval: 1000
+    timeout: 15
+    use_proxy: false
+    proxy_url: ""
+  
+  weight:
+    rank: 0.6
+    frequency: 0.3
+    hotness: 0.1
+  
+  max_accounts_per_channel: 3
+  
+  batch_size:
+    default: 4000
+    dingtalk: 20000
+    feishu: 30000
+    bark: 4000
+    slack: 4000
+  batch_send_interval: 3
+  feishu_message_separator: "━━━━━━━━━━━━━━━━"

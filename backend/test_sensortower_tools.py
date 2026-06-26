@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import ai_tools
 from ai_tools import AgentToolDispatcher
 from sensortower_tools import SensorTowerQueryTools
 
@@ -301,9 +302,12 @@ def sensortower_public_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def tools(sensortower_public_dir: Path) -> SensorTowerQueryTools:
+def tools(sensortower_public_dir: Path, monkeypatch: pytest.MonkeyPatch) -> SensorTowerQueryTools:
+    monkeypatch.setattr(ai_tools, "DATA_SOURCE_DB_PATHS", {})
+    AgentToolDispatcher.invalidate_schema_cache()
     dispatcher = AgentToolDispatcher(sensortower_public_dir, "", True, False)
-    return SensorTowerQueryTools(dispatcher)
+    yield SensorTowerQueryTools(dispatcher)
+    AgentToolDispatcher.invalidate_schema_cache()
 
 
 def test_top_ranking_latest_returns_table_envelope(tools: SensorTowerQueryTools):
@@ -316,6 +320,55 @@ def test_top_ranking_latest_returns_table_envelope(tools: SensorTowerQueryTools)
     assert result["cutoff"] == "2026-06-01"
     assert [row["app_name"] for row in result["rows"]] == ["Royal Match", "Block Blast"]
     assert result["columns"][0]["label"] == "排名"
+
+
+def test_sensortower_query_prefers_configured_source_db_over_public_placeholder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    public = tmp_path / "public"
+    public.mkdir()
+    sqlite3.connect(public / "sensortower_top100.db").close()
+
+    source_dir = tmp_path / "data"
+    source_dir.mkdir()
+    source_db = source_dir / "sensortower_top100.db"
+    conn = sqlite3.connect(source_db)
+    conn.execute(
+        """
+        CREATE TABLE apple_top100 (
+            rank_date TEXT,
+            country TEXT,
+            chart_type TEXT,
+            rank INTEGER,
+            app_id TEXT,
+            app_name TEXT,
+            downloads REAL,
+            revenue REAL
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO apple_top100
+            (rank_date, country, chart_type, rank, app_id, app_name, downloads, revenue)
+        VALUES ('2026-06-15', 'US', 'free', 1, 'ios_real', 'Real Source Game', 123, 456)
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr(ai_tools, "DATA_SOURCE_DB_PATHS", {"sensortower_top100.db": str(source_db)})
+    AgentToolDispatcher.invalidate_schema_cache()
+    dispatcher = AgentToolDispatcher(public, "", True, False)
+    tools = SensorTowerQueryTools(dispatcher)
+
+    result = tools.run(
+        {"operation": "top_ranking", "platform": "ios", "country": "US", "chartType": "free", "limit": 1}
+    )
+
+    assert result["rows"][0]["app_name"] == "Real Source Game"
+    AgentToolDispatcher.invalidate_schema_cache()
 
 
 def test_rank_changes_latest_returns_table_envelope(tools: SensorTowerQueryTools):

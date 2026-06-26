@@ -9,6 +9,7 @@ import pytest
 
 import assistant_service
 from ai_tools import AgentToolDispatcher, build_overseas_weekly_prompt_block
+from ai_tools import openai_style_tools_schema
 from assistant_service import (
     build_system_content,
     detect_data_source_intents,
@@ -493,6 +494,9 @@ def test_casual_sensortower_prompt_includes_semantic_tool_guidance():
     assert "sensortower_query" in system
     assert "飞书群消息卡片表格" in system
     assert "只读 SQL 兜底" in system
+    assert "自己填参数" in system
+    assert "不要先用 query_sqlite 自己写 SQL" in system
+    assert "没明确指定国家/平台时默认 country=US、platform=ios" in system
 
 
 def test_casual_game_profile_prompt_includes_single_game_tool_guidance():
@@ -532,3 +536,20 @@ def test_sensortower_game_profile_tool_has_friendly_display_name():
 
 def test_wechat_douyin_game_profile_tool_has_friendly_display_name():
     assert tool_display_name("wechat_douyin_game_profile") == "正在生成微信/抖音小游戏画像…"
+
+
+def test_sensortower_query_schema_guides_parameter_filling_not_free_sql():
+    tools = openai_style_tools_schema(enable_db=True, enable_web=False)
+    st_tool = next(tool for tool in tools if tool["function"]["name"] == "sensortower_query")
+    params = st_tool["function"]["parameters"]["properties"]
+
+    assert "自己填" in st_tool["function"]["description"]
+    assert "固定取数逻辑" in st_tool["function"]["description"]
+    assert "top_ranking" in params["operation"]["enum"]
+    assert "rank_changes" in params["operation"]["enum"]
+    assert "默认 US" in params["country"]["description"]
+    assert "没明确指定国家时" in params["country"]["description"]
+    assert "没明确指定平台时默认 ios" in params["platform"]["description"]
+    assert "Top N" in params["limit"]["description"]
+    assert "最大 100" in params["limit"]["description"]
+    assert "仅在没有受控 operation" in params["sql"]["description"]

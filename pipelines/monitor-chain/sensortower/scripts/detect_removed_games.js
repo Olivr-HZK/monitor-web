@@ -41,6 +41,8 @@ const path = require('path');
 const https = require('https');
 const { execSync } = require('child_process');
 
+const HTTPS_AGENT = new https.Agent({ keepAlive: false, maxSockets: 12 });
+
 const DB_FILE = process.env.SENSORTOWER_DB_FILE
   ? (path.isAbsolute(process.env.SENSORTOWER_DB_FILE)
       ? process.env.SENSORTOWER_DB_FILE
@@ -206,6 +208,7 @@ function checkUrl(url) {
         {
           method: 'GET',
           timeout: 15000,
+          agent: HTTPS_AGENT,
         },
         (res) => {
           resolved = true;
@@ -354,7 +357,13 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-main().catch((e) => {
-  console.error(e && e.message ? e.message : e);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    HTTPS_AGENT.destroy();
+    process.exit(0);
+  })
+  .catch((e) => {
+    HTTPS_AGENT.destroy();
+    console.error(e && e.message ? e.message : e);
+    process.exit(1);
+  });

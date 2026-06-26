@@ -76,6 +76,8 @@ def render_chart_png(chart: dict[str, Any]) -> bytes | None:
         plt.close(fig)
         return None
 
+    if bool(chart.get("invertYAxis")):
+        ax.invert_yaxis()
     ax.grid(True, linestyle="--", alpha=0.35)
     ax.legend(loc="best", fontsize=9)
     ax.tick_params(axis="x", labelrotation=28, labelsize=8)

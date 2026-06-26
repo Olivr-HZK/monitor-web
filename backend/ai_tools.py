@@ -1417,7 +1417,8 @@ def openai_style_tools_schema(
                         "SensorTower 语义查询工具，优先用于 SensorTower/Top100/App Store/Google Play/美国免费榜问题。"
                         "当前支持操作：top_ranking、rank_changes、weekly_sales_trend、removed_games、top5_overview、"
                         "game_lookup、store_changes、metadata_changes、applist_summary、fallback_sql。"
-                        "使用受控 SQL 模板与参数/输出策略；fallback_sql 仅作为只读 SQL 兜底，不要向用户暴露 SQL、表名或内部路径。"
+                        "使用固定取数逻辑、受控 SQL 模板与固定输出策略；模型自己填国家、平台、榜单类型、Top N、方向、appId 等参数。"
+                        "已有 operation 能覆盖时不要自由写 SQL；fallback_sql 仅作为只读 SQL 兜底，不要向用户暴露 SQL、表名或内部路径。"
                     ),
                     "parameters": {
                         "type": "object",
@@ -1441,19 +1442,19 @@ def openai_style_tools_schema(
                             "platform": {
                                 "type": "string",
                                 "enum": ["ios", "android"],
-                                "description": "平台，iOS 用 ios，Google Play 用 android",
+                                "description": "平台，iOS 用 ios，Google Play 用 android；没明确指定平台时默认 ios。",
                             },
                             "country": {
                                 "type": "string",
-                                "description": "国家/地区代码，如 US",
+                                "description": "国家/地区代码，如 US、JP、GB、DE、IN；没明确指定国家时默认 US。用户说美国/日本/英国/德国/印度时自己填对应代码。",
                             },
                             "chartType": {
                                 "type": "string",
-                                "description": "榜单类型，如 free",
+                                "description": "榜单类型，默认 free；用户说免费榜填 free，说收入榜/畅销榜填 revenue。",
                             },
                             "limit": {
                                 "type": "integer",
-                                "description": "最多返回行数，默认由工具按操作决定",
+                                "description": "Top N / 最多返回行数，默认由工具按操作决定；top_ranking 最大 100，用户说 Top10/Top50/Top100 时自己填 10/50/100。",
                             },
                             "direction": {
                                 "type": "string",
@@ -1474,7 +1475,7 @@ def openai_style_tools_schema(
                             },
                             "sql": {
                                 "type": "string",
-                                "description": "fallback_sql 专用，只读 SELECT/WITH SQL",
+                                "description": "fallback_sql 专用，只读 SELECT/WITH SQL；仅在没有受控 operation 能覆盖用户问题时使用。",
                             },
                         },
                         "required": ["operation"],

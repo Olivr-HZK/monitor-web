@@ -420,9 +420,6 @@ class SensorTowerQueryTools:
         )
 
     def _db_path(self, db_name: str) -> Path:
-        public_db_path = self.dispatcher.public_dir / db_name
-        if public_db_path.is_file() and public_db_path.suffix.lower() == ".db":
-            return public_db_path.resolve()
         _, db_path = _validate_db_name(self.dispatcher.public_dir, db_name)
         return db_path
 

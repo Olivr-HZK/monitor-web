@@ -506,6 +506,8 @@ def build_system_content(
                 "\n- 我方产品、自家产品、US Free、appid、按产品追溯：查 us_free_appid_weekly.db。"
                 "\n- 休闲飞书入口不要主动使用 AI 产品 UA 库；除非用户明确跳出休闲范围，否则围绕上述四源回答。"
                 "\n- SensorTower 问题优先调用 sensortower_query；它是受控 SQL 模板 + 参数/输出策略，不是实时外部抓取。"
+                "\n- SensorTower 已封装的问题（Top N 榜单、排名异动、新进榜、下架、商店页变化、元数据变化、Top5 总结、app 查找）不要先用 query_sqlite 自己写 SQL；你只负责从用户话里自己填参数，如国家、平台、榜单类型、Top N。"
+                "\n- SensorTower Top N 榜单、排名异动和排名趋势没明确指定国家/平台时默认 country=US、platform=ios、chartType=free；用户明确国家/平台/收入榜/Top10/Top50 时自己填参数，Top N 最大 100。"
                 "\n- 当用户说「帮我看看/分析/查一下/看一下 + 某个具体游戏」或「某游戏怎么样」时，优先调用 sensortower_game_profile；只传游戏名，不要向用户索要 app id，工具会自动识别 iOS/Android app id。"
                 "\n- sensortower_game_profile 会调用 SensorTower App Analysis API，并生成下载量、收入、RPD、平均 DAU、ARPDAU、类别排名等画像卡片；文字回复只需总结关键点，不要复述整张卡片。"
                 "\n- SensorTower 表格形结果会作为飞书群消息卡片表格发送；趋势/对比结果会作为 PNG 图表发送。"

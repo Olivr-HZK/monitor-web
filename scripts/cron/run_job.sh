@@ -49,6 +49,7 @@ Job ids:
   competitor_weekly_period
   wechat_douyin_weekly
   wechat_douyin_weekly_rerun
+  wechat_douyin_weekly_rerun_then_push
   sensortower_weekly
   sensortower_us_free_daily
   sensortower_arrow_madness_daily
@@ -191,6 +192,12 @@ on_exit() {
   else
     log "FAILED: $JOB_ID exit_code=$code"
     printf 'status=failed\njob=%s\nexit_code=%s\ntime=%s\nlog=%s\n' "$JOB_ID" "$code" "$(date '+%Y-%m-%d %H:%M:%S')" "$LOG_FILE" > "$STATUS_FILE"
+    if [[ "$JOB_ID" == "wechat_douyin_weekly" && "${WECHAT_DOUYIN_FAILURE_NOTIFY:-1}" != "0" ]]; then
+      "$REPO_ROOT/scripts/send_wechat_douyin_failure_snapshot.py" \
+        --date "$(date '+%Y-%m-%d')" \
+        --log-file "$LOG_FILE" \
+        --exit-code "$code" || log "WARN: failed to send WeChat/Douyin failure snapshot"
+    fi
   fi
   exit "$code"
 }
@@ -230,9 +237,34 @@ case "$JOB_ID" in
   wechat_douyin_weekly_rerun)
     run_in "$REPO_ROOT/pipelines/monitor-chain/wechat-douyin" /bin/bash ./scripts/rerun_weekly_wx_three_charts_if_needed.sh "$@"
     ;;
+  wechat_douyin_weekly_rerun_then_push)
+    run_in "$REPO_ROOT/pipelines/monitor-chain/wechat-douyin" /bin/bash ./scripts/rerun_weekly_wx_three_charts_if_needed.sh "$@"
+    if [[ "${MONITOR_CHAIN_PUSH_AFTER_WECHAT_RERUN:-1}" == "1" ]]; then
+      target_week="$(
+        python3 - <<'PY'
+from datetime import datetime, timedelta
+
+today = datetime.now()
+end = today - timedelta(days=today.isoweekday())
+start = end - timedelta(days=6)
+print(f"{start:%Y-%m-%d}~{end:%Y-%m-%d}")
+PY
+      )"
+      marker="$REPO_ROOT/logs/sent/wechatdouyin_${target_week}.sent"
+      if [[ -f "$marker" ]]; then
+        log "SKIP: WeChat/Douyin already sent for ${target_week}: ${marker}"
+      else
+        log "WeChat/Douyin ready for ${target_week}; triggering monitor_chain_checked_push"
+        (
+          cd "$REPO_ROOT"
+          SYNC_SKIP_DEPLOY="${SYNC_SKIP_DEPLOY:-1}" /bin/bash ./scripts/sync_dbs_and_deploy.sh
+        )
+      fi
+    fi
+    ;;
   sensortower_weekly)
     export SKIP_SENSORTOWER_WEEKLY_PUSH="${SKIP_SENSORTOWER_WEEKLY_PUSH:-1}"
-    run_in "$REPO_ROOT/pipelines/monitor-chain/sensortower" /bin/bash ./scripts/cron_run_weekly.sh "$@"
+    run_in_timeout "$REPO_ROOT/pipelines/monitor-chain/sensortower" "${SENSORTOWER_WEEKLY_TIMEOUT_SEC:-3600}" /bin/bash ./scripts/cron_run_weekly.sh "$@"
     ;;
   sensortower_us_free_daily)
     run_in "$REPO_ROOT/pipelines/monitor-chain/sensortower" /bin/bash ./scripts/cron_run_us_free_daily.sh "$@"
@@ -272,15 +304,15 @@ case "$JOB_ID" in
     run_in "$WORKSPACE_ROOT/AITools Competitor Monitor" /bin/bash ./run-weekly-period-workflow.sh "$@"
     ;;
   gaming_daily)
-    run_in "$LYB_ROOT/gaming-daily-report2" ./run_gaming_daily.sh "$@"
+    run_in "$REPO_ROOT/pipelines/monitor-chain/gaming-weekly" /bin/bash ./run_gaming_daily.sh "$@"
     ;;
   gaming_weekly_generate)
-    run_in_timeout "$LYB_ROOT/gaming-daily-report2" "${GAMING_WEEKLY_GENERATE_TIMEOUT_SEC:-3600}" ./.venv/bin/python3 send_gaming_weekly.py --phase generate "$@"
+    run_in_timeout "$REPO_ROOT/pipelines/monitor-chain/gaming-weekly" "${GAMING_WEEKLY_GENERATE_TIMEOUT_SEC:-3600}" /bin/bash ./run_gaming_weekly_generate.sh "$@"
+    run_in "$REPO_ROOT" node ./scripts/sync_overseas_weekly_reports.js
     ;;
   gaming_weekly_push)
-    JOB_STATUS_KIND="disabled"
-    JOB_STATUS_NOTE="Local gaming weekly push is disabled; production push is owned by the server cron under /opt/gaming-daily-report2."
-    log "DISABLED: local gaming_weekly_push will not send Feishu/WeCom messages or write push ok markers."
+    run_in "$REPO_ROOT/pipelines/monitor-chain/gaming-weekly" /bin/bash ./run_gaming_weekly_push_cron.sh "$@"
+    run_in "$REPO_ROOT" node ./scripts/sync_overseas_weekly_reports.js
     ;;
   ai_video_enhancer_daily)
     run_in "$OLIVER_ROOT/ai-" /bin/bash ./scripts/cron_ai_video_enhancer_daily.sh "$@"

@@ -241,6 +241,31 @@ log_source_state() {
   fi
 }
 
+job_failed_today() {
+  local job_id="$1"
+  local status_file="$LOG_DIR/jobs/${job_id}.last_status"
+  [[ -f "$status_file" ]] || return 1
+  grep -q '^status=failed$' "$status_file" || return 1
+  grep -q "^time=${REPORT_DATE} " "$status_file" || return 1
+}
+
+abort_if_blocked_by_failed_job() {
+  local label="$1"
+  local file="$2"
+  local cutoff_epoch="$3"
+  shift 3
+
+  local job_id
+  for job_id in "$@"; do
+    if job_failed_today "$job_id"; then
+      log_source_state "$label" "$file" "$cutoff_epoch"
+      log_err "${label} 源库未就绪，且上游任务 ${job_id} 今日已失败；提前中止等待，避免空等后推送旧数据"
+      status_line "${label} 源库未就绪；上游任务 ${job_id} 今日已失败"
+      exit 1
+    fi
+  done
+}
+
 # 从 .env.production 读取 VITE_API_BASE_URL（不含引号与首尾空格）
 read_env_production_api_base() {
   local f="$REPO_ROOT/.env.production"
@@ -405,13 +430,32 @@ wait_until_sources_ready() {
     our_product_file="$(current_our_product_source)"
     wechat_file="$(current_wechat_source)"
 
-    if is_fresh "$sensortower_file" "$cutoff_epoch" \
-       && is_fresh "$competitor_file" "$cutoff_epoch" \
-       && is_fresh "$wechat_file" "$cutoff_epoch" \
-       && is_fresh "$our_product_file" "$cutoff_epoch"; then
+    local sensortower_ready=0 competitor_ready=0 wechat_ready=0 our_product_ready=0
+    is_fresh "$sensortower_file" "$cutoff_epoch" && sensortower_ready=1
+    is_fresh "$competitor_file" "$cutoff_epoch" && competitor_ready=1
+    is_fresh "$wechat_file" "$cutoff_epoch" && wechat_ready=1
+    is_fresh "$our_product_file" "$cutoff_epoch" && our_product_ready=1
+
+    if [[ "$sensortower_ready" == "1" \
+       && "$competitor_ready" == "1" \
+       && "$wechat_ready" == "1" \
+       && "$our_product_ready" == "1" ]]; then
       log "源库均已就绪"
       status_line "源库 mtime 检查通过（cutoff=${CUTOFF_HOUR}:00）"
       return 0
+    fi
+
+    if [[ "$sensortower_ready" != "1" ]]; then
+      abort_if_blocked_by_failed_job "SensorTower" "$sensortower_file" "$cutoff_epoch" sensortower_weekly
+    fi
+    if [[ "$competitor_ready" != "1" ]]; then
+      abort_if_blocked_by_failed_job "竞品社媒" "$competitor_file" "$cutoff_epoch" competitor_weekly_period
+    fi
+    if [[ "$wechat_ready" != "1" ]]; then
+      abort_if_blocked_by_failed_job "微信/抖音" "$wechat_file" "$cutoff_epoch" wechat_douyin_weekly_rerun
+    fi
+    if [[ "$our_product_ready" != "1" ]]; then
+      abort_if_blocked_by_failed_job "我方产品" "$our_product_file" "$cutoff_epoch" sensortower_us_free_daily sensortower_arrow_madness_daily
     fi
 
     if [[ $waited -ge $WAIT_MAX ]]; then

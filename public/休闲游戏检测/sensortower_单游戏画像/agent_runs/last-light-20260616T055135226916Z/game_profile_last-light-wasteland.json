@@ -1,0 +1,707 @@
+{
+  "generatedAt": "2026-06-16T05:51:39.433Z",
+  "identity": {
+    "query": "Last Light",
+    "canonicalName": "Last Light: Wasteland",
+    "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+    "unifiedAppId": null,
+    "iosAppIds": [
+      "6754545818"
+    ],
+    "androidAppIds": [
+      "com.lighthouse.freeplay.ameuno"
+    ],
+    "confidence": "high",
+    "platforms": {
+      "ios": {
+        "appId": "6754545818",
+        "name": "Last Light: Wasteland",
+        "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+        "score": 0.8369,
+        "confidence": "high",
+        "source": "apple_search"
+      },
+      "android": {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "name": "Last Light",
+        "publisher": "",
+        "score": 0.78,
+        "confidence": "medium",
+        "source": "google_play_search"
+      }
+    },
+    "warnings": [],
+    "cachedAt": "2026-06-16T03:11:23.597Z"
+  },
+  "period": {
+    "startDate": "2026-05-17",
+    "endDate": "2026-06-15",
+    "country": "WW"
+  },
+  "summary": {
+    "downloads": 241832,
+    "revenue": 59784448,
+    "rpd": 247.2148,
+    "averageDau": null,
+    "arpdau": null,
+    "timeSpentSeconds": null,
+    "websiteVisits": null
+  },
+  "series": {
+    "sales": [
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-17T00:00:00Z",
+        "downloads": 1020,
+        "revenue": 966820
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-18T00:00:00Z",
+        "downloads": 941,
+        "revenue": 911802
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-19T00:00:00Z",
+        "downloads": 1069,
+        "revenue": 1162763
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-20T00:00:00Z",
+        "downloads": 1211,
+        "revenue": 1025908
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-21T00:00:00Z",
+        "downloads": 1010,
+        "revenue": 1118103
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-22T00:00:00Z",
+        "downloads": 439,
+        "revenue": 1233807
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-23T00:00:00Z",
+        "downloads": 173,
+        "revenue": 1115589
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-24T00:00:00Z",
+        "downloads": 336,
+        "revenue": 1096436
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-25T00:00:00Z",
+        "downloads": 337,
+        "revenue": 1312209
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-26T00:00:00Z",
+        "downloads": 232,
+        "revenue": 1170619
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-27T00:00:00Z",
+        "downloads": 178,
+        "revenue": 989393
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-28T00:00:00Z",
+        "downloads": 256,
+        "revenue": 1130370
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-29T00:00:00Z",
+        "downloads": 296,
+        "revenue": 1354324
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-30T00:00:00Z",
+        "downloads": 383,
+        "revenue": 1089615
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-05-31T00:00:00Z",
+        "downloads": 542,
+        "revenue": 1017248
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-01T00:00:00Z",
+        "downloads": 493,
+        "revenue": 818139
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-02T00:00:00Z",
+        "downloads": 1172,
+        "revenue": 1047764
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-03T00:00:00Z",
+        "downloads": 2631,
+        "revenue": 1021092
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-04T00:00:00Z",
+        "downloads": 3433,
+        "revenue": 1076127
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-05T00:00:00Z",
+        "downloads": 6112,
+        "revenue": 1305819
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-06T00:00:00Z",
+        "downloads": 6815,
+        "revenue": 1044921
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-07T00:00:00Z",
+        "downloads": 5562,
+        "revenue": 951607
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-08T00:00:00Z",
+        "downloads": 3810,
+        "revenue": 1118555
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-09T00:00:00Z",
+        "downloads": 2168,
+        "revenue": 1178988
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-10T00:00:00Z",
+        "downloads": 1354,
+        "revenue": 1169005
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-11T00:00:00Z",
+        "downloads": 826,
+        "revenue": 1068594
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-12T00:00:00Z",
+        "downloads": 444,
+        "revenue": 1197077
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-13T00:00:00Z",
+        "downloads": 1013,
+        "revenue": 1004124
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-14T00:00:00Z",
+        "downloads": 3068,
+        "revenue": 888300
+      },
+      {
+        "appId": "6754545818",
+        "country": "WW",
+        "date": "2026-06-15T00:00:00Z",
+        "downloads": 2943,
+        "revenue": 1291219
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-17T00:00:00Z",
+        "downloads": 7598,
+        "revenue": 675090
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-18T00:00:00Z",
+        "downloads": 7104,
+        "revenue": 637448
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-19T00:00:00Z",
+        "downloads": 8712,
+        "revenue": 709456
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-20T00:00:00Z",
+        "downloads": 8572,
+        "revenue": 780685
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-21T00:00:00Z",
+        "downloads": 6347,
+        "revenue": 889577
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-22T00:00:00Z",
+        "downloads": 4149,
+        "revenue": 1004236
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-23T00:00:00Z",
+        "downloads": 2147,
+        "revenue": 959540
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-24T00:00:00Z",
+        "downloads": 934,
+        "revenue": 879014
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-25T00:00:00Z",
+        "downloads": 818,
+        "revenue": 836547
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-26T00:00:00Z",
+        "downloads": 752,
+        "revenue": 736334
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-27T00:00:00Z",
+        "downloads": 843,
+        "revenue": 744115
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-28T00:00:00Z",
+        "downloads": 910,
+        "revenue": 822253
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-29T00:00:00Z",
+        "downloads": 2094,
+        "revenue": 910847
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-30T00:00:00Z",
+        "downloads": 4346,
+        "revenue": 945656
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-05-31T00:00:00Z",
+        "downloads": 6407,
+        "revenue": 902289
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-01T00:00:00Z",
+        "downloads": 7760,
+        "revenue": 903241
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-02T00:00:00Z",
+        "downloads": 12071,
+        "revenue": 914714
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-03T00:00:00Z",
+        "downloads": 13934,
+        "revenue": 926848
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-04T00:00:00Z",
+        "downloads": 17743,
+        "revenue": 961018
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-05T00:00:00Z",
+        "downloads": 16213,
+        "revenue": 1106092
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-06T00:00:00Z",
+        "downloads": 15836,
+        "revenue": 1032430
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-07T00:00:00Z",
+        "downloads": 11396,
+        "revenue": 921913
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-08T00:00:00Z",
+        "downloads": 8231,
+        "revenue": 840144
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-09T00:00:00Z",
+        "downloads": 5920,
+        "revenue": 865279
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-10T00:00:00Z",
+        "downloads": 4329,
+        "revenue": 892518
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-11T00:00:00Z",
+        "downloads": 3153,
+        "revenue": 1015997
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-12T00:00:00Z",
+        "downloads": 3261,
+        "revenue": 1126886
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-13T00:00:00Z",
+        "downloads": 3564,
+        "revenue": 1070098
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-14T00:00:00Z",
+        "downloads": 3540,
+        "revenue": 989243
+      },
+      {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "country": "WW",
+        "date": "2026-06-15T00:00:00Z",
+        "downloads": 2881,
+        "revenue": 908603
+      }
+    ],
+    "activeUsers": [],
+    "timeSpent": []
+  },
+  "rankings": [
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "7012",
+      "categoryName": "Games/Puzzle",
+      "chartType": "topfreeapplications",
+      "latestRank": null,
+      "series": {
+        "lines": 0
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "7003",
+      "categoryName": "Games/Casual",
+      "chartType": "topfreeapplications",
+      "latestRank": 493,
+      "series": {
+        "6754545818": {
+          "US": {
+            "7003": {
+              "topfreeapplications": {
+                "name": "Last Light: Wasteland",
+                "humanized_app_name": "Last Light: Wasteland",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/f8/6a/d8/f86ad8be-bd13-5ac2-7639-aa7d5ba7c3ce/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1778976000,
+                    436,
+                    null
+                  ],
+                  [
+                    1779062400,
+                    420,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779148800,
+                    405,
+                    null
+                  ],
+                  [
+                    1779235200,
+                    331,
+                    null
+                  ],
+                  [
+                    1779321600,
+                    371,
+                    null
+                  ],
+                  [
+                    1780444800,
+                    220,
+                    null
+                  ],
+                  [
+                    1780531200,
+                    225,
+                    null
+                  ],
+                  [
+                    1780617600,
+                    109,
+                    null
+                  ],
+                  [
+                    1780704000,
+                    90,
+                    null
+                  ],
+                  [
+                    1780790400,
+                    121,
+                    null
+                  ],
+                  [
+                    1780876800,
+                    163,
+                    null
+                  ],
+                  [
+                    1780963200,
+                    278,
+                    null
+                  ],
+                  [
+                    1781049600,
+                    330,
+                    null
+                  ],
+                  [
+                    1781136000,
+                    456,
+                    null
+                  ],
+                  [
+                    1781481600,
+                    464,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games/Casual",
+                "todays_rank": 493
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "6014",
+      "categoryName": "Games",
+      "chartType": "topfreeapplications",
+      "latestRank": 364,
+      "series": {
+        "6754545818": {
+          "US": {
+            "6014": {
+              "topfreeapplications": {
+                "name": "Last Light: Wasteland",
+                "humanized_app_name": "Last Light: Wasteland",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/f8/6a/d8/f86ad8be-bd13-5ac2-7639-aa7d5ba7c3ce/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1780617600,
+                    242,
+                    null
+                  ],
+                  [
+                    1780704000,
+                    204,
+                    null
+                  ],
+                  [
+                    1780790400,
+                    278,
+                    null
+                  ],
+                  [
+                    1780876800,
+                    364,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games",
+                "todays_rank": null
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "0",
+      "categoryName": "Overall",
+      "chartType": "topfreeapplications",
+      "latestRank": null,
+      "series": {
+        "lines": 0
+      }
+    },
+    {
+      "os": "ios",
+      "device": "ipad",
+      "category": "7012",
+      "categoryName": "Games/Puzzle",
+      "chartType": "topfreeipadapplications",
+      "latestRank": null,
+      "series": {
+        "lines": 0
+      }
+    }
+  ],
+  "apiCalls": [
+    {
+      "name": "sales_report_estimates",
+      "url": "https://api.sensortower.com/v1/ios/sales_report_estimates?app_ids=6754545818&countries=WW&start_date=2026-05-17&end_date=2026-06-15&date_granularity=daily&auth_token=***"
+    },
+    {
+      "name": "active_users",
+      "url": "https://api.sensortower.com/v1/ios/usage/active_users?app_ids=6754545818&countries=WW&start_date=2026-05-17&end_date=2026-06-15&time_period=day&auth_token=***"
+    },
+    {
+      "name": "sales_report_estimates",
+      "url": "https://api.sensortower.com/v1/android/sales_report_estimates?app_ids=com.lighthouse.freeplay.ameuno&countries=WW&start_date=2026-05-17&end_date=2026-06-15&date_granularity=daily&auth_token=***"
+    },
+    {
+      "name": "active_users",
+      "url": "https://api.sensortower.com/v1/android/usage/active_users?app_ids=com.lighthouse.freeplay.ameuno&countries=WW&start_date=2026-05-17&end_date=2026-06-15&time_period=day&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754545818&countries=US&category=7012&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754545818&countries=US&category=7003&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754545818&countries=US&category=6014&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754545818&countries=US&category=0&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754545818&countries=US&category=7012&chart_type_ids=topfreeipadapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    }
+  ],
+  "warnings": [
+    "identity loaded from cache",
+    "website visits endpoint unavailable: App Analysis OpenAPI does not expose Web Insights visits.",
+    "time spent is not fetched in the first live workflow unless a verified unified app id is available."
+  ],
+  "markdownPath": "/Users/ggbond/lyb/monitor-web/public/休闲游戏检测/sensortower_单游戏画像/agent_runs/last-light-20260616T055135226916Z/game_profile_last-light-wasteland.md",
+  "jsonPath": "/Users/ggbond/lyb/monitor-web/public/休闲游戏检测/sensortower_单游戏画像/agent_runs/last-light-20260616T055135226916Z/game_profile_last-light-wasteland.json"
+}

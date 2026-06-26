@@ -7,12 +7,15 @@ PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 30 7 * * * __REPO_ROOT__/scripts/cron/run_job.sh competitor_daily_scraper
 40 7 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh competitor_weekly_period
 30 7 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh wechat_douyin_weekly
-50 8 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh wechat_douyin_weekly_rerun
-50 9 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh wechat_douyin_weekly_rerun
+50 8 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh wechat_douyin_weekly_rerun_then_push
+20,50 9-17 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh wechat_douyin_weekly_rerun_then_push
 30 7 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh sensortower_weekly
 30 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh sensortower_us_free_daily
 0 8 * * * __REPO_ROOT__/scripts/cron/run_job.sh sensortower_arrow_madness_daily
-35 10 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh monitor_chain_checked_push
+0 0 * * * __REPO_ROOT__/scripts/cron/run_job.sh gaming_daily
+0 6 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh gaming_weekly_generate
+0 8 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh gaming_weekly_push
+10 18 * * 1 __REPO_ROOT__/scripts/cron/run_job.sh monitor_chain_checked_push
 
 # monitor-web daily reports
 30 10 * * * __REPO_ROOT__/scripts/cron/run_job.sh monitor_reports_daily

@@ -7,11 +7,19 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
+const defaultSourceDir = path.join(
+  repoRoot,
+  'pipelines',
+  'monitor-chain',
+  'gaming-weekly',
+  'output',
+  'weekly_reports',
+);
 
 const sourceDir =
   process.argv[2] ||
   process.env.OVERSEAS_WEEKLY_SOURCE ||
-  '/Users/ggbond/lyb/gaming-daily-report2/output/weekly_reports';
+  defaultSourceDir;
 const destDir =
   process.argv[3] ||
   path.join(repoRoot, 'public', '休闲游戏检测', '出海周报');
@@ -186,12 +194,6 @@ function main() {
     }
   }
 
-  for (const name of fs.readdirSync(destDir)) {
-    if (/^weekly_report_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.json$/.test(name)) {
-      fs.unlinkSync(path.join(destDir, name));
-    }
-  }
-
   const outputs = Array.from(latestByWeek.values())
     .map(({ filePath, report }) => normalizeReport(filePath, report))
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -203,14 +205,23 @@ function main() {
     reportFiles.push(fileName);
   }
 
+  const existingReportFiles = fs
+    .readdirSync(destDir)
+    .filter((name) => /^weekly_report_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.json$/.test(name));
+  const mergedReportFiles = Array.from(new Set([...reportFiles, ...existingReportFiles])).sort((a, b) => {
+    const aDoc = readJson(path.join(destDir, a));
+    const bDoc = readJson(path.join(destDir, b));
+    return String(bDoc.date || '').localeCompare(String(aDoc.date || '')) || b.localeCompare(a);
+  });
+
   const index = {
     generated_at: new Date().toISOString(),
-    source: 'gaming-daily-report2/output/weekly_reports',
+    source: path.relative(repoRoot, sourceDir) || sourceDir,
     skipped_failed_weeks: Array.from(new Set(skippedFailed)).sort(),
-    reports: reportFiles,
+    reports: mergedReportFiles,
   };
   fs.writeFileSync(path.join(destDir, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
-  console.log(`Synced ${reportFiles.length} overseas weekly reports to ${destDir}`);
+  console.log(`Synced ${reportFiles.length} overseas weekly reports to ${destDir}; index has ${mergedReportFiles.length}`);
 }
 
 main();

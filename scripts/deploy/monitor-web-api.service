@@ -1,0 +1,14 @@
+[Unit]
+Description=monitor-web FastAPI API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/oliver/monitor-web/backend
+EnvironmentFile=/root/oliver/monitor-web/backend/.env
+ExecStart=/root/oliver/monitor-web/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 3001
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

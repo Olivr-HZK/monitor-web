@@ -18,6 +18,7 @@ SensorTower 问数优先读取本地数据库，不默认访问外部 SensorTowe
 
 - 表格型结果：机器人回复飞书群消息卡片表格，例如 TopN、排名异动、商店页变化、下架检测。
 - 趋势/对比型结果：机器人生成 PNG 图并回复到同一线程，例如排名趋势、下载趋势、收入趋势。
+- 单游戏画像：用户说「帮我看看 / 分析 / 查一下某个具体游戏」时，机器人可调用 `sensortower_game_profile`，自动用游戏名解析 iOS / Android app id，再调用 SensorTower App Analysis API 获取下载量、收入、RPD、平均 DAU、ARPDAU、类别排名等；回复一张飞书画像卡片，并跟随发送下载量、收入、DAU、类别排名趋势图。这个路径不同于普通榜单问数，会访问外部 SensorTower API。
 - “最新 / 最近 / 本周”以数据库最新可用期为准；“上周 / 环比 / 变化”以最新可用期对比上一可用期。
 - 机器人不会在群里暴露 SQL、数据库表名、内部路径或密钥。
 
@@ -38,6 +39,8 @@ SensorTower 问数优先读取本地数据库，不默认访问外部 SensorTowe
 | `CASUAL_FEISHU_ASSISTANT_SEND_THINKING` | 可选 | 默认 `true`，先回复「正在查询」 |
 
 AI、数据查询与联网搜索沿用现有配置：`OPENAI_API_KEY`、`AI_PROVIDER=openrouter`（推荐）、`CODEX_ENABLE_DB_TOOL=true`、`CODEX_ENABLE_WEB_SEARCH_TOOL=true` 等；配置 `TAVILY_API_KEY` 时优先用 Tavily，否则走 DuckDuckGo 摘要接口兜底。
+
+SensorTower 单游戏画像还要求后端机器可以执行 Node.js，并能读取 `pipelines/monitor-chain/sensortower/.env` 或仓库根 `.env` 中的 `SENSORTOWER_API_TOKEN`。默认脚本入口为 `pipelines/monitor-chain/sensortower/scripts/single_game_profile.js`，输出落到 `public/休闲游戏检测/sensortower_单游戏画像/agent_runs/`。
 
 ## 3. 飞书开放平台步骤
 

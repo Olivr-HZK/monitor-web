@@ -153,6 +153,32 @@ class CasualFeishuAgent:
             uuid_prefix=f"{uuid_prefix}:casual-answer",
         )
 
+        card_count = 0
+        card_errors = 0
+        cards = getattr(result, "cards", []) or []
+        for idx, card_payload in enumerate(cards):
+            if not isinstance(card_payload, dict):
+                continue
+            try:
+                await self.bot_client.reply_interactive_card(
+                    event.message_id,
+                    card_payload,
+                    uuid_prefix=f"{uuid_prefix}:casual-card:{idx}",
+                )
+                card_count += 1
+            except Exception as card_err:
+                card_errors += 1
+                print("[casual-feishu-card]", str(card_err)[:500])
+
+        if cards and card_count == 0:
+            await self.bot_client.reply_text(
+                event.message_id,
+                "🎮 画像卡带这次没能成功上屏，我先把文字结论交给你。换个游戏名或时间范围，本神再回收一局。",
+                uuid_prefix=f"{uuid_prefix}:casual-card-fallback",
+            )
+        elif card_errors:
+            print("[casual-feishu-card]", {"sent": card_count, "failed": card_errors})
+
         attachment_count = 0
         attachment_errors = 0
         attachments = getattr(result, "attachments", []) or []

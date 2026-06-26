@@ -1,0 +1,101 @@
+{
+  "block-blast|US": {
+    "query": "Block Blast",
+    "canonicalName": "Block Blast！",
+    "publisher": "ARETIS LIMITED",
+    "unifiedAppId": null,
+    "iosAppIds": [
+      "1617391485"
+    ],
+    "androidAppIds": [
+      "com.block.juggle"
+    ],
+    "confidence": "high",
+    "platforms": {
+      "ios": {
+        "appId": "1617391485",
+        "name": "Block Blast！",
+        "publisher": "ARETIS LIMITED",
+        "score": 0.9605,
+        "confidence": "high",
+        "source": "apple_search"
+      },
+      "android": {
+        "appId": "com.block.juggle",
+        "name": "Block Blast!",
+        "publisher": "",
+        "score": 0.78,
+        "confidence": "medium",
+        "source": "google_play_search"
+      }
+    },
+    "warnings": [],
+    "cachedAt": "2026-06-16T03:02:10.667Z"
+  },
+  "last-light|WW": {
+    "query": "Last Light",
+    "canonicalName": "Last Light: Wasteland",
+    "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+    "unifiedAppId": null,
+    "iosAppIds": [
+      "6754545818"
+    ],
+    "androidAppIds": [
+      "com.lighthouse.freeplay.ameuno"
+    ],
+    "confidence": "high",
+    "platforms": {
+      "ios": {
+        "appId": "6754545818",
+        "name": "Last Light: Wasteland",
+        "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+        "score": 0.8369,
+        "confidence": "high",
+        "source": "apple_search"
+      },
+      "android": {
+        "appId": "com.lighthouse.freeplay.ameuno",
+        "name": "Last Light",
+        "publisher": "",
+        "score": 0.78,
+        "confidence": "medium",
+        "source": "google_play_search"
+      }
+    },
+    "warnings": [],
+    "cachedAt": "2026-06-16T03:11:23.597Z"
+  },
+  "last-light|GB": {
+    "query": "Last Light",
+    "canonicalName": "Last Light: Rebirth",
+    "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+    "unifiedAppId": null,
+    "iosAppIds": [
+      "6754688040"
+    ],
+    "androidAppIds": [
+      "com.RedMoonGS.LastLight"
+    ],
+    "confidence": "medium",
+    "platforms": {
+      "ios": {
+        "appId": "6754688040",
+        "name": "Last Light: Rebirth",
+        "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+        "score": 0.8094,
+        "confidence": "high",
+        "source": "apple_search"
+      },
+      "android": {
+        "appId": "com.RedMoonGS.LastLight",
+        "name": "Last Light: Vampire Defense RedMoon GS",
+        "publisher": "",
+        "score": 0.7256,
+        "confidence": "medium",
+        "source": "google_play_search"
+      }
+    },
+    "warnings": [],
+    "cachedAt": "2026-06-17T06:22:58.429Z"
+  }
+}

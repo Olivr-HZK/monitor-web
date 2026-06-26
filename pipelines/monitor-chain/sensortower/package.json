@@ -26,7 +26,8 @@
     "copy-arrow2-us-free": "node scripts/copy_arrow_madness_to_us_free_weekly.js",
     "arrow-madness-daily-competitors": "node scripts/arrow_madness_daily_competitors.js",
     "arrow-madness-daily-competitors-no-feishu": "node scripts/arrow_madness_daily_competitors.js --no-feishu",
-    "migrate-competitors-to-us-free": "node scripts/migrate_competitors_daily_to_us_free.js"
+    "migrate-competitors-to-us-free": "node scripts/migrate_competitors_daily_to_us_free.js",
+    "single-game-profile": "node scripts/single_game_profile.js"
   },
   "dependencies": {
     "playwright": "^1.58.1",

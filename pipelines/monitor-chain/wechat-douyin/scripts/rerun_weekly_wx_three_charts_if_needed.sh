@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
 # Check whether the current target week has complete WeChat/Douyin three-chart
-# data. If not, rerun the weekly scraper/import once.
+# data. If not, rerun the weekly scraper/import once for this invocation.
 #
-# Intended as a cron safety net after the 07:30 primary run.
+# Intended as a cron safety net after the 07:30 primary run. It is safe to
+# schedule multiple times on Monday: complete data exits immediately, incomplete
+# data gets another chance after Gravity Engine catches up.
 
 set -euo pipefail
 

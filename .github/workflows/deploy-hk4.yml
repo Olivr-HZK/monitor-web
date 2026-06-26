@@ -1,0 +1,93 @@
+name: Deploy hk4
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Git branch to deploy"
+        default: "staging"
+        required: true
+      app_dir:
+        description: "Server application directory"
+        default: "/root/oliver/monitor-web"
+        required: true
+      install_pipelines:
+        description: "Install pipeline dependencies"
+        default: "1"
+        required: true
+      restart_service:
+        description: "Optional systemd service to restart"
+        default: ""
+        required: false
+
+concurrency:
+  group: deploy-hk4-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Resolve inputs
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "branch=${{ inputs.branch }}" >> "$GITHUB_OUTPUT"
+            echo "app_dir=${{ inputs.app_dir }}" >> "$GITHUB_OUTPUT"
+            echo "install_pipelines=${{ inputs.install_pipelines }}" >> "$GITHUB_OUTPUT"
+            echo "restart_service=${{ inputs.restart_service }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "app_dir=/root/oliver/monitor-web" >> "$GITHUB_OUTPUT"
+            echo "install_pipelines=1" >> "$GITHUB_OUTPUT"
+            echo "restart_service=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure SSH key
+        shell: bash
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.HK4_SSH_KEY }}" > ~/.ssh/hk4_deploy_key
+          chmod 600 ~/.ssh/hk4_deploy_key
+          ssh-keyscan -p "${{ secrets.HK4_PORT || 22 }}" "${{ secrets.HK4_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy on hk4
+        shell: bash
+        env:
+          HK4_HOST: ${{ secrets.HK4_HOST }}
+          HK4_USER: ${{ secrets.HK4_USER }}
+          HK4_PORT: ${{ secrets.HK4_PORT || 22 }}
+          APP_DIR: ${{ steps.vars.outputs.app_dir }}
+          DEPLOY_BRANCH: ${{ steps.vars.outputs.branch }}
+          DEPLOY_INSTALL_PIPELINES: ${{ steps.vars.outputs.install_pipelines }}
+          DEPLOY_RESTART_SERVICE: ${{ steps.vars.outputs.restart_service }}
+        run: |
+          ssh -i ~/.ssh/hk4_deploy_key \
+            -p "$HK4_PORT" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$HK4_USER@$HK4_HOST" \
+            "APP_DIR='$APP_DIR' DEPLOY_BRANCH='$DEPLOY_BRANCH' DEPLOY_INSTALL_PIPELINES='$DEPLOY_INSTALL_PIPELINES' DEPLOY_RESTART_SERVICE='$DEPLOY_RESTART_SERVICE' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          REPO_URL="git@github.com:Olivr-HZK/monitor-web.git"
+          mkdir -p "$APP_DIR"
+          if [[ ! -x "$APP_DIR/scripts/deploy/hk4_deploy.sh" ]]; then
+            cd "$APP_DIR"
+            if [[ ! -d .git ]]; then
+              git init
+              git remote add origin "$REPO_URL"
+            else
+              git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+            fi
+            git fetch --prune origin "$DEPLOY_BRANCH"
+            git reset --hard "origin/$DEPLOY_BRANCH"
+            chmod +x "$APP_DIR/scripts/deploy/hk4_deploy.sh"
+          fi
+          exec bash "$APP_DIR/scripts/deploy/hk4_deploy.sh"
+          REMOTE

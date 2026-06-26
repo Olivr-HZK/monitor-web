@@ -426,6 +426,14 @@ function getRankingWeekStatus(table, rankDate, countries, chartTypes) {
   };
 }
 
+function isAuthFailure(message) {
+  return /HTTP\s+(401|403)\b/.test(String(message || ''));
+}
+
+function formatWeekStatus(status) {
+  return `${status.groupCount}/${status.expectedGroups} 组，min=${status.minCount}，max=${status.maxCount}`;
+}
+
 function insertRanking(table, rankDate, country, chartType, appIds, nameMap) {
   if (!appIds || appIds.length === 0) return;
   const dateStr = formatDate(rankDate);
@@ -489,6 +497,7 @@ async function main() {
       );
     } else {
       const iosResults = [];
+      const iosFailures = [];
       for (const country of COUNTRIES) {
         for (const chartType of CHART_TYPES_IOS) {
           console.log(`[iOS] ${country} ${chartType} ${apiDateStr}`);
@@ -503,12 +512,28 @@ async function main() {
             );
             iosResults.push({ country, chartType, ranking });
           } catch (e) {
-            console.error('  -> 请求失败：', e.message);
+            const message = e && e.message ? e.message : String(e);
+            console.error('  -> 请求失败：', message);
+            iosFailures.push({ country, chartType, message });
+            if (isAuthFailure(message)) {
+              throw new Error(
+                `[iOS] ranking API 认证失败（${country} ${chartType} ${apiDateStr}）。` +
+                  '请确认 SENSORTOWER_API_TOKEN 是否具备 /v1/ios/ranking 权限；' +
+                  '我方产品日报使用的是 /category/category_history，不能证明 ranking API 可用。'
+              );
+            }
           }
         }
       }
+      if (iosFailures.length > 0) {
+        throw new Error(`[iOS] ranking API 请求失败 ${iosFailures.length} 组，停止写入不完整 Top100`);
+      }
       for (const { country, chartType, ranking } of iosResults) {
         insertRanking('apple_top100', rankDateMonday, country, chartType, ranking, {});
+      }
+      const iosAfterStatus = getRankingWeekStatus('apple_top100', rankDateMonday, COUNTRIES, CHART_TYPES_IOS);
+      if (!iosAfterStatus.complete) {
+        throw new Error(`[iOS] ${mondayStr} Top100 不完整：${formatWeekStatus(iosAfterStatus)}`);
       }
     }
 
@@ -520,6 +545,7 @@ async function main() {
       );
     } else {
       const androidResults = [];
+      const androidFailures = [];
       for (const country of COUNTRIES) {
         for (const chartType of CHART_TYPES_ANDROID) {
           console.log(`[Android] ${country} ${chartType} ${apiDateStr}`);
@@ -534,12 +560,28 @@ async function main() {
             );
             androidResults.push({ country, chartType, ranking });
           } catch (e) {
-            console.error('  -> 请求失败：', e.message);
+            const message = e && e.message ? e.message : String(e);
+            console.error('  -> 请求失败：', message);
+            androidFailures.push({ country, chartType, message });
+            if (isAuthFailure(message)) {
+              throw new Error(
+                `[Android] ranking API 认证失败（${country} ${chartType} ${apiDateStr}）。` +
+                  '请确认 SENSORTOWER_API_TOKEN 是否具备 /v1/android/ranking 权限；' +
+                  '我方产品日报使用的是 /category/category_history，不能证明 ranking API 可用。'
+              );
+            }
           }
         }
       }
+      if (androidFailures.length > 0) {
+        throw new Error(`[Android] ranking API 请求失败 ${androidFailures.length} 组，停止写入不完整 Top100`);
+      }
       for (const { country, chartType, ranking } of androidResults) {
         insertRanking('android_top100', rankDateMonday, country, chartType, ranking, {});
+      }
+      const androidAfterStatus = getRankingWeekStatus('android_top100', rankDateMonday, COUNTRIES, CHART_TYPES_ANDROID);
+      if (!androidAfterStatus.complete) {
+        throw new Error(`[Android] ${mondayStr} Top100 不完整：${formatWeekStatus(androidAfterStatus)}`);
       }
     }
   }

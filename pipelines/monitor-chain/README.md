@@ -17,10 +17,13 @@ pipelines/
     wechat-douyin/        # WeChat/Douyin ranking crawler and import flow
     sensortower/          # SensorTower weekly and daily app-rank flows
     competitor-social/    # Competitor social crawler and weekly report flow
+    gaming-weekly/        # Puzzle Game overseas daily RSS and weekly report flow
     shared/               # Shared env loading, logging, DB backup, webhook helpers
 data/
   databases/              # Local canonical SQLite snapshots, ignored by git
   artifacts/              # Generated reports, screenshots, diagnostics, ignored by git
 ```
 
-The next source-code migration should start with `wechat-douyin`, because it has the most fragile browser flow and the smallest database surface.
+The legacy `gaming-daily-report2` project has been migrated into
+`gaming-weekly/`; runtime reports remain ignored under that pipeline's
+`output/` directory.

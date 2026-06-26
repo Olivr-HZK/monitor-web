@@ -1,0 +1,1878 @@
+{
+  "generatedAt": "2026-06-16T03:02:14.522Z",
+  "identity": {
+    "query": "Block Blast",
+    "canonicalName": "Block Blast！",
+    "publisher": "ARETIS LIMITED",
+    "unifiedAppId": null,
+    "iosAppIds": [
+      "1617391485"
+    ],
+    "androidAppIds": [
+      "com.block.juggle"
+    ],
+    "confidence": "high",
+    "platforms": {
+      "ios": {
+        "appId": "1617391485",
+        "name": "Block Blast！",
+        "publisher": "ARETIS LIMITED",
+        "score": 0.9605,
+        "confidence": "high",
+        "source": "apple_search"
+      },
+      "android": {
+        "appId": "com.block.juggle",
+        "name": "Block Blast!",
+        "publisher": "",
+        "score": 0.78,
+        "confidence": "medium",
+        "source": "google_play_search"
+      }
+    },
+    "warnings": [],
+    "cachedAt": "2026-06-16T03:02:10.667Z"
+  },
+  "period": {
+    "startDate": "2026-05-04",
+    "endDate": "2026-06-02",
+    "country": "US"
+  },
+  "summary": {
+    "downloads": 1873273,
+    "revenue": 450008,
+    "rpd": 0.2402,
+    "averageDau": 1449218,
+    "arpdau": 0.3105,
+    "timeSpentSeconds": null,
+    "websiteVisits": null
+  },
+  "series": {
+    "sales": [
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-04T00:00:00Z",
+        "downloads": 37607,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-05T00:00:00Z",
+        "downloads": 32328,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-06T00:00:00Z",
+        "downloads": 34168,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-07T00:00:00Z",
+        "downloads": 30824,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-08T00:00:00Z",
+        "downloads": 52861,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-09T00:00:00Z",
+        "downloads": 79715,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-10T00:00:00Z",
+        "downloads": 78254,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-11T00:00:00Z",
+        "downloads": 48698,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-12T00:00:00Z",
+        "downloads": 43138,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-13T00:00:00Z",
+        "downloads": 43385,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-14T00:00:00Z",
+        "downloads": 37557,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-15T00:00:00Z",
+        "downloads": 44489,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-16T00:00:00Z",
+        "downloads": 75925,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-17T00:00:00Z",
+        "downloads": 74881,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-18T00:00:00Z",
+        "downloads": 40633,
+        "revenue": 208927
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-19T00:00:00Z",
+        "downloads": 34107,
+        "revenue": 241081
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-20T00:00:00Z",
+        "downloads": 33978,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-21T00:00:00Z",
+        "downloads": 32117,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-22T00:00:00Z",
+        "downloads": 45850,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-23T00:00:00Z",
+        "downloads": 53230,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-24T00:00:00Z",
+        "downloads": 46126,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-25T00:00:00Z",
+        "downloads": 37690,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-26T00:00:00Z",
+        "downloads": 33953,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-27T00:00:00Z",
+        "downloads": 37272,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-28T00:00:00Z",
+        "downloads": 37554,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-29T00:00:00Z",
+        "downloads": 42956,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-30T00:00:00Z",
+        "downloads": 44132,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-31T00:00:00Z",
+        "downloads": 41392,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-06-01T00:00:00Z",
+        "downloads": 33377,
+        "revenue": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-06-02T00:00:00Z",
+        "downloads": 31229,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-04T00:00:00Z",
+        "downloads": 17582,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-05T00:00:00Z",
+        "downloads": 17038,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-06T00:00:00Z",
+        "downloads": 16835,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-07T00:00:00Z",
+        "downloads": 16138,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-08T00:00:00Z",
+        "downloads": 21798,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-09T00:00:00Z",
+        "downloads": 24338,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-10T00:00:00Z",
+        "downloads": 22986,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-11T00:00:00Z",
+        "downloads": 18091,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-12T00:00:00Z",
+        "downloads": 17854,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-13T00:00:00Z",
+        "downloads": 17322,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-14T00:00:00Z",
+        "downloads": 16871,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-15T00:00:00Z",
+        "downloads": 22367,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-16T00:00:00Z",
+        "downloads": 25149,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-17T00:00:00Z",
+        "downloads": 23751,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-18T00:00:00Z",
+        "downloads": 20732,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-19T00:00:00Z",
+        "downloads": 20771,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-20T00:00:00Z",
+        "downloads": 15274,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-21T00:00:00Z",
+        "downloads": 13908,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-22T00:00:00Z",
+        "downloads": 19715,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-23T00:00:00Z",
+        "downloads": 20922,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-24T00:00:00Z",
+        "downloads": 18319,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-25T00:00:00Z",
+        "downloads": 17227,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-26T00:00:00Z",
+        "downloads": 14846,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-27T00:00:00Z",
+        "downloads": 11692,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-28T00:00:00Z",
+        "downloads": 11172,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-29T00:00:00Z",
+        "downloads": 12270,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-30T00:00:00Z",
+        "downloads": 16306,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-31T00:00:00Z",
+        "downloads": 15245,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-06-01T00:00:00Z",
+        "downloads": 13335,
+        "revenue": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-06-02T00:00:00Z",
+        "downloads": 13993,
+        "revenue": 0
+      }
+    ],
+    "activeUsers": [
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-04T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-05T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-06T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-07T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-08T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-09T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-10T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-11T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-12T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-13T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-14T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-15T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-16T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-17T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-18T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-19T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-20T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-21T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-22T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-23T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-24T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-25T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-26T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-27T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-28T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-29T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-30T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-05-31T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-06-01T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "1617391485",
+        "country": "US",
+        "date": "2026-06-02T00:00:00Z",
+        "activeUsers": 0
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-04T00:00:00Z",
+        "activeUsers": 1361698
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-05T00:00:00Z",
+        "activeUsers": 1397804
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-06T00:00:00Z",
+        "activeUsers": 1340492
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-07T00:00:00Z",
+        "activeUsers": 1395818
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-08T00:00:00Z",
+        "activeUsers": 1343977
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-09T00:00:00Z",
+        "activeUsers": 1442882
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-10T00:00:00Z",
+        "activeUsers": 1512223
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-11T00:00:00Z",
+        "activeUsers": 1376001
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-12T00:00:00Z",
+        "activeUsers": 1408253
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-13T00:00:00Z",
+        "activeUsers": 1414471
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-14T00:00:00Z",
+        "activeUsers": 1471439
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-15T00:00:00Z",
+        "activeUsers": 1561210
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-16T00:00:00Z",
+        "activeUsers": 1457039
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-17T00:00:00Z",
+        "activeUsers": 1447477
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-18T00:00:00Z",
+        "activeUsers": 1557669
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-19T00:00:00Z",
+        "activeUsers": 1529028
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-20T00:00:00Z",
+        "activeUsers": 1374519
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-21T00:00:00Z",
+        "activeUsers": 1536768
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-22T00:00:00Z",
+        "activeUsers": 1514351
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-23T00:00:00Z",
+        "activeUsers": 1512595
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-24T00:00:00Z",
+        "activeUsers": 1601521
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-25T00:00:00Z",
+        "activeUsers": 1517903
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-26T00:00:00Z",
+        "activeUsers": 1399858
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-27T00:00:00Z",
+        "activeUsers": 1465736
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-28T00:00:00Z",
+        "activeUsers": 1473084
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-29T00:00:00Z",
+        "activeUsers": 1442536
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-30T00:00:00Z",
+        "activeUsers": 1503567
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-05-31T00:00:00Z",
+        "activeUsers": 1470942
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-06-01T00:00:00Z",
+        "activeUsers": 1309090
+      },
+      {
+        "appId": "com.block.juggle",
+        "country": "US",
+        "date": "2026-06-02T00:00:00Z",
+        "activeUsers": 1336580
+      }
+    ],
+    "timeSpent": []
+  },
+  "rankings": [
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "7012",
+      "categoryName": "Games/Puzzle",
+      "chartType": "topfreeapplications",
+      "latestRank": 5,
+      "series": {
+        "1617391485": {
+          "US": {
+            "7012": {
+              "topfreeapplications": {
+                "name": "Block Blast！",
+                "humanized_app_name": "Block Blast！",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e6/d2/9a/e6d29ac8-c0c8-c9a3-4f78-38b849d47532/AppIcon-0-0-1x_U007emarketing-0-11-0-sRGB-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1777852800,
+                    2,
+                    null
+                  ],
+                  [
+                    1777939200,
+                    2,
+                    null
+                  ],
+                  [
+                    1778025600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778112000,
+                    2,
+                    null
+                  ],
+                  [
+                    1778198400,
+                    2,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778284800,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778371200,
+                    1,
+                    null
+                  ],
+                  [
+                    1778457600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778544000,
+                    3,
+                    null
+                  ],
+                  [
+                    1778630400,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778716800,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778803200,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778889600,
+                    1,
+                    null
+                  ],
+                  [
+                    1778976000,
+                    1,
+                    null
+                  ],
+                  [
+                    1779062400,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779148800,
+                    3,
+                    null
+                  ],
+                  [
+                    1779235200,
+                    3,
+                    null
+                  ],
+                  [
+                    1779321600,
+                    4,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779408000,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779494400,
+                    3,
+                    null
+                  ],
+                  [
+                    1779580800,
+                    3,
+                    null
+                  ],
+                  [
+                    1779667200,
+                    3,
+                    null
+                  ],
+                  [
+                    1779753600,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779840000,
+                    3,
+                    null
+                  ],
+                  [
+                    1779926400,
+                    3,
+                    null
+                  ],
+                  [
+                    1780012800,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780099200,
+                    4,
+                    null
+                  ],
+                  [
+                    1780185600,
+                    4,
+                    null
+                  ],
+                  [
+                    1780272000,
+                    5,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780358400,
+                    5,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games/Puzzle",
+                "todays_rank": 5
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "7003",
+      "categoryName": "Games/Casual",
+      "chartType": "topfreeapplications",
+      "latestRank": 5,
+      "series": {
+        "1617391485": {
+          "US": {
+            "7003": {
+              "topfreeapplications": {
+                "name": "Block Blast！",
+                "humanized_app_name": "Block Blast！",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e6/d2/9a/e6d29ac8-c0c8-c9a3-4f78-38b849d47532/AppIcon-0-0-1x_U007emarketing-0-11-0-sRGB-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1777852800,
+                    2,
+                    null
+                  ],
+                  [
+                    1777939200,
+                    2,
+                    null
+                  ],
+                  [
+                    1778025600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778112000,
+                    2,
+                    null
+                  ],
+                  [
+                    1778198400,
+                    2,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778284800,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778371200,
+                    1,
+                    null
+                  ],
+                  [
+                    1778457600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778544000,
+                    3,
+                    null
+                  ],
+                  [
+                    1778630400,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778716800,
+                    2,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778803200,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778889600,
+                    1,
+                    null
+                  ],
+                  [
+                    1778976000,
+                    1,
+                    null
+                  ],
+                  [
+                    1779062400,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779148800,
+                    3,
+                    null
+                  ],
+                  [
+                    1779235200,
+                    3,
+                    null
+                  ],
+                  [
+                    1779321600,
+                    5,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779408000,
+                    4,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779494400,
+                    4,
+                    null
+                  ],
+                  [
+                    1779580800,
+                    4,
+                    null
+                  ],
+                  [
+                    1779667200,
+                    3,
+                    null
+                  ],
+                  [
+                    1779753600,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779840000,
+                    3,
+                    null
+                  ],
+                  [
+                    1779926400,
+                    3,
+                    null
+                  ],
+                  [
+                    1780012800,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780099200,
+                    4,
+                    null
+                  ],
+                  [
+                    1780185600,
+                    4,
+                    null
+                  ],
+                  [
+                    1780272000,
+                    5,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780358400,
+                    5,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games/Casual",
+                "todays_rank": 5
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "6014",
+      "categoryName": "Games",
+      "chartType": "topfreeapplications",
+      "latestRank": 8,
+      "series": {
+        "1617391485": {
+          "US": {
+            "6014": {
+              "topfreeapplications": {
+                "name": "Block Blast！",
+                "humanized_app_name": "Block Blast！",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e6/d2/9a/e6d29ac8-c0c8-c9a3-4f78-38b849d47532/AppIcon-0-0-1x_U007emarketing-0-11-0-sRGB-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1777852800,
+                    3,
+                    null
+                  ],
+                  [
+                    1777939200,
+                    3,
+                    null
+                  ],
+                  [
+                    1778025600,
+                    3,
+                    null
+                  ],
+                  [
+                    1778112000,
+                    3,
+                    null
+                  ],
+                  [
+                    1778198400,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778284800,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778371200,
+                    1,
+                    null
+                  ],
+                  [
+                    1778457600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778544000,
+                    4,
+                    null
+                  ],
+                  [
+                    1778630400,
+                    4,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778716800,
+                    5,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778803200,
+                    5,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778889600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778976000,
+                    1,
+                    null
+                  ],
+                  [
+                    1779062400,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779148800,
+                    4,
+                    null
+                  ],
+                  [
+                    1779235200,
+                    5,
+                    null
+                  ],
+                  [
+                    1779321600,
+                    5,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779408000,
+                    4,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779494400,
+                    4,
+                    null
+                  ],
+                  [
+                    1779580800,
+                    4,
+                    null
+                  ],
+                  [
+                    1779667200,
+                    3,
+                    null
+                  ],
+                  [
+                    1779753600,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779840000,
+                    4,
+                    null
+                  ],
+                  [
+                    1779926400,
+                    4,
+                    null
+                  ],
+                  [
+                    1780012800,
+                    3,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780099200,
+                    4,
+                    null
+                  ],
+                  [
+                    1780185600,
+                    4,
+                    null
+                  ],
+                  [
+                    1780272000,
+                    6,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780358400,
+                    6,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games",
+                "todays_rank": 8
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "0",
+      "categoryName": "Overall",
+      "chartType": "topfreeapplications",
+      "latestRank": 61,
+      "series": {
+        "1617391485": {
+          "US": {
+            "0": {
+              "topfreeapplications": {
+                "name": "Block Blast！",
+                "humanized_app_name": "Block Blast！",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e6/d2/9a/e6d29ac8-c0c8-c9a3-4f78-38b849d47532/AppIcon-0-0-1x_U007emarketing-0-11-0-sRGB-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1777852800,
+                    33,
+                    null
+                  ],
+                  [
+                    1777939200,
+                    44,
+                    null
+                  ],
+                  [
+                    1778025600,
+                    37,
+                    null
+                  ],
+                  [
+                    1778112000,
+                    44,
+                    null
+                  ],
+                  [
+                    1778198400,
+                    38,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778284800,
+                    19,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778371200,
+                    17,
+                    null
+                  ],
+                  [
+                    1778457600,
+                    23,
+                    null
+                  ],
+                  [
+                    1778544000,
+                    34,
+                    null
+                  ],
+                  [
+                    1778630400,
+                    38,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778716800,
+                    42,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778803200,
+                    40,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778889600,
+                    25,
+                    null
+                  ],
+                  [
+                    1778976000,
+                    18,
+                    null
+                  ],
+                  [
+                    1779062400,
+                    28,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779148800,
+                    40,
+                    null
+                  ],
+                  [
+                    1779235200,
+                    46,
+                    null
+                  ],
+                  [
+                    1779321600,
+                    45,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779408000,
+                    39,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779494400,
+                    29,
+                    null
+                  ],
+                  [
+                    1779580800,
+                    26,
+                    null
+                  ],
+                  [
+                    1779667200,
+                    27,
+                    null
+                  ],
+                  [
+                    1779753600,
+                    40,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779840000,
+                    42,
+                    null
+                  ],
+                  [
+                    1779926400,
+                    43,
+                    null
+                  ],
+                  [
+                    1780012800,
+                    38,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780099200,
+                    33,
+                    null
+                  ],
+                  [
+                    1780185600,
+                    30,
+                    null
+                  ],
+                  [
+                    1780272000,
+                    47,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780358400,
+                    55,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Overall",
+                "todays_rank": 61
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "ipad",
+      "category": "7012",
+      "categoryName": "Games/Puzzle",
+      "chartType": "topfreeipadapplications",
+      "latestRank": 1,
+      "series": {
+        "1617391485": {
+          "US": {
+            "7012": {
+              "topfreeipadapplications": {
+                "name": "Block Blast！",
+                "humanized_app_name": "Block Blast！",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e6/d2/9a/e6d29ac8-c0c8-c9a3-4f78-38b849d47532/AppIcon-0-0-1x_U007emarketing-0-11-0-sRGB-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1777852800,
+                    1,
+                    null
+                  ],
+                  [
+                    1777939200,
+                    2,
+                    null
+                  ],
+                  [
+                    1778025600,
+                    2,
+                    null
+                  ],
+                  [
+                    1778112000,
+                    2,
+                    null
+                  ],
+                  [
+                    1778198400,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778284800,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778371200,
+                    1,
+                    null
+                  ],
+                  [
+                    1778457600,
+                    1,
+                    null
+                  ],
+                  [
+                    1778544000,
+                    1,
+                    null
+                  ],
+                  [
+                    1778630400,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778716800,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778803200,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1778889600,
+                    1,
+                    null
+                  ],
+                  [
+                    1778976000,
+                    1,
+                    null
+                  ],
+                  [
+                    1779062400,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779148800,
+                    1,
+                    null
+                  ],
+                  [
+                    1779235200,
+                    1,
+                    null
+                  ],
+                  [
+                    1779321600,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779408000,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779494400,
+                    1,
+                    null
+                  ],
+                  [
+                    1779580800,
+                    1,
+                    null
+                  ],
+                  [
+                    1779667200,
+                    2,
+                    null
+                  ],
+                  [
+                    1779753600,
+                    2,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1779840000,
+                    1,
+                    null
+                  ],
+                  [
+                    1779926400,
+                    1,
+                    null
+                  ],
+                  [
+                    1780012800,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780099200,
+                    1,
+                    null
+                  ],
+                  [
+                    1780185600,
+                    1,
+                    null
+                  ],
+                  [
+                    1780272000,
+                    1,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1780358400,
+                    1,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeipadapplications",
+                "category_name": "Games/Puzzle",
+                "todays_rank": 1
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    }
+  ],
+  "apiCalls": [
+    {
+      "name": "sales_report_estimates",
+      "url": "https://api.sensortower.com/v1/ios/sales_report_estimates?app_ids=1617391485&countries=US&start_date=2026-05-04&end_date=2026-06-02&date_granularity=daily&auth_token=***"
+    },
+    {
+      "name": "active_users",
+      "url": "https://api.sensortower.com/v1/ios/usage/active_users?app_ids=1617391485&countries=US&start_date=2026-05-04&end_date=2026-06-02&time_period=day&auth_token=***"
+    },
+    {
+      "name": "sales_report_estimates",
+      "url": "https://api.sensortower.com/v1/android/sales_report_estimates?app_ids=com.block.juggle&countries=US&start_date=2026-05-04&end_date=2026-06-02&date_granularity=daily&auth_token=***"
+    },
+    {
+      "name": "active_users",
+      "url": "https://api.sensortower.com/v1/android/usage/active_users?app_ids=com.block.juggle&countries=US&start_date=2026-05-04&end_date=2026-06-02&time_period=day&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=1617391485&countries=US&category=7012&chart_type_ids=topfreeapplications&start_date=2026-05-04&end_date=2026-06-02&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=1617391485&countries=US&category=7003&chart_type_ids=topfreeapplications&start_date=2026-05-04&end_date=2026-06-02&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=1617391485&countries=US&category=6014&chart_type_ids=topfreeapplications&start_date=2026-05-04&end_date=2026-06-02&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=1617391485&countries=US&category=0&chart_type_ids=topfreeapplications&start_date=2026-05-04&end_date=2026-06-02&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=1617391485&countries=US&category=7012&chart_type_ids=topfreeipadapplications&start_date=2026-05-04&end_date=2026-06-02&auth_token=***"
+    }
+  ],
+  "warnings": [
+    "website visits endpoint unavailable: App Analysis OpenAPI does not expose Web Insights visits.",
+    "time spent is not fetched in the first live workflow unless a verified unified app id is available."
+  ],
+  "markdownPath": "/Users/ggbond/lyb/monitor-web/public/休闲游戏检测/sensortower_单游戏画像/agent_runs/block-blast-20260616T030209582833Z/game_profile_block-blast.md",
+  "jsonPath": "/Users/ggbond/lyb/monitor-web/public/休闲游戏检测/sensortower_单游戏画像/agent_runs/block-blast-20260616T030209582833Z/game_profile_block-blast.json"
+}

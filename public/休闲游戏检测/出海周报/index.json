@@ -1,10 +1,9 @@
 {
-  "generated_at": "2026-06-03T03:27:44.536Z",
-  "source": "gaming-daily-report2/output/weekly_reports",
-  "skipped_failed_weeks": [
-    "2026-05-25_2026-06-01"
-  ],
+  "generated_at": "2026-06-26T05:11:56.994Z",
+  "source": "pipelines/monitor-chain/gaming-weekly/output/weekly_reports",
+  "skipped_failed_weeks": [],
   "reports": [
+    "weekly_report_2026-06-15_2026-06-22.json",
     "weekly_report_2026-05-27_2026-06-03.json",
     "weekly_report_2026-05-18_2026-05-25.json",
     "weekly_report_2026-05-11_2026-05-18.json",

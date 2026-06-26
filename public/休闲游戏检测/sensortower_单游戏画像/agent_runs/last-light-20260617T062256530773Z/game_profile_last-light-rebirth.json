@@ -1,0 +1,559 @@
+{
+  "generatedAt": "2026-06-17T06:23:01.713Z",
+  "identity": {
+    "query": "Last Light",
+    "canonicalName": "Last Light: Rebirth",
+    "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+    "unifiedAppId": null,
+    "iosAppIds": [
+      "6754688040"
+    ],
+    "androidAppIds": [
+      "com.RedMoonGS.LastLight"
+    ],
+    "confidence": "medium",
+    "platforms": {
+      "ios": {
+        "appId": "6754688040",
+        "name": "Last Light: Rebirth",
+        "publisher": "Hong Kong Bingchuan Network Co., Ltd.",
+        "score": 0.8094,
+        "confidence": "high",
+        "source": "apple_search"
+      },
+      "android": {
+        "appId": "com.RedMoonGS.LastLight",
+        "name": "Last Light: Vampire Defense RedMoon GS",
+        "publisher": "",
+        "score": 0.7256,
+        "confidence": "medium",
+        "source": "google_play_search"
+      }
+    },
+    "warnings": [],
+    "cachedAt": "2026-06-17T06:22:58.429Z"
+  },
+  "period": {
+    "startDate": "2026-05-17",
+    "endDate": "2026-06-15",
+    "country": "GB"
+  },
+  "summary": {
+    "downloads": 18843,
+    "revenue": 256540,
+    "rpd": 13.6146,
+    "averageDau": null,
+    "arpdau": null,
+    "timeSpentSeconds": null,
+    "websiteVisits": null
+  },
+  "series": {
+    "sales": [
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-17T00:00:00Z",
+        "downloads": 37,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-18T00:00:00Z",
+        "downloads": 28,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-19T00:00:00Z",
+        "downloads": 33,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-20T00:00:00Z",
+        "downloads": 34,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-21T00:00:00Z",
+        "downloads": 38,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-22T00:00:00Z",
+        "downloads": 59,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-23T00:00:00Z",
+        "downloads": 118,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-24T00:00:00Z",
+        "downloads": 188,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-25T00:00:00Z",
+        "downloads": 110,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-26T00:00:00Z",
+        "downloads": 61,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-27T00:00:00Z",
+        "downloads": 44,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-28T00:00:00Z",
+        "downloads": 111,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-29T00:00:00Z",
+        "downloads": 149,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-30T00:00:00Z",
+        "downloads": 157,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-05-31T00:00:00Z",
+        "downloads": 147,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-01T00:00:00Z",
+        "downloads": 80,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-02T00:00:00Z",
+        "downloads": 71,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-03T00:00:00Z",
+        "downloads": 84,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-04T00:00:00Z",
+        "downloads": 141,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-05T00:00:00Z",
+        "downloads": 149,
+        "revenue": 23904
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-06T00:00:00Z",
+        "downloads": 221,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-07T00:00:00Z",
+        "downloads": 192,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-08T00:00:00Z",
+        "downloads": 124,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-09T00:00:00Z",
+        "downloads": 87,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-10T00:00:00Z",
+        "downloads": 55,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-11T00:00:00Z",
+        "downloads": 543,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-12T00:00:00Z",
+        "downloads": 2352,
+        "revenue": 0
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-13T00:00:00Z",
+        "downloads": 4012,
+        "revenue": 22497
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-14T00:00:00Z",
+        "downloads": 4341,
+        "revenue": 76835
+      },
+      {
+        "appId": "6754688040",
+        "country": "GB",
+        "date": "2026-06-15T00:00:00Z",
+        "downloads": 5077,
+        "revenue": 133304
+      }
+    ],
+    "activeUsers": [],
+    "timeSpent": []
+  },
+  "rankings": [
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "7012",
+      "categoryName": "Games/Puzzle",
+      "chartType": "topfreeapplications",
+      "latestRank": null,
+      "series": {
+        "lines": 0
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "7003",
+      "categoryName": "Games/Casual",
+      "chartType": "topfreeapplications",
+      "latestRank": 6,
+      "series": {
+        "6754688040": {
+          "GB": {
+            "7003": {
+              "topfreeapplications": {
+                "name": "Last Light: Rebirth",
+                "humanized_app_name": "Last Light: Rebirth",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/d2/46/16/d2461665-6c05-936d-bda6-9ee0cf2bb49c/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1779494400,
+                    385,
+                    null
+                  ],
+                  [
+                    1779580800,
+                    300,
+                    null
+                  ],
+                  [
+                    1779667200,
+                    496,
+                    null
+                  ],
+                  [
+                    1779926400,
+                    403,
+                    null
+                  ],
+                  [
+                    1780012800,
+                    335,
+                    null
+                  ],
+                  [
+                    1780099200,
+                    337,
+                    null
+                  ],
+                  [
+                    1780185600,
+                    398,
+                    null
+                  ],
+                  [
+                    1780444800,
+                    475,
+                    null
+                  ],
+                  [
+                    1780531200,
+                    249,
+                    null
+                  ],
+                  [
+                    1780617600,
+                    263,
+                    null
+                  ],
+                  [
+                    1780704000,
+                    310,
+                    null
+                  ],
+                  [
+                    1780790400,
+                    328,
+                    null
+                  ],
+                  [
+                    1780876800,
+                    372,
+                    null
+                  ],
+                  [
+                    1780963200,
+                    452,
+                    null
+                  ],
+                  [
+                    1781136000,
+                    49,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1781222400,
+                    6,
+                    null
+                  ],
+                  [
+                    1781308800,
+                    5,
+                    null
+                  ],
+                  [
+                    1781395200,
+                    5,
+                    null
+                  ],
+                  [
+                    1781481600,
+                    3,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games/Casual",
+                "todays_rank": 6
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "6014",
+      "categoryName": "Games",
+      "chartType": "topfreeapplications",
+      "latestRank": 13,
+      "series": {
+        "6754688040": {
+          "GB": {
+            "6014": {
+              "topfreeapplications": {
+                "name": "Last Light: Rebirth",
+                "humanized_app_name": "Last Light: Rebirth",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/d2/46/16/d2461665-6c05-936d-bda6-9ee0cf2bb49c/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1781136000,
+                    116,
+                    {
+                      "type": "update"
+                    }
+                  ],
+                  [
+                    1781222400,
+                    18,
+                    null
+                  ],
+                  [
+                    1781308800,
+                    12,
+                    null
+                  ],
+                  [
+                    1781395200,
+                    11,
+                    null
+                  ],
+                  [
+                    1781481600,
+                    6,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Games",
+                "todays_rank": 13
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "iphone",
+      "category": "0",
+      "categoryName": "Overall",
+      "chartType": "topfreeapplications",
+      "latestRank": 151,
+      "series": {
+        "6754688040": {
+          "GB": {
+            "0": {
+              "topfreeapplications": {
+                "name": "Last Light: Rebirth",
+                "humanized_app_name": "Last Light: Rebirth",
+                "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/d2/46/16/d2461665-6c05-936d-bda6-9ee0cf2bb49c/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/150x150bb.jpg",
+                "graphData": [
+                  [
+                    1781222400,
+                    201,
+                    null
+                  ],
+                  [
+                    1781308800,
+                    118,
+                    null
+                  ],
+                  [
+                    1781395200,
+                    114,
+                    null
+                  ],
+                  [
+                    1781481600,
+                    70,
+                    null
+                  ]
+                ],
+                "chart_type": "topfreeapplications",
+                "category_name": "Overall",
+                "todays_rank": 151
+              }
+            }
+          }
+        },
+        "lines": 1
+      }
+    },
+    {
+      "os": "ios",
+      "device": "ipad",
+      "category": "7012",
+      "categoryName": "Games/Puzzle",
+      "chartType": "topfreeipadapplications",
+      "latestRank": null,
+      "series": {
+        "lines": 0
+      }
+    }
+  ],
+  "apiCalls": [
+    {
+      "name": "sales_report_estimates",
+      "url": "https://api.sensortower.com/v1/ios/sales_report_estimates?app_ids=6754688040&countries=GB&start_date=2026-05-17&end_date=2026-06-15&date_granularity=daily&auth_token=***"
+    },
+    {
+      "name": "active_users",
+      "url": "https://api.sensortower.com/v1/ios/usage/active_users?app_ids=6754688040&countries=GB&start_date=2026-05-17&end_date=2026-06-15&time_period=day&auth_token=***"
+    },
+    {
+      "name": "sales_report_estimates",
+      "url": "https://api.sensortower.com/v1/android/sales_report_estimates?app_ids=com.RedMoonGS.LastLight&countries=GB&start_date=2026-05-17&end_date=2026-06-15&date_granularity=daily&auth_token=***"
+    },
+    {
+      "name": "active_users",
+      "url": "https://api.sensortower.com/v1/android/usage/active_users?app_ids=com.RedMoonGS.LastLight&countries=GB&start_date=2026-05-17&end_date=2026-06-15&time_period=day&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754688040&countries=GB&category=7012&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754688040&countries=GB&category=7003&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754688040&countries=GB&category=6014&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754688040&countries=GB&category=0&chart_type_ids=topfreeapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    },
+    {
+      "name": "category_history",
+      "url": "https://api.sensortower.com/v1/ios/category/category_history?app_ids=6754688040&countries=GB&category=7012&chart_type_ids=topfreeipadapplications&start_date=2026-05-17&end_date=2026-06-15&auth_token=***"
+    }
+  ],
+  "warnings": [
+    "website visits endpoint unavailable: App Analysis OpenAPI does not expose Web Insights visits.",
+    "time spent is not fetched in the first live workflow unless a verified unified app id is available."
+  ],
+  "markdownPath": "/Users/ggbond/lyb/monitor-web/public/休闲游戏检测/sensortower_单游戏画像/agent_runs/last-light-20260617T062256530773Z/game_profile_last-light-rebirth.md",
+  "jsonPath": "/Users/ggbond/lyb/monitor-web/public/休闲游戏检测/sensortower_单游戏画像/agent_runs/last-light-20260617T062256530773Z/game_profile_last-light-rebirth.json"
+}

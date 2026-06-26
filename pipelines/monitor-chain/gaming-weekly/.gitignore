@@ -1,0 +1,8 @@
+.env
+.runtime/
+.venv/
+__pycache__/
+*.pyc
+config/*.backup
+output/
+TrendRadar/output/

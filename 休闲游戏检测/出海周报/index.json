@@ -1,7 +1,13 @@
 {
-  "generated_at": "2026-05-18T03:16:48.773Z",
-  "source": "gaming-daily-report2/output/weekly_reports",
+  "generated_at": "2026-07-06T15:42:16.939060",
+  "source": "pipelines/monitor-chain/gaming-weekly/output/weekly_reports",
+  "skipped_failed_weeks": [],
   "reports": [
+    "weekly_report_2026-06-29_2026-07-05.json",
+    "weekly_report_2026-06-22_2026-06-28.json",
+    "weekly_report_2026-06-15_2026-06-21.json",
+    "weekly_report_2026-05-27_2026-06-03.json",
+    "weekly_report_2026-05-18_2026-05-25.json",
     "weekly_report_2026-05-11_2026-05-18.json",
     "weekly_report_2026-05-04_2026-05-11.json",
     "weekly_report_2026-04-29_2026-05-06.json",
